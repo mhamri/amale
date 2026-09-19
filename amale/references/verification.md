@@ -1,6 +1,6 @@
 # Implementation verification — 2026-09-19
 
-The canonical skill and TypeScript runtime are installed through directory links in Claude and Codex. There are no external skill dependencies and no npm runtime dependencies. The invoking agent drives the next-action loop and performs native host interactions, workspace preparation and integration. This is not an unattended daemon or an automatic merge service.
+The skill installer links the canonical directory into Claude and Codex. There are no external skill dependencies and no npm runtime dependencies. The invoking agent drives the next-action loop and performs native host interactions, workspace preparation and integration. This is not an unattended daemon or an automatic merge service.
 
 ## Evidence
 
@@ -34,33 +34,12 @@ Workspace fingerprints are conservative whole-tree content hashes excluding runt
 
 Secrets are read from existing credential configuration or environment and are not intentionally placed into logs or command-line arguments. Original tool artifacts are retained; their contents still depend on the commands the user authorizes.
 
-## Fresh worktree self-review
+## Reproducible verification
 
-A fresh agent used Amale in an isolated Git worktree at baseline `c0a2be0`, executed CLI paths and live Jev/GLM requests, and retained reproductions under the repository's `.amale/self-review/.amale/audit`. It reproduced missing-executable check deadlock, hidden independent work, malformed pi success, unlaunchable effort deadlock and missing API diagnostics. Replay of its three original failing regressions passes against the fixes. A second review reproduced invalid assistant-content crashes and late spawn-exit telemetry misclassification; both now have regression coverage.
+From `amale/`, run `bun install --frozen-lockfile`, `bun run check`, `bun run test:bun` and `node --test tests/*.test.ts`.
 
-The patched suite has 37 top-level tests (43 including Node subtests), strict TypeScript checking and skill validation. Node 24.19.0 and 26.9.0 and Bun 1.4.2 were exercised. A patched live Jev / DeepSeek Flash worker / GLM Flash reviewer / amount tests / completion probe passed. A separate live discount fixture demonstrated failing check, actual review findings, repair, fresh pass, uncertain Jev, host fallback and completion.
+The offline suite covers routing, lifecycle recovery, parallel ownership, review coverage, context isolation and startup preflight. Latest development check: 70 Bun tests and 82 Node tests (including nested cases) passed. Live probes above are historical development observations, not offline-suite requirements or general model-quality claims. Raw development artifacts and review reports are not distributed.
 
-`diagnose` retains failed API attempts, process/protocol failures and operations interrupted before state commits. Costs distinguish gateway response values from pi estimates; this is not a billing ledger. See the repository's `REVIEW.html` for the tested-path matrix, preserved evidence and explicit limits. Line coverage is not proof of scenario completeness, especially in compact functions.
+From the repository root, build the standalone viewer with `bun design/build.ts` or `node design/build.ts`. DESIGN.html is shipped; design/viewer.generated.js is an ignored intermediate.
 
-## Enforced automatic routing
-
-Worker and reviewer launches now obtain a durable Jev model choice from current eligible catalog cards. Manual model assertions must match. Default Flash candidates are one newest eligible stable exact model per GLM/DeepSeek family; floating aliases and prerelease names are excluded. Named purpose pools may include other eligible models. Uncertainty becomes a recorded host decision, not an automatic launch. Review family independence and repair escalation remain enforced.
-
-The suite now has 47 top-level tests (55 with Node subtests). Both GLM and DeepSeek author selections, specialized image pools, capability filters, uncertainty reuse, override rejection, stale scope, unrelated parallel progress, Kimi/host escalation and automatic author/reviewer execution passed controlled fixtures. A live synthetic run in `.amale/live-auto-routing-stable` completed with Jev selecting `deepseek/deepseek-v4.1-flash` for work and `z-ai/glm-5.3-flashx` for review. This demonstrates routing integration, not a benchmark proving those models are always best. The previous audit report's pending independent-acceptance gate is unchanged.
-
-## Flow critique and controlled A/B
-
-A fresh native subagent used Amale against baseline a928049 and prepared an isolated recovery/preflight patch. Controlled offline A/B fixtures reproduced missing-checkout failures in next/status/resume and routing before dispatch prerequisites were satisfied. Patched behavior preserves independent progress and avoids catalog/Jev calls for dependency/capacity/conflict blockers. Quarantine retains prior repair ancestry; it does not count a filesystem outage as a failed implementation attempt. Acceptance checks dependency validity even when a descendant was already live.
-
-A separate identical-state context A/B reduced the worker packet from 67,633 to 2,155 JSON bytes at 100 unrelated task routes while retaining constraints, global decisions, relevant task/dependency routing and original evidence. This measures serialized context, not token cost or quality. Arbitrary last-five decision truncation was rejected. The graph now defaults to the actual command path, and conceptual tabs are labeled. See FLOW-REVIEW.html and local .amale/flow-critique artifacts. No external model calls or fabricated independent model receipts were used in this round.
-
-## Parallelism review
-
-A fresh Amale subagent reproduced serial visibility of independent verification and duplicate checks exceeding maxWorkers. The corrected next frontier exposes all task stages and a conservative independent check/review batch. Task checks and pi reviewers acquire durable leases, share worker capacity, reject duplicates/conflicts, retain coordinator/child identity, and release on success or failure. Native reviews recorded after external execution and feature-wide integration checks remain host-managed boundaries.
-
-An actual local subprocess A/B selected checks through the new frontier: 3,675ms sequential baseline versus 1,392ms batched, with 899ms of three-process overlap. This is one synthetic local trial, not a model/network speed or cost benchmark. Tests cover slot occupancy, overlap, duplicate and conflict rejection, failed-process cleanup, live/dead verification recovery and reviewer ownership. See PARALLEL-REVIEW.html and .amale/parallel-critic-20260919 evidence.
-
-
-## Review-method audit (2026-09-19)
-
-The original explicit-incomplete-report/empty-findings replay is now rejected by the coverage gate. Six additional regression tests cover missing/malformed coverage, valid attestation, unresolved finding coverage, gap-to-probe recovery and factual reviewer context. Full suite: 65 Bun tests; Node also runs nested protocol cases. These are deterministic protocol/behavior tests, not measured model review recall. No paid model review was used for this round. Historical accepted runs are grandfathered; new acceptance transitions require coverage. See the repository REVIEW-METHOD.html and DESIGN.html#review.
+Startup preflight cannot grant network access or authorize project-data export. Previously accepted historical runs are not retroactively re-reviewed by the coverage gate.
