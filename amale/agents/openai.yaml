@@ -1,0 +1,4 @@
+interface:
+  display_name: "Amale"
+  short_description: "Complete and resume work in one durable flow"
+  default_prompt: "Use $amale to carry this task through to verified completion, or resume its existing run."

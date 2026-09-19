@@ -1,0 +1,15 @@
+node_modules/
+.amale/
+*.tmp
+
+# Generated intermediate bundle; DESIGN.html is the distributable.
+/design/viewer.generated.js
+# Local screenshots and original design reference.
+/amale-design-desktop.png
+/design/preview-*.png
+/photo_*.jpg
+# Local credentials and opt-in probe workspaces.
+.env
+.env.*
+!.env.example
+.amale-live/
