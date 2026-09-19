@@ -65,3 +65,18 @@ Reviewer context includes only settled decisions explicitly marked `purpose: "re
 ### Startup network preflight
 
 `preflight`: `{ "network":"restricted|allowed|unknown", "channel":"actual host execution channel" }`. Returns ready or an actionable failure, elapsed time and an artifact reference. Known restricted networking performs zero requests. Otherwise it validates credentials and a fixed synthetic Jev choice with one request attempt and a ten-second timeout. Run before the first network operation using the same permitted execution boundary as later Jev/pi calls. No project content is included, no permission is granted, and no global setting is changed. `doctor` remains a local check; it does not prove network connectivity. An existing run is optional: the supplied run-id provides the diagnostic/artifact location.
+
+
+### Host actions and diagnostic export
+
+`host-action` records an immutable, local host observation even before run initialization or after an API failure:
+
+```json
+{"actionId":"review-attempt-1","sessionId":"host-session-1","kind":"review","phase":"planned","summary":"Request fresh review of the current task","taskId":"layout","next":"Request host network permission"}
+```
+
+Kinds: decision, worker, review, edit, check, integration, permission, other. Phases: planned, permission-granted, permission-denied, started, completed, failed, skipped. Use the same action/session identifiers for an attempt's observations, and a fresh actionId for a retry. Summary is required; taskId and next are optional. Summaries should contain concise reasons and local evidence references, never credentials. Logs use existing best-effort secret masking; arbitrary sensitive text is not guaranteed to be detected.
+
+`diagnose` includes this ledger and unreadable-record names alongside runtime diagnostics. These are host attestations, not proof of tool execution or authorization. Missing outcomes need reconciliation; an absent event does not prove the agent skipped a step. Same-timestamp records have no guaranteed causal ordering.
+
+`diagnostic-export` writes a local JSON file under the run's exports directory and returns its path and content. Its structural allowlist excludes free text, prompts, code, original action/session/task IDs, model names, paths, raw tool output and exception messages. It retains pseudonymous action/session relationships, phase/kind, task status counts and runtime outcome/timing/usage summaries. It works without valid run state and reports unreadable record counts. The result still discloses operational metadata; inspect it before explicitly sharing. Nothing is automatically uploaded. Full explanations remain available locally through `diagnose`.

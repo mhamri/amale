@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import * as core from './core.ts';
 import * as adapters from './adapters.ts';
 import { preflight } from './preflight.ts';
+import {recordHostAction,hostActions,exportDiagnostics} from './host-diagnostics.ts';
 import { selectModel } from './routing.ts';
 import * as effort from './effort.ts';
 import { trace, diagnostics } from './telemetry.ts';
@@ -22,9 +23,11 @@ async function executeMain(args=process.argv.slice(2)){
  core.invariant(runId,'Usage: node scripts/cli.ts <operation> <workspace> <run-id> [input.json]');
  const store=new core.Store(workspace,runId);
  switch(operation){
+ case 'host-action':return recordHostAction(store,input);
+ case 'diagnostic-export':return exportDiagnostics(store);
  case 'preflight':return preflight(store,input);
  case 'status':return core.packet(store);
- case 'diagnose':{let state:unknown,stateError:string|undefined;try{state=await core.packet(store);}catch(error){stateError=(error as Error).message;}return {state,stateError,diagnostics:await diagnostics(store.root)};}
+ case 'diagnose':{let state:unknown,stateError:string|undefined;try{state=await core.packet(store);}catch(error){stateError=(error as Error).message;}return {state,stateError,hostActions:await hostActions(store),diagnostics:await diagnostics(store.root)};}
  case 'next':return core.next(store);
  case 'resume':return core.resume(store,input.host);
  case 'unlock':await store.unlock();return {unlocked:true};
@@ -67,7 +70,7 @@ async function executeMain(args=process.argv.slice(2)){
 }
 export async function main(args=process.argv.slice(2)){
  const [operation,workspace,runId]=args;
- if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install'].includes(operation))return executeMain(args);
+ if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export'].includes(operation))return executeMain(args);
  const store=new core.Store(workspace,runId),operationTrace=await trace(store.root,'cli:'+operation,{runId});
  try{const value=await executeMain(args);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
 }

@@ -28,6 +28,10 @@ The host runs a synthetic startup preflight through its permitted execution chan
 - [Verification and limitations](amale/references/verification.md)
 - [Interactive workflow graph](DESIGN.html): open the downloaded file in a browser.
 
+## Diagnostics
+
+`diagnose` reads durable state, runtime traces and host-reported actions. `host-action` records native edits, delegation, permission outcomes and next steps across sessions. `diagnostic-export` creates a local summary with free text and source identifiers omitted; it never uploads it. See the [command reference](amale/references/runtime.md#host-actions-and-diagnostic-export).
+
 ## Development
 
 ```sh
