@@ -1,12 +1,17 @@
 # Website verification
 
-Observed locally on 2026-09-21 using Node 24.19.0 (additional local compatibility, not the latest release) and the committed package lock. CI targets the separately verified latest stable Node.
+Observed locally on 2026-09-22 using Node 24.19.0 (additional local compatibility, not the latest release) and the committed package lock. CI targets the separately verified latest stable Node.
 
 - `npm ci --no-audit --no-fund`: installed successfully from the lockfile.
 - `npm run check`: TypeScript strict mode passed.
 - `npm run build` prerenders seven routes via nitro's link crawler with `failOnError: true`: `/`, `/docs/`, `/evidence/`, `/docs/getting-started/`, `/docs/workflow/`, `/docs/review-and-recovery/` and `/docs/commands/`. Each route renders to complete HTML with a heading and a `<title>`.
+- `npm run build:all` (`scripts/build.mjs`) runs the prepare step, that prerendering build and the postbuild step from one command, which is what an automated check can spawn in a single call.
 - `npm run test:static` passes for both `SITE_BASE=/` and `SITE_BASE=/amale/`. The checker asserts headings, titles, brand (عمله with pronunciation AH-mah-lah and meaning workers / laborers) on index.html, docs/index.html and evidence/index.html only, metadata, unique element ids, link and asset containment within the configured base path, resolvable link targets and anchor targets, a shipped `.nojekyll`, no private or build files in the output, and WCAG AA 4.5:1 contrast for every foreground/background pair declared in the design system. The brand assertion is gated to those three routes because only they carry the name in body copy; the other four routes are checked for headings, titles, metadata, ids, link containment and resolvable targets.
-- Headless Chromium render probe over every prerendered route in `website/.output/public` runs clean.
+- `npm run test:static` additionally walks each prerendered route with an ancestor-tracking element scanner and fails the build when a route puts a `badge-neutral` or otherwise hueless chip on a card surface, when a section container is narrower than `max-w-7xl`, or when a documentation route carries no `figure` containing a diagram. It also reproduces daisyUI's soft-badge fill by mixing each hue 8 percent into `base-100` in oklab and asserts at least 4.5:1 for primary, secondary, accent, info, success, warning and error, so a palette edit that makes a chip unreadable fails rather than ships.
+- Headless Chromium render probe over every prerendered route in `website/.output/public`, at 320, 390, 768, 1024 and 1440 CSS pixels: no horizontal overflow on any route at any of those widths, one `<h1>` per route, and zero console or page errors. The landing route renders one `<canvas>` and seven SVG text labels; the four documentation pages that carry a topic diagram render 5, 2, 2 and 38 figures and 38, 28, 43 and 85 SVG text labels respectively.
+- Same probe with JavaScript disabled: every SVG text label count is unchanged, so the hero structure and every diagram are fully server-rendered rather than drawn on the client.
+- Same probe with `prefers-reduced-motion: reduce` forced: every route schedules zero `requestAnimationFrame` callbacks of its own and reports zero running Web Animations, so the hero canvas and every diagram timeline stay still.
+- SVG label geometry probe: every `<text>` box inside every diagram measured with `getBBox` against its own `viewBox` at 320, 768 and 1440 CSS pixels. Zero labels escape a viewBox and zero label pairs overlap. This check exists because two clipped or colliding labels passed both the type check and the static check before a browser was pointed at the built pages.
 
 ## Routes and verification state
 
@@ -34,9 +39,17 @@ Contrast checks read the `--token: #hex` variables from `website/src/style.css` 
 
 `npm run build` is followed by a `postbuild` step (`website/scripts/postbuild.mjs`) that removes Vite's chunk manifest directory (`.vite/`) from the published output — nothing in the prerendered HTML references it. The checker's output-sanity pass rejects `.vite` alongside the other private and build paths, so its reappearance fails `npm run test:static`.
 
+The same step removes `.output/nitro.json`, which records the wall-clock time of the build. Nothing in the published site reads it, and while it was present two identical builds produced two different output trees, so no verification that compares a build against the tree it ran on could ever settle. With it gone, two consecutive `npm run build:all` runs hash identically.
+
 ## Rendered inspection
 
-Rendered desktop and mobile inspection shows no horizontal overflow at 320 and 390 CSS pixels; the header and footer use the shared shell classes and stay inside the viewport. Reduced-motion is respected via the global `@media (prefers-reduced-motion: reduce)` rule in `style.css`. Interactive controls (header dropdown, docs sidebar, on-page table of contents) are keyboard reachable.
+Rendered inspection covers five widths — 320, 390, 768, 1024 and 1440 CSS pixels — on every prerendered route, and shows no horizontal overflow at any of them; the header and footer use the shared shell classes and stay inside the viewport. From 1024 pixels upward each page pairs its prose column with a second column of real content rather than leaving a narrow tablet-width column on an empty page, and the documentation pages move their on-page list into a third rail from 1280 pixels, rendering it exactly once at any width.
+
+Motion is stopped two ways, because the CSS rule alone does not reach script-driven animation. The global `@media (prefers-reduced-motion: reduce)` block in `style.css` kills transitions, keyframes and smooth scrolling. On top of that, the hero canvas and every diagram query `matchMedia('(prefers-reduced-motion: reduce)')` themselves, subscribe to its `change` event, pause through an `IntersectionObserver` when off screen and through `visibilitychange` when the tab is hidden, and tear down their frame, observers and listeners on cleanup. Forcing the preference in headless Chromium leaves zero self-scheduled `requestAnimationFrame` callbacks on every route.
+
+The hero canvas degrades in three directions and was inspected in each: with JavaScript disabled, with WebGL unavailable, and with reduced motion set. In all three the server-rendered SVG structure and its labels remain on screen, because that SVG is never removed from the DOM — only its structure group fades once the canvas is live, and the labels stay visible over the animation as real selectable text.
+
+Interactive controls (header dropdown, docs sidebar, on-page list in both positions) are keyboard reachable.
 
 ## CI and deployment
 
