@@ -10,6 +10,7 @@
     "build:all": "node scripts/build.mjs",
     "check": "tsc --noEmit",
     "test:static": "node scripts/check-static.mjs",
+    "test:rendered": "node scripts/check-rendered.mjs",
     "preview": "node scripts/preview.mjs"
   },
   "engines": {

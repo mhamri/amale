@@ -70,7 +70,7 @@ function T(props: {
 }
 
 /** Wide variant: a panel of operations with its stage title. */
-function Panel(props: { x: number; y: number; step: number; tone: Tone; title: string; ops: string[] }) {
+function Panel(props: { x: number; y: number; step: number; tone: Tone; title: string; ops: string[]; opsSize?: number }) {
   return (
     <g>
       <rect
@@ -97,7 +97,7 @@ function Panel(props: { x: number; y: number; step: number; tone: Tone; title: s
         {props.title}
       </T>
       {props.ops.map((op, i) => (
-        <T x={props.x + 12} y={props.y + 50 + i * 17} s={10} mono>
+        <T x={props.x + 12} y={props.y + 50 + i * 17} s={props.opsSize ?? 8.5} mono>
           {op}
         </T>
       ))}
@@ -129,7 +129,7 @@ function Stop(props: { x: number; y: number; w: number; h: number; step: number;
         data-pulse={props.step}
         opacity={props.step === 0 ? '0.9' : '0'}
       />
-      <T x={props.x + props.w / 2} y={props.y + props.h / 2 + 5} s={12.5} f="fill-base-content" b mid>
+      <T x={props.x + props.w / 2} y={props.y + props.h / 2 + 5} s={11} f="fill-base-content" b mid>
         {props.label}
       </T>
     </g>
@@ -244,23 +244,23 @@ export default function OperationMap() {
           <Flow d="M 238 14 H 242" />
 
           <T x={6} y={36} s={8.5} f="fill-primary" b>plan</T>
-          <T x={44} y={36} s={8} mono>plan · amend · invalidate · record-decision</T>
+          <T x={44} y={36} s={7} mono>plan · amend · invalidate · record-decision</T>
           <T x={6} y={55} s={8.5} f="fill-primary" b>build</T>
-          <T x={44} y={55} s={8} mono>delegate · delegate-batch · claim · route</T>
-          <T x={44} y={66} s={8} mono>worker · check · result</T>
+          <T x={44} y={55} s={7} mono>delegate · delegate-batch · claim · route</T>
+          <T x={44} y={66} s={7} mono>worker · check · result</T>
           <T x={6} y={85} s={8.5} f="fill-secondary" b>review</T>
-          <T x={44} y={85} s={8} mono>reviewer · review-packet · review-check</T>
-          <T x={44} y={96} s={8} mono>review · repair · accept · integrated</T>
-          <T x={44} y={107} s={8} mono>finish · health</T>
+          <T x={44} y={85} s={7} mono>reviewer · review-packet · review-check</T>
+          <T x={44} y={96} s={7} mono>review · repair · accept · integrated</T>
+          <T x={44} y={107} s={7} mono>finish · health</T>
           <T x={6} y={126} s={8.5} f="fill-accent" b>decide</T>
-          <T x={44} y={126} s={8} mono>decide · decide-batch · host-decision · pools</T>
-          <T x={44} y={137} s={8} mono>catalog · host-exception</T>
+          <T x={44} y={126} s={7} mono>decide · decide-batch · host-decision · pools</T>
+          <T x={44} y={137} s={7} mono>catalog · host-exception</T>
           <T x={6} y={156} s={8.5} f="fill-info" b>operate</T>
-          <T x={44} y={156} s={8} mono>start · list · status · next · diagnose · resume</T>
-          <T x={44} y={167} s={8} mono>configure · block · requeue · unlock · preflight</T>
-          <T x={44} y={178} s={8} mono>save · artifact · fingerprint · host-action</T>
-          <T x={44} y={189} s={8} mono>diagnostic-export · doctor · install · html</T>
-          <T x={44} y={200} s={8} mono>effort-configure … effort-reconcile (5)</T>
+          <T x={44} y={156} s={7} mono>start · list · status · next · diagnose · resume</T>
+          <T x={44} y={167} s={7} mono>configure · block · requeue · unlock · preflight</T>
+          <T x={44} y={178} s={7} mono>save · artifact · fingerprint · host-action</T>
+          <T x={44} y={189} s={7} mono>diagnostic-export · doctor · install · html</T>
+          <T x={44} y={200} s={7} mono>effort-configure … effort-reconcile (5)</T>
         </svg>
 
         <svg
@@ -307,7 +307,7 @@ export default function OperationMap() {
           <Panel x={483} y={286} step={5} tone="info" title="evidence"
             ops={['save', 'artifact', 'fingerprint', 'host-action', 'diagnostic-export']} />
           <Panel x={639} y={286} step={5} tone="info" title="bootstrap & effort"
-            ops={['doctor', 'install', 'html', 'effort-* (5 operations)']} />
+            ops={['doctor', 'install', 'html', 'effort-* (5 operations)']} opsSize={7.5} />
         </svg>
       </div>
       <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">
