@@ -280,7 +280,7 @@ export default function EvidencePage() {
               <figure class="overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
                 <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
                   <span>from website/</span>
-                  <span class="badge badge-soft badge-primary text-xs">site gates</span>
+                  <span class="badge badge-soft badge-primary font-sans text-xs">site gates</span>
                 </div>
                 <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`npm ci
 npm run check
@@ -290,7 +290,7 @@ npm run test:static`}</code></pre>
               <figure class="overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
                 <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
                   <span>from amale/</span>
-                  <span class="badge badge-soft badge-primary text-xs">skill gates</span>
+                  <span class="badge badge-soft badge-primary font-sans text-xs">skill gates</span>
                 </div>
                 <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun install --frozen-lockfile
 bun run check

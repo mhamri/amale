@@ -56,7 +56,7 @@ export default function Footer() {
           </nav>
         </div>
         <div class="mt-10 flex flex-col gap-2 border-t border-line pt-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between">
-          <p>ʿamalah (AH-mah-lah) — Persian for workers / laborers.</p>
+          <p>ʿamalah (Ah-mah-leh) — Persian for workers / laborers.</p>
           <p>
             Source and issues on{' '}
             <a class="link-hover link text-base-content" href="https://github.com/mhamri/amale" target="_blank" rel="noopener noreferrer">

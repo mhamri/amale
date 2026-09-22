@@ -67,7 +67,7 @@ export default function DocsOverview() {
             </p>
             <p>
               The project's name is <span lang="fa" dir="rtl">عمله</span> — Persian in origin, pronounced{' '}
-              <span class="text-base-content">AH-mah-lah</span>, meaning{' '}
+              <span class="text-base-content">Ah-mah-leh</span>, meaning{' '}
               <span class="text-base-content">workers / laborers</span>. <em>Amale</em> is the
               Latin-script name for coordinated workers contributing to a shared, verified outcome.
             </p>

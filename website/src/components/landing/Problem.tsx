@@ -26,7 +26,7 @@ export default function Problem() {
               عمله
             </span>{" "}
             — Persian in origin, pronounced{" "}
-            <span class="text-base-content">AH-mah-lah</span>, meaning{" "}
+            <span class="text-base-content">Ah-mah-leh</span>, meaning{" "}
             <span class="text-base-content">workers / laborers</span>.{" "}
             <em>Amale</em> is the project's Latin-script name: coordinated
             workers contributing to a shared, verified outcome.
