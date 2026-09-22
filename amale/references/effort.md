@@ -31,3 +31,5 @@ If the selected mechanism cannot launch, use `effort-reconcile` with outcome `no
 - `effort-reconcile`: `{ "outcome":"not-started", "restoredEffort":"medium", "evidence":"native adapter refused launch; no execution was created" }`; use `failed` plus `execution` for a verified stopped execution.
 
 This mechanism governs host effort. It does not imply pi worker thinking levels have been configured or that a requested level was honored without host evidence.
+
+Effort escalation authorizes a bounded reasoning pass; it does not authorize coordinator implementation. A host-depth repair still requires a `host-exception` grant and authorized `claim` before edits. Routine implementation remains with routed workers.

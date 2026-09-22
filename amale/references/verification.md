@@ -38,8 +38,10 @@ Secrets are read from existing credential configuration or environment and are n
 
 From `amale/`, run `bun install --frozen-lockfile`, `bun run check`, `bun run test:bun` and `node --test tests/*.test.ts`.
 
-The offline suite covers routing, lifecycle recovery, parallel ownership, review coverage, context isolation and startup preflight. Latest development check: 70 Bun tests and 82 Node tests (including nested cases) passed. Live probes above are historical development observations, not offline-suite requirements or general model-quality claims. Raw development artifacts and review reports are not distributed.
+The offline suite covers routing, lifecycle recovery, parallel ownership, review coverage, context isolation and startup preflight. Latest development check: 83 Bun tests and 95 Node tests (including nested cases) passed. Live probes above are historical development observations, not offline-suite requirements or general model-quality claims. Raw development artifacts and review reports are not distributed.
 
 From the repository root, build the standalone viewer with `bun design/build.ts` or `node design/build.ts`. DESIGN.html is shipped; design/viewer.generated.js is an ignored intermediate.
 
 Startup preflight cannot grant network access or authorize project-data export. Previously accepted historical runs are not retroactively re-reviewed by the coverage gate.
+
+Execution authorization rejects plain claims and consumes a fresh matching worker route or scoped single-use host exception. This is an authorization gate, not proof that a model actually performed edits. pi records its process/session evidence; native execution and explicit user instructions remain trusted host attestations. Arbitrary host filesystem edits are outside this runtime boundary.

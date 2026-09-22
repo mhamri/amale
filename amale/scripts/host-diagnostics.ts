@@ -23,6 +23,36 @@ export async function hostActions(store:Store){
  for(const file of files.filter(f=>/^[a-f0-9-]+\.json$/.test(f))){try{const row=JSON.parse(await readFile(join(directory,file),'utf8'));invariant(row?.schema===1&&typeof row.id==='string'&&typeof row.actionId==='string'&&typeof row.sessionId==='string'&&typeof row.at==='string'&&kinds.includes(row.kind)&&phases.includes(row.phase),'Invalid ledger record');records.push(row);}catch{unreadable.push(file);}}
  records.sort((a,b)=>a.at.localeCompare(b.at)||a.id.localeCompare(b.id));return {records,unreadable};
 }
+// Process health: measurable anti-patterns that reveal the coordinator doing
+// the work itself instead of delegating, or model usage fixating on one family.
+export async function processHealth(store:Store):Promise<{available:false;reason:string}|{available:true;metrics:Record<string,unknown>;warnings:string[]}> {
+ const runtime=await diagnostics(store.root),ledger=await hostActions(store);
+ let s:Awaited<ReturnType<Store['load']>>;
+ try{s=await store.load();}catch(error){return {available:false,reason:(error as Error).message};}
+ const tasks=s.tasks.length;
+ const isRouting=(d:any)=>(d.state as any)?.routing?.models;
+ const coordinatorDecisions=s.decisions.filter((d:any)=>!isRouting(d)&&d.artifact);
+ const hostDecisions=s.decisions.filter((d:any)=>String(d.source??'').startsWith('host:'));
+ const workerJev=s.events.filter(e=>e.type==='worker-jev');
+ const delegations=s.events.filter(e=>e.type==='delegate-started');
+ const claims=s.events.filter(e=>e.type==='claimed');
+ const families:Record<string,number>={};
+ for(const e of claims){const model=(e.detail as any)?.model;if(typeof model==='string'){const f=model.split('/')[0];families[f]=(families[f]??0)+1;}}
+ const dominant=Object.entries(families).sort((a,b)=>b[1]-a[1])[0];
+ const perTask=(n:number)=>Number((n/Math.max(tasks,1)).toFixed(2));
+ const revisionBudget=15,retryBudget=5;
+ const retries=s.events.filter(e=>e.type==='provider-failover'||e.type==='repair').length;
+ const revisionAllowance=revisionBudget*tasks+retryBudget*retries;
+ const warnings:string[]=[];
+ if(tasks&&coordinatorDecisions.length>2*tasks)warnings.push(`${coordinatorDecisions.length} coordinator-authored Jev decisions across ${tasks} task(s): micro-decision pattern. Delegate chunks and let workers consult Jev through the worker helper.`);
+ if(claims.length>0&&delegations.length===0)warnings.push(`${claims.length} worker dispatch(es) without any delegate run: the coordinator is stepping through the worker→check→review→repair loop manually instead of delegating the chunk.`);
+ if(coordinatorDecisions.length>0&&workerJev.length===0)warnings.push('All semantic decisions were made by the coordinator; none by workers. In-task choices belong to the worker-side Jev helper.');
+ if(ledger.records.length>6*Math.max(tasks,1))warnings.push(`${ledger.records.length} host-action records across ${tasks} task(s): recording ceremony is eating coordinator context.`);
+ if(claims.length>=3&&dominant&&dominant[1]/claims.length>0.8)warnings.push(`Model usage is fixated on ${dominant[0]} (${dominant[1]}/${claims.length} dispatches): round-robin routing should distribute across eligible families.`);
+ if(tasks&&s.revision>revisionAllowance&&(delegations.length<tasks||coordinatorDecisions.length>tasks))warnings.push(`${s.revision} state revisions across ${tasks} task(s) with ${retries} recorded retr${retries===1?'y':'ies'}, above the ${revisionAllowance} a delegated run needs, alongside ${delegations.length} delegation(s) and ${coordinatorDecisions.length} coordinator decision(s). The coordinator is driving the loop turn by turn instead of handing over whole chunks.`);
+ if(tasks===1&&s.criteria.length>=3&&!s.events.some(e=>e.type==='single-chunk'))warnings.push(`One task carries ${s.criteria.length} run outcomes: nothing can run in parallel. Split the work into independent chunks, or record a single-chunk reason.`);
+ return {available:true,metrics:{tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals},warnings};
+}
 // Shareable by explicit user choice: omit all free text, paths, models, raw
 // identifiers, prompts, artifact bodies and original exception messages.
 export async function exportDiagnostics(store:Store){

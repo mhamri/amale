@@ -1,6 +1,7 @@
 import { Store, invariant } from './core.ts';
 import { credential, requestJson, choiceAnswer } from './adapters.ts';
 import { sanitize } from './telemetry.ts';
+import { jevModel } from './config.ts';
 
 export type PreflightInput = { network:'restricted'|'allowed'|'unknown'; channel:string };
 // The host supplies its effective permission context. A child process cannot
@@ -18,7 +19,7 @@ export async function preflight(store:Store,input:PreflightInput,fetcher:typeof 
    await credential();stage='request';
    const criteria={a:'Option A has number 1',b:'Option B has number 9'};
    const raw=await requestJson('https://openrouter.ai/api/alpha/decisions',{
-    model:process.env.AMALE_JEV_MODEL??'typesafe/jev-1.13',state:{synthetic:true,options:{a:1,b:9}},
+    model:await jevModel(),state:{synthetic:true,options:{a:1,b:9}},
     questions:{selection:{type:'choice',instructions:'Which option has the smaller stated number?',criteria}},
    },fetcher,store.root,{attempts:1,timeoutMs:10000});
    stage='response';const answer=choiceAnswer(raw,criteria);

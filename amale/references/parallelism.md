@@ -1,10 +1,12 @@
 # Parallel execution without a phase barrier
 
-The host drives concurrency. A CLI call performs one operation; the skill does not run a background scheduler.
+`delegate-batch` drives concurrency inside the runtime: one invocation takes every ready task id, runs them through a pool bounded by `maxWorkers`, and starts the next id the moment a slot frees. Use it whenever `next.parallel.ready` lists more than one candidate. A sequence of single `delegate` calls leaves configured capacity idle and is the most common reason a run feels slow and expensive. The skill still runs no background scheduler: the batch returns when every chunk has an outcome.
+
+Each batched task needs its own isolated checkout, prepared before the batch. Two tasks pointing at one checkout, or a single `workspace` passed for the whole batch, is refused before any worker starts, because concurrent work in one checkout serializes into ownership conflicts rather than into parallel progress.
 
 Read `next.parallel` alongside the focus action:
 
-- `ready`: dependency-ready implementation candidates. Prepare separate workspaces and dispatch independent workers concurrently through the host's asynchronous tools.
+- `ready`: dependency-ready implementation candidates. Prepare a separate workspace per candidate, then hand the whole list to `delegate-batch`.
 - `actions`: per-task verification, repair, recovery and integration actions, including tasks beyond the focus. Keep healthy tasks progressing when one needs diagnosis.
 - `independent`: a conservative batch of checks/reviews in distinct, nonconflicting task workspaces, within currently available capacity. The focus may be included: execute each listed operation once, not once for the focus and again for the batch.
 - `running` and `available`: execution ownership and remaining shared slots. A suggested batch is not a reservation; runtime guards recheck at execution.

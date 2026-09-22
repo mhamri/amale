@@ -2,7 +2,8 @@ import { realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { Store, taskOf, invariant, hash, family, fingerprint, event, conflict, activeTasks } from './core.ts';
 import type { Run } from './core.ts';
-import { catalog, requestJson, choiceAnswer } from './adapters.ts';
+import { catalog } from './adapters.ts';
+import { loadModelConfig, configPath } from './config.ts';
 
 export type RoutingRequest = { role?:string; requiredInputs?:string[]; contextTokens?:number; evidence?:string };
 type Purpose = 'worker'|'reviewer';
@@ -10,13 +11,14 @@ type Scope = { taskId:string; purpose:Purpose; workspace:string; request:Routing
 type Grant = { action:'launch'; model:string; decisionId:string; key:string; scope:Scope };
 type Route = {action:'dispatch-blocked';reason:string;tasks:string[]} | Grant | {action:'host-decision';decisionId:string} | {action:'route-blocked';reason:string;decisionId?:string} | {action:'host-takeover';model:string};
 
-function scopeKey(s:Run,scope:Scope){
+export function scopeKey(s:Run,scope:Scope){
  const t=taskOf(s,scope.taskId);
  return hash(JSON.stringify({scope,host:s.host,intent:s.intent,constraints:s.constraints,pools:s.modelPools,
   task:{id:t.id,goal:t.goal,criteria:t.criteria,checks:t.checks,kind:t.kind,deps:t.deps,resources:t.resources,status:t.status,cycles:t.cycles,depth:t.depth,author:t.author,output:t.output},
   dependencies:t.deps.map(id=>{const d=taskOf(s,id);return [id,d.status,d.integrated];})}));
 }
 const used=(s:Run,id:string)=>s.events.some(e=>e.type==='route-used'&&(e.detail as any).decisionId===id);
+const cooling=(s:Run,model:string,cooldownMs:number,now=Date.now())=>s.events.some(e=>e.type==='provider-unavailable'&&(e.detail as any)?.model===model&&now-Date.parse(e.at)<cooldownMs);
 
 /** Consume with the task claim in the same transaction, before any process starts. */
 export function consumeRoute(s:Run,route:Grant){
@@ -50,10 +52,10 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
  const scope:Scope={taskId:id,purpose,workspace:resolvedWorkspace,request,content:purpose==='reviewer'?await fingerprint(workspace):undefined};
  if(purpose==='reviewer')invariant(scope.workspace===t.workspace,'Reviewer must inspect the task workspace');
  const key=scopeKey(s,scope);
- const stale=s.decisions.filter(d=>{const r=(d.state as any)?.routing;return !d.choice&&r?.scope?.taskId===id&&r.scope.purpose===purpose&&r.key!==key;});
+ const stale=s.decisions.filter(d=>{const r=(d.state as any)?.routing;return !used(s,d.id)&&r?.scope?.taskId===id&&r.scope.purpose===purpose&&r.key!==key;});
  if(stale.length)await store.transaction(current=>{
   invariant(scopeKey(current,scope)===key,'Task changed while invalidating its old route');
-  for(const old of stale){const d=current.decisions.find(d=>d.id===old.id);if(d&&!d.choice){d.choice='reassess';d.source='runtime:route-invalidated';d.reason='Task, workspace content or routing requirements changed; old route cannot authorize launch';event(current,'route-invalidated',{decisionId:d.id,taskId:id,purpose});}}
+  for(const old of stale){const d=current.decisions.find(d=>d.id===old.id);if(d&&!used(current,d.id)&&d.choice!=='reassess'){d.choice='reassess';d.source='runtime:route-invalidated';d.reason='Task, workspace content or routing requirements changed; old route cannot authorize launch';event(current,'route-invalidated',{decisionId:d.id,taskId:id,purpose});}}
  });
  const existing=s.decisions.find(d=>(d.state as any)?.routing?.key===key&&!used(s,d.id));
  const resolve=(d:Run['decisions'][number]):Route=>{
@@ -66,32 +68,46 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
  invariant(!request.role||pool,`No configured model pool for role ${request.role}`);
  const inputs=[...new Set(['text',...(pool?.requiredInputs??[]),...(request.requiredInputs??[])])];
  const cards=await catalog(store,fetcher);
- let eligible=cards.models.filter((m:any)=>!/(^~|preview|experimental|:free|[/:_-]latest(?:$|[/:_-]))/i.test(m.id)&&m.parameters?.includes('tools')&&inputs.every(i=>m.modalities?.includes(i))&&(!request.contextTokens||m.context>=request.contextTokens));
- if(pool)eligible=eligible.filter((m:any)=>pool.models.includes(m.id));
- else {
-  const candidates=eligible.filter((m:any)=>purpose==='worker'&&t.depth==='deep'?family(m.id)==='kimi':/flash/i.test(m.id)&&['deepseek','glm'].includes(family(m.id)));
-  // Catalog is newest first. Keep one current eligible Flash per family, not one hardcoded author.
-  const families=new Set<string>();eligible=candidates.filter((m:any)=>{const f=family(m.id);if(families.has(f))return false;families.add(f);return true;});
- }
- if(purpose==='worker'&&t.depth==='deep')eligible=eligible.filter((m:any)=>family(m.id)==='kimi');
+ const config=await loadModelConfig();
+ const listed=pool?pool.models:purpose==='worker'&&t.depth==='deep'?config.deep:config.flash;
+ const card=new Map<string,any>(cards.models.map((m:any)=>[m.id,m]));
+ const capable=(m:any)=>!!m.parameters?.includes('tools')&&inputs.every(i=>m.modalities?.includes(i))&&(!request.contextTokens||m.context>=request.contextTokens);
+ const absent=listed.filter(id=>!card.has(id)),unfit=listed.filter(id=>card.has(id)&&!capable(card.get(id)));
+ let eligible=listed.filter(id=>card.has(id)&&capable(card.get(id))).map(id=>card.get(id));
  if(purpose==='reviewer')eligible=eligible.filter((m:any)=>family(m.id)!==t.family);
- if(!eligible.length)return {action:'route-blocked',reason:'No stable tool-capable model satisfies the pool, inputs, context, independence and escalation requirements'};
+ const responsive=eligible.filter((m:any)=>!cooling(s,m.id,config.providerCooldownMs));
+ if(responsive.length)eligible=responsive;
+ if(!eligible.length)return {action:'route-blocked',reason:`No configured model is routable for this ${purpose}. Configured in ${configPath()}: ${listed.join(', ')}.`
+  +(absent.length?` Absent from the OpenRouter catalog: ${absent.join(', ')}.`:'')
+  +(unfit.length?` Lacking tool support, the required input modalities (${inputs.join(', ')}) or ${request.contextTokens??0} context tokens: ${unfit.join(', ')}.`:'')
+  +(purpose==='reviewer'?` A reviewer must differ from the author family ${t.family}; add a model from another family.`:'')};
  const models:Record<string,string>={},criteria:Record<string,string>={};
- eligible.forEach((m:any,i:number)=>{const option=`model_${i}`;models[option]=m.id;criteria[option]=`Use ${m.id}: meets enforced requirements; compare its supplied capabilities, pricing and task evidence.`;});
+ eligible.forEach((m:any,i:number)=>{const option=`model_${i}`;models[option]=m.id;criteria[option]=`Use ${m.id}: meets enforced requirements (stability, tools, modalities, context).`;});
  criteria.reassess='No offered model is sufficiently suitable: revise requirements/pool or use host diagnosis. Do not invent strengths or latency.';
  const decisionId=`route-${randomUUID()}`;
- const state={routing:{key,models,scope},task:{goal:t.goal,criteria:t.criteria,kind:t.kind,depth:t.depth},purpose,
-  preferences:'Routine footwork should use the cheapest suitable fast Flash model. Specialized work may justify a configured specialist. Descriptions are vendor claims, not measured quality. No latency measurements are supplied.',
-  poolNotes:pool?.notes,evidence:request.evidence,catalog:{verifiedAt:cards.verifiedAt,source:cards.source,models:eligible}};
- const question='Choose the best suitable model for this task and purpose, balancing correctness, cost and speed from the supplied evidence.';
- const raw=await requestJson('https://openrouter.ai/api/alpha/decisions',{model:process.env.AMALE_JEV_MODEL??'typesafe/jev-1.13',state,questions:{selection:{type:'choice',instructions:question,criteria}}},fetcher,store.root);
- const artifact=await store.artifact(raw);let answer:{choice?:string;source:string;confidence?:number;reason?:string};
- try{answer=choiceAnswer(raw,criteria);}catch(error){answer={source:'invalid-jev-response',reason:(error as Error).message};}
- const decision={id:decisionId,question,criteria,state,revision:s.revision,artifact,...answer};
- await store.transaction(current=>{
+ // Deterministic round-robin seeded by the run's session hash: each routing decision in this
+ // run advances the rotation, so sessions distribute across eligible families instead of
+ // fixating on one vendor. No Jev call is spent on mechanical model selection.
+ // The rotation counter is read inside the same transaction that appends the decision:
+ // concurrent routes would otherwise all observe the same count and select one model.
+ const decision=await store.transaction(current=>{
   invariant(scopeKey(current,scope)===key,'Task changed during routing; request a fresh route');
   invariant(!current.decisions.some(d=>(d.state as any)?.routing?.key===key&&!used(current,d.id)),'Another route already exists; reuse it');
-  current.decisions.push(decision);event(current,'model-routed',{id:decisionId,taskId:id,purpose,eligible:eligible.map((m:any)=>m.id),...answer,artifact});
+  const prior=current.decisions.filter(d=>(d.state as any)?.routing?.models).length;
+  const index=(parseInt(hash(current.id).slice(0,8),16)+prior)%eligible.length;
+  const choice=`model_${index}`;
+  const state={routing:{key,models,scope},rotation:{seed:'run-session-hash',priorRoutes:prior,index,eligible:eligible.length},task:{goal:t.goal,criteria:t.criteria,kind:t.kind,depth:t.depth},purpose,
+   poolNotes:pool?.notes,evidence:request.evidence,catalog:{verifiedAt:cards.verifiedAt,source:cards.source,models:eligible}};
+  const made={id:decisionId,question:'Deterministic round-robin rotation across eligible models, seeded by the run session hash',criteria,state,revision:current.revision,choice,source:'runtime:round-robin',confidence:1};
+  current.decisions.push(made);event(current,'model-routed',{id:decisionId,taskId:id,purpose,eligible:eligible.map((m:any)=>m.id),choice,model:models[choice],source:'runtime:round-robin'});
+  return made;
  });
  return resolve(decision);
+}
+
+// Reconstruct grants from durable decisions; never trust a caller-supplied scope.
+export function consumeWorkerRoute(s:Run,id:string,model:string,workspace:string,decisionId:string){
+ const decision=s.decisions.find(d=>d.id===decisionId),routing=(decision?.state as any)?.routing;
+ invariant(routing?.scope?.purpose==='worker'&&routing.scope.taskId===id&&routing.scope.workspace===workspace,'Worker route must match task and workspace');
+ consumeRoute(s,{action:'launch',model,decisionId,key:routing.key,scope:routing.scope});
 }

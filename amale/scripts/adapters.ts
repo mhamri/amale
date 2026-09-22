@@ -1,16 +1,20 @@
-import { readFile, mkdir, access } from 'node:fs/promises';
-import { join, delimiter, dirname } from 'node:path';
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { join, delimiter, dirname, basename, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { invariant, execute, Store, event, claim, result, review, packet, fingerprint, taskOf, family, acquireActivity, releaseActivity, activitySpawned, reviewObligations } from './core.ts';
-import type { Decision, Command } from './core.ts';
+import type { Decision, Command, Guidance } from './core.ts';
 import { selectModel, consumeRoute } from './routing.ts';
 import type { RoutingRequest } from './routing.ts';
 import { trace, registerSecret, sanitize } from './telemetry.ts';
+import { jsRuntime } from './runtime.ts';
+import { jevModel, isAlias, loadModelConfig } from './config.ts';
 
 export async function piCommand():Promise<Command>{
- if(process.env.AMALE_PI_ENTRY)return {command:process.env.AMALE_NODE??'node',args:[process.env.AMALE_PI_ENTRY]};
- for(const root of (process.env.PATH??'').split(delimiter))for(const candidate of [join(root,'node_modules','@earendil-works','pi-coding-agent','dist','bundle','cli.js'),join(root,'..','lib','node_modules','@earendil-works','pi-coding-agent','dist','bundle','cli.js')]){try{await access(candidate);return {command:process.env.AMALE_NODE??'node',args:[candidate]};}catch{}}
+ const runtime=await jsRuntime();
+ if(process.env.AMALE_PI_ENTRY)return {command:runtime,args:[process.env.AMALE_PI_ENTRY]};
+ for(const root of (process.env.PATH??'').split(delimiter))for(const candidate of [join(root,'node_modules','@earendil-works','pi-coding-agent','dist','bundle','cli.js'),join(root,'..','lib','node_modules','@earendil-works','pi-coding-agent','dist','bundle','cli.js')]){try{await access(candidate);return {command:runtime,args:[candidate]};}catch{}}
  if(process.platform!=='win32')return {command:'pi',args:[]};
  throw new Error('Set AMALE_PI_ENTRY to the installed pi JavaScript entrypoint; no shell shim is executed.');
 }
@@ -40,22 +44,46 @@ export async function requestJson(url:string,body?:unknown,fetcher:typeof fetch=
  throw new Error('OpenRouter request failed');
  }catch(error){await telemetry.end('failed',{message:(error as Error).message});throw error;}
 }
-export function choiceAnswer(raw:any,criteria:Record<string,string>,threshold=.7){const a=raw?.answers?.selection;invariant(a?.type==='choice'&&typeof a.choice==='string'&&Object.hasOwn(criteria,a.choice),'Invalid Jev choice');invariant(Number.isFinite(a.confidence)&&a.confidence>=0&&a.confidence<=1,'Invalid Jev confidence');invariant(a.probabilities&&Object.keys(a.probabilities).length===Object.keys(criteria).length&&Object.keys(criteria).every(k=>Number.isFinite(a.probabilities[k])&&a.probabilities[k]>=0&&a.probabilities[k]<=1),'Invalid Jev probabilities');invariant(Math.abs(Object.values(a.probabilities as Record<string,number>).reduce((a,b)=>a+b,0)-1)<.02,'Invalid Jev probability sum');return {choice:a.confidence>=threshold?a.choice:undefined,confidence:a.confidence,source:String(raw.model??'OpenRouter Jev')};}
+export function choiceAnswerFor(raw:any,key:string,criteria:Record<string,string>,threshold=.7){const a=raw?.answers?.[key];invariant(a?.type==='choice'&&typeof a.choice==='string'&&Object.hasOwn(criteria,a.choice),'Invalid Jev choice');invariant(Number.isFinite(a.confidence)&&a.confidence>=0&&a.confidence<=1,'Invalid Jev confidence');invariant(a.probabilities&&Object.keys(a.probabilities).length===Object.keys(criteria).length&&Object.keys(criteria).every(k=>Number.isFinite(a.probabilities[k])&&a.probabilities[k]>=0&&a.probabilities[k]<=1),'Invalid Jev probabilities');invariant(Math.abs(Object.values(a.probabilities as Record<string,number>).reduce((a,b)=>a+b,0)-1)<.02,'Invalid Jev probability sum');return {choice:a.confidence>=threshold?a.choice:undefined,confidence:a.confidence,source:String(raw.model??'OpenRouter Jev')};}
+export function choiceAnswer(raw:any,criteria:Record<string,string>,threshold=.7){return choiceAnswerFor(raw,'selection',criteria,threshold);}
+// One HTTP round trip settles many independent questions; use instead of repeated decide calls.
+export async function decideBatch(store:Store,input:{decisions:Omit<Decision,'revision'>[]},fetcher?:typeof fetch){
+ invariant(Array.isArray(input.decisions)&&input.decisions.length>=1&&input.decisions.length<=16,'One to sixteen decisions per batch');
+ for(const d of input.decisions)invariant(d.id&&d.question&&d.criteria&&Object.keys(d.criteria).length>=2,`Decision ${d.id??'?'} needs ID, question and at least two options`);
+ const before=await store.load();for(const d of input.decisions)invariant(!before.decisions.some(x=>x.id===d.id),`Decision ID already exists: ${d.id}`);
+ const raw=await requestJson('https://openrouter.ai/api/alpha/decisions',{model:await jevModel(),state:{batch:input.decisions.map(d=>({id:d.id,state:d.state}))},questions:Object.fromEntries(input.decisions.map(d=>[d.id,{type:'choice',instructions:d.question,criteria:d.criteria}]))},fetcher,store.root);
+ const artifact=await store.artifact(raw);
+ const answers=input.decisions.map(d=>{let a:{choice?:string;confidence?:number;source:string;reason?:string};try{a=choiceAnswerFor(raw,d.id,d.criteria);}catch(e){a={source:'invalid-jev-response',reason:(e as Error).message};}return {...a,id:d.id};});
+ await store.transaction(s=>{invariant(s.revision===before.revision,'State changed during batch decision; request fresh decisions');for(const d of input.decisions){const {id:_omit,...a}=answers.find(x=>x.id===d.id)!;s.decisions.push({...d,purpose:d.purpose??'workflow',revision:before.revision,...a,artifact});event(s,'decision',{id:d.id,purpose:d.purpose??'workflow',...a,artifact,batch:input.decisions.length});}});
+ return answers;
+}
 export async function decide(store:Store,input:Omit<Decision,'revision'>,fetcher?:typeof fetch){
  invariant(input.id&&input.question&&input.criteria&&Object.keys(input.criteria).length>=2,'Decision needs ID, question and at least two options');
  const before=await store.load();invariant(!before.decisions.some(d=>d.id===input.id),'Decision ID already exists');
- const raw=await requestJson('https://openrouter.ai/api/alpha/decisions',{model:process.env.AMALE_JEV_MODEL??'typesafe/jev-1.13',state:input.state,questions:{selection:{type:'choice',instructions:input.question,criteria:input.criteria}}},fetcher,store.root);
+ const raw=await requestJson('https://openrouter.ai/api/alpha/decisions',{model:await jevModel(),state:input.state,questions:{selection:{type:'choice',instructions:input.question,criteria:input.criteria}}},fetcher,store.root);
  const artifact=await store.artifact(raw);let answer:{choice?:string;confidence?:number;source:string;reason?:string};try{answer=choiceAnswer(raw,input.criteria);}catch(e){answer={source:'invalid-jev-response',reason:(e as Error).message};}
- await store.transaction(s=>{invariant(s.revision===before.revision,'State changed during decision; request a fresh decision');s.decisions.push({...input,revision:before.revision,...answer,artifact});event(s,'decision',{id:input.id,...answer,artifact});});return answer;
+ await store.transaction(s=>{invariant(s.revision===before.revision,'State changed during decision; request a fresh decision');s.decisions.push({...input,purpose:input.purpose??'workflow',revision:before.revision,...answer,artifact});event(s,'decision',{id:input.id,purpose:input.purpose??'workflow',...answer,artifact});});return answer;
 }
 export async function hostDecision(store:Store,id:string,choice:string,reason:string){await store.transaction(s=>{const d=s.decisions.find(d=>d.id===id);invariant(d&&!d.choice&&Object.hasOwn(d.criteria,choice)&&reason,'Pending decision, eligible option and reason required');d.choice=choice;d.source='host:'+s.host.model;d.reason=reason;event(s,'host-decision',{id,choice,reason});});}
 export async function catalog(store?:Store,fetcher:typeof fetch=fetch){const data=await requestJson('https://openrouter.ai/api/v1/models',undefined,fetcher,store?.root);invariant(Array.isArray(data.data),'Invalid OpenRouter catalog');const selected=data.data.filter((m:any)=>typeof m.id==='string').map((m:any)=>({id:m.id,created:m.created,context:m.context_length,modalities:m.architecture?.input_modalities,parameters:m.supported_parameters,pricing:m.pricing,description:m.description})).sort((a:any,b:any)=>b.created-a.created);const record={verifiedAt:new Date().toISOString(),source:'https://openrouter.ai/api/v1/models',models:selected};if(store)await store.artifact(record);return record;}
 
-export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;onSpawn?:(pid:number)=>Promise<void>}){
+// Retrying a funding or authorization failure burns money and never succeeds, so
+// those are matched first and never treated as transient.
+const settledProvider=/credits? (are )?exhausted|insufficient (credit|balance|fund)|top ?up|quota exceeded|billing|unauthorized|invalid api key|lacks access|no endpoints found/i;
+const codedFailure=/\b(408|409|429|500|502|503|504|529)\b/;
+const transientWording=/rate.?limit|temporarily|overload|unavailable|timed? ?out|Provider returned error|Internal Server Error/i;
+const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits/i;
+export const transientProvider=(message:string)=>!settledProvider.test(message)&&((codedFailure.test(message)&&transientWording.test(message))||transientWithoutCode.test(message));
+export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;onSpawn?:(pid:number)=>Promise<void>;attempts?:number;idleTimeoutMs?:number}){
  const telemetry=await trace(input.diagnosticRoot,'pi',{model:input.model,workspace:input.workspace,readOnly:!!input.readOnly,sessionDir:input.sessionDir});
  try{
+  const config=await loadModelConfig();
+  const attempts=input.attempts??config.launchAttempts;
+  const idleTimeoutMs=input.idleTimeoutMs??config.idleTimeoutMs;
+  invariant(Number.isInteger(attempts)&&attempts>=1&&attempts<=5,'Invalid pi attempt count');
+  invariant(input.prompt.length<=promptLimit,`Prompt is ${input.prompt.length} characters; the command line cannot carry more than ${promptLimit}. Hand large material to the model as a file path it reads, rather than inlining it.`);
   const pi=await piCommand();await mkdir(input.sessionDir,{recursive:true});const key=await credential();
-  const output=await new Promise<{events:any[];text:string;model:string;code:number}>((done,fail)=>{
+  const launch=()=>new Promise<{events:any[];text:string;model:string;code:number}>((done,fail)=>{
    const args=[...pi.args,'--mode','json','--print','--provider','openrouter','--model',input.model,'--session-dir',input.sessionDir,'--no-extensions','--no-skills','--no-prompt-templates','--no-context-files','--offline','--tools',input.readOnly?'read,grep,find,ls':'read,grep,find,ls,edit,write,bash,powershell','--',input.prompt];
    // Synchronous spawn errors reject this ordinary Promise executor; no async-executor hang.
    const child=spawn(pi.command,args,{cwd:input.workspace,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe'],env:{...process.env,OPENROUTER_API_KEY:key,PI_TELEMETRY:'0'}});
@@ -80,8 +108,22 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
    child.stderr.on('data',data=>{stderr=(stderr+data).slice(-4096);});
    const ownership=Promise.resolve().then(async()=>{if(child.pid){record('spawned',{pid:child.pid});await input.onSpawn?.(child.pid);}});
    ownership.catch(error=>{providerError='Ownership registration failed: '+(error as Error).message;child.kill();});
+   let lastOutput=Date.now(),idleTimer:ReturnType<typeof setInterval>|undefined;
+   const seen=()=>{lastOutput=Date.now();};
+   child.stdout.on('data',seen);child.stderr.on('data',seen);
+   if(idleTimeoutMs>0){
+    idleTimer=setInterval(()=>{
+     const idleMs=Date.now()-lastOutput;
+     if(idleMs<idleTimeoutMs)return;
+     clearInterval(idleTimer);
+     providerError=`No output for ${Math.round(idleMs/1000)}s; a child command is hung. Inspect diagnostic trace ${telemetry.id} for the last tool it started.`;
+     record('idle-timeout',{idleMs,pid:child.pid});
+     void killTree(child);
+    },Math.min(30000,idleTimeoutMs));
+    idleTimer.unref?.();
+   }
    child.on('error',error=>{spawnError=error;});
-   child.on('close',(code,signal)=>{void (async()=>{
+   child.on('close',(code,signal)=>{clearInterval(idleTimer);void (async()=>{
     if(buffer.trim())parse(buffer.replace(/\r$/,''));
     await ownership;await writes;
     await telemetry.write('process-exit',{code,signal,stderr,protocolError,providerError,ended,actualModel:actual});
@@ -89,19 +131,61 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     invariant(!protocolError,protocolError);
     invariant(!providerError,String(sanitize(providerError)));
     invariant(code===0&&ended&&text&&actual,`pi incomplete: exit ${code}, agent_end=${ended}; inspect diagnostic trace ${telemetry.id}`);
-    invariant(actual===input.model,`pi resolved a different model (${actual}); update the task route explicitly`);
+    invariant(actual===input.model||(isAlias(input.model)&&family(actual)===family(input.model)),`pi resolved a different model (${actual}); update the task route explicitly`);
     done({events,text,model:actual,code:0});
    })().catch(fail);});
   });
+  let output;
+  for(let attempt=1;;attempt++){
+   await telemetry.write('attempt',{attempt,of:attempts});
+   try{output=await launch();break;}
+   catch(error){
+    const message=(error as Error).message;
+    if(attempt>=attempts||!transientProvider(message))throw error;
+    await telemetry.write('transient-provider',{attempt,message});
+    await new Promise(r=>setTimeout(r,1000*attempt));
+   }
+  }
   await telemetry.end('success',{model:output.model});return output;
  }catch(error){await telemetry.end('failed',{message:(error as Error).message});throw error;}
 }
-export async function worker(store:Store,id:string,input:{workspace:string;model?:string;brief:string;routing?:RoutingRequest}){
+const guidanceRoots=()=>[join(homedir(),'.claude','skills'),join(process.env.CODEX_HOME??join(homedir(),'.codex'),'skills')];
+async function guidanceSource(workspace:string,entry:string){
+ invariant(typeof entry==='string'&&entry.trim(),'Guidance entries must be non-empty strings');
+ const asPath=/[\\/]/.test(entry)||entry.endsWith('.md');
+ const candidates=asPath?[isAbsolute(entry)?entry:join(workspace,entry)]:guidanceRoots().map(root=>join(root,entry,'SKILL.md'));
+ for(const candidate of candidates){try{return {path:candidate,body:await readFile(candidate,'utf8')};}catch{}}
+ throw new Error(`Guidance "${entry}" was not readable; searched ${candidates.join(' and ')}`);
+}
+export async function guidanceBlock(workspace:string,guidance:Guidance,limit=32000){
+ const sections:string[]=[];
+ for(const [label,entries] of [['SKILL',guidance.skills??[]],['REFERENCE',guidance.references??[]]] as const){
+  invariant(Array.isArray(entries),`Task ${label.toLowerCase()}s must be an array of names or paths`);
+  for(const entry of entries){const {path,body}=await guidanceSource(workspace,entry);
+   sections.push(`--- ${label}: ${entry} (${path}) ---\n${body.length>limit?body.slice(0,limit)+`\n[truncated at ${limit} characters]`:body}`);}
+ }
+ return sections.length?`\nApply the guidance below as if it were loaded into your own instructions; it is binding for this task.\n${sections.join('\n')}\n`:'';
+}
+// The prompt is an argv element, so a large skill inlined into it overflows the
+// operating system's command-line limit. Hand the worker a path instead: the file
+// lives outside the task workspace so it cannot alter the verification fingerprint.
+export async function handoffFile(store:Store,id:string,name:string,body:string){
+ const dir=join(store.root,'sessions',id);await mkdir(dir,{recursive:true});
+ const path=join(dir,name);await writeFile(path,body);
+ return path;
+}
+export async function worker(store:Store,id:string,input:{workspace:string;model?:string;brief?:string;routing?:RoutingRequest}&Guidance){
  const route=await selectModel(store,id,'worker',input.workspace,input.routing);if(route.action!=='launch')return route;
  invariant(!input.model||input.model===route.model,'Explicit model disagrees with recorded route; omit model for automatic selection');
  const model=route.model;
- const s=await store.load(),t=taskOf(s,id);const context=await packet(store,id);const prompt=`You are an Amale worker. Work only on this task within the supplied workspace. Do not invoke other skills or delegate. Follow constraints and acceptance criteria. Do not add hypothetical features. Return actual changed artifacts, checks and unresolved issues.\n${JSON.stringify(context)}\n${input.brief}`;
- await claim(store,id,{...input,model,pid:process.pid,beforeClaim:s=>consumeRoute(s,route)});try{const out=await piRun({...input,model,prompt,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});});throw e;}
+ const s=await store.load(),t=taskOf(s,id);const context=await packet(store,id);
+ const jev=join(dirname(fileURLToPath(import.meta.url)),'jev.ts'),runId=basename(store.root),runtime=await jsRuntime();
+ const brief=input.brief??'Own this task end to end: satisfy every criterion and make the registered checks pass, stay within the allowed scope and resources, and do not add hypothetical features.';
+ const guidance=await guidanceBlock(t.workspace??input.workspace,{skills:input.skills??t.skills,references:input.references??t.references});
+ const briefPath=await handoffFile(store,id,'brief.md',[`# Task ${id}\n\n## Your brief\n${brief}`,
+  `## Task and run context\n\`\`\`json\n${JSON.stringify(context,null,1)}\n\`\`\``,guidance].filter(Boolean).join('\n\n'));
+ const prompt=`You are an Amale worker owning this task end to end within the supplied workspace. Do not invoke other skills or delegate. Do not add hypothetical features.\nYour brief, the run context and any binding guidance are in "${briefPath}". Read that file in full before you touch anything, and follow it as part of your instructions. It sits outside your workspace: read it, never edit it, never copy it in.\nWhen you face an uncertain semantic choice inside this task (approach, trade-off, interpretation), consult Jev instead of guessing or stalling: "${runtime}" "${jev}" "${s.workspace}" ${runId} ${id} "<question>" "<optionA>|<optionB>|...". Follow its choice; on low confidence pick the safest option, record why, and continue. Return actual changed artifacts, checks and unresolved issues.`;
+ await claim(store,id,{...input,model,pid:process.pid,routeDecisionId:route.decisionId});try{const out=await piRun({...input,model,prompt,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});if(transientProvider(t.blocked))event(s,'provider-unavailable',{model,family:family(model),taskId:id,purpose:'worker'});});throw e;}
 }
 // Factual projection: never forward author output, verdicts or decision rationale.
 export async function reviewPacket(store:Store,id:string,lenses:string[]=[]){
@@ -109,16 +193,67 @@ export async function reviewPacket(store:Store,id:string,lenses:string[]=[]){
  return {intent:s.intent,constraints:s.constraints,goal:t.goal,criteria:t.criteria,outcomes:s.criteria,
   workspace:t.workspace,fingerprint:t.workspace?await fingerprint(t.workspace):undefined,lenses,
   obligations:reviewObligations(s,t),artifactDirectory:join(store.root,'artifacts'),
-  checks:t.checks.map(command=>({command,receipt:t.receipts.find(r=>r.id===command.id)})),
+  checks:t.checks.map(command=>{const receipt=t.receipts.find(r=>r.id===command.id);
+   return {command,receipt,executed:!!receipt,passed:receipt?.code===0,current:receipt?.fingerprint===t.fingerprint};}),
   decisions:s.decisions.filter(d=>d.purpose==='requirement'&&d.choice&&context.decisions.some(ref=>ref.id===d.id)).map(d=>({id:d.id,question:d.question,choice:d.choice,answer:d.criteria[d.choice!]})),
   dependencies:s.tasks.filter(d=>('dependencies' in context && context.dependencies.some(ref=>ref.id===d.id))).map(d=>({id:d.id,goal:d.goal,criteria:d.criteria,workspace:d.workspace,integrated:d.integrated})),
   inspection:{standards:'Read applicable repository AGENTS.md and existing conventions. Context files are not automatically injected.',
    scope:'Trace changed behavior to its callers and consumers. A pinned Git baseline/diff is not supplied automatically; locate trustworthy scope evidence or mark the relevant boundary unreviewed.',
-   probes:'Read registered command receipts via artifactDirectory. You cannot execute tests. Missing behavioral evidence must be unreviewed with an exact requested host probe, never a passing claim.'}};
+   probes:'Read registered command receipts via artifactDirectory. You cannot execute tests yourself, but a registered check whose receipt carries exit code 0 at the task fingerprint below did execute and did pass: that receipt is executed evidence, so cite it as covered rather than marking the obligation unreviewed. A nonzero or fingerprint-mismatched receipt is not evidence. Reserve unreviewed for behaviour no receipt covers, and name the exact host probe you need.'}};
+}
+// Killing pi alone leaves a hung grandchild running, holding the pipe open, so
+// the close event never arrives. Windows needs the whole tree taken down.
+export function killTree(child:{pid?:number;kill:(signal?:NodeJS.Signals)=>boolean}){
+ if(!child.pid||process.platform!=='win32'){child.kill('SIGKILL');return;}
+ const killer=spawn('taskkill',['/pid',String(child.pid),'/T','/F'],{windowsHide:true,shell:false,stdio:'ignore'});
+ killer.on('error',()=>{child.kill('SIGKILL');});
+}
+export const reviewFormatAttempts=2;
+// Windows caps a whole command line near 32767 characters; leave room for the
+// executable, the flags and the session paths that sit alongside the prompt.
+export const promptLimit=24000;
+// Flash models routinely wrap the report in prose or a fenced block. Take the
+// outermost balanced object rather than requiring the whole reply to be JSON.
+export function reviewReport(text:string){
+ const body=text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
+ const balanced=(start:number)=>{
+  let depth=0,quoted=false,escaped=false;
+  for(let i=start;i<body.length;i++){
+   const ch=body[i];
+   if(escaped){escaped=false;continue;}
+   if(ch==='\\'){escaped=true;continue;}
+   if(ch==='"'){quoted=!quoted;continue;}
+   if(quoted)continue;
+   if(ch==='{')depth++;
+   else if(ch==='}'&&--depth===0)return body.slice(start,i+1);
+  }
+  return undefined;
+ };
+ const candidates=[body];
+ for(let at=body.indexOf('{'),tried=0;at>=0&&tried<20;at=body.indexOf('{',at+1),tried++){const slice=balanced(at);if(slice)candidates.push(slice);}
+ const parsed=candidates.map(candidate=>{try{const value=JSON.parse(candidate);return value&&typeof value==='object'&&!Array.isArray(value)?value:undefined;}catch{return undefined;}}).filter(Boolean);
+ const report=parsed.find(value=>Array.isArray(value.coverage))??parsed[0];
+ invariant(report,'Reviewer did not return a JSON report object; re-request the exact output shape');
+ return report;
 }
 export async function reviewer(store:Store,id:string,model:string|undefined,lenses:string[],routing?:RoutingRequest){const original=taskOf(await store.load(),id);invariant(original.workspace,'Task workspace missing');const route=await selectModel(store,id,'reviewer',original.workspace,routing);if(route.action!=='launch')return route;invariant(!model||model===route.model,'Explicit reviewer disagrees with recorded route; omit model for automatic selection');model=route.model;const s=await store.load(),t=taskOf(s,id);invariant(t.status==='review'&&t.workspace,'Task not awaiting review');invariant(family(model)!==t.family,'Reviewer must use a different model family');const fp=await fingerprint(t.workspace);invariant(fp===route.scope.content,'Review content changed after routing; route again');
  const clean=await reviewPacket(store,id,lenses);
- const prompt=`You are an independent read-only reviewer. Inspect actual files and affected consumers. Report only supported reachable defects, not hypothetical requirements. Keep Spec and Standards coverage distinct. Do not invoke other skills. Return ONLY JSON with report (nonempty string explaining coverage), coverage (array), and findings (array). For EVERY supplied obligation return exactly one coverage entry {id,status,evidence}. Status is covered, finding, unreviewed, or not-applicable. Evidence must name inspected files/consumers or executed receipt paths and observed results, or the exact missing host probe. Task criteria and outcomes cannot be not-applicable; explain preservation or contribution to global outcomes. Other nonapplicability needs a concrete reason. A finding entry remains unresolved until a corrected review. Enumerate reachable failure/recovery exits, protocol boundaries, shared ownership and affected consumers before judging these obligations. Never invent execution evidence or treat no findings as complete coverage. Each finding requires id,lens,location,scenario,evidence,consequence,blocking (boolean). Group multiple lenses describing the same root defect into one finding; keep each lens and its evidence in the report. An empty findings array is allowed only after inspection.\n${JSON.stringify(clean)}`;
+ const prompt=`You are an independent read-only reviewer. Inspect actual files and affected consumers. Report only supported reachable defects, not hypothetical requirements. Keep Spec and Standards coverage distinct. Do not invoke other skills. Return ONLY JSON with report (nonempty string explaining coverage), coverage (array), and findings (array). For EVERY supplied obligation return exactly one coverage entry {id,status,evidence}. Status is covered, finding, unreviewed, or not-applicable. Use covered when you inspected the obligation and found no defect — that is the normal result. Use finding ONLY when you are also filing that defect in the findings array; a finding status with an empty findings array is rejected. Use unreviewed only when you genuinely could not inspect it, naming the exact host probe you need. Evidence must name inspected files/consumers or executed receipt paths and observed results, or the exact missing host probe. This task's own criteria can never be not-applicable: they are what it was asked to deliver. A run outcome may be not-applicable only when no change in this workspace could affect it either way, and the evidence must name the task or component that owns it; otherwise explain this task's contribution or preservation. Other nonapplicability needs a concrete reason. A finding entry remains unresolved until a corrected review. Enumerate reachable failure/recovery exits, protocol boundaries, shared ownership and affected consumers before judging these obligations. Never invent execution evidence or treat no findings as complete coverage. Every finding must be located in a file inside this task's workspace and must describe a defect in the changes under review. The status of other tasks, provider or model availability, coordinator behaviour and run orchestration are outside your scope: never report them as findings, and never let them make an obligation a finding. Judging this task means judging what is in this workspace. Each finding requires id,lens,location,scenario,evidence,consequence,blocking (boolean). Group multiple lenses describing the same root defect into one finding; keep each lens and its evidence in the report. An empty findings array is allowed only after inspection.\nThe task contract, its obligations, the registered checks and their receipts are in "${await handoffFile(store,id,'review-packet.md',`# Review packet for ${id}\n\n\`\`\`json\n${JSON.stringify(clean,null,1)}\n\`\`\``)}". Read that file in full before inspecting anything. It sits outside the workspace: read it, never edit it.`;
  const operation=await acquireActivity(store,id,'review',undefined,async current=>{invariant(fp===await fingerprint(t.workspace!),'Review workspace changed during routing');consumeRoute(current,route);});
  try{
- const out=await piRun({workspace:t.workspace,model,prompt,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id+'-review-'+Date.now()),readOnly:true,onSpawn:pid=>activitySpawned(store,id,operation,pid)});const raw=out.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');let report;try{report=JSON.parse(raw);}catch{throw new Error('Reviewer did not return valid JSON; retain session and retry a targeted format correction');}await review(store,id,{model,findings:report.findings,coverage:report.coverage,report:report.report,fingerprint:fp});return {findings:report.findings,artifact:await store.artifact(out)};}finally{await releaseActivity(store,id,operation);}}
+ let correction='',lastFormatError='';
+ for(let attempt=1;;attempt++){
+  const out=await piRun({workspace:t.workspace,model,prompt:prompt+correction,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id+'-review-'+Date.now()),readOnly:true,onSpawn:pid=>activitySpawned(store,id,operation,pid)});
+  try{
+   const report=reviewReport(out.text);
+   await review(store,id,{model,findings:report.findings,coverage:report.coverage,report:report.report,fingerprint:fp});
+   return {findings:report.findings,artifact:await store.artifact(out)};
+  }catch(error){
+   const message=(error as Error).message;
+   if(attempt>=reviewFormatAttempts||transientProvider(message))throw new Error(lastFormatError&&lastFormatError!==message?`Reviewer output stayed malformed across ${attempt} attempts: ${lastFormatError}, then ${message}`:message);
+   lastFormatError=message;
+   await store.transaction(s=>event(s,'review-format-retry',{id,model,attempt,reason:message})).catch(()=>{});
+   correction=`\n\nYour previous reply was rejected: ${message}\nReturn ONLY this JSON object, with no surrounding prose and no code fence. All three top-level keys are required, including a nonempty "report":\n{"report":"one paragraph naming the files you inspected and what you observed","coverage":[{"id":"<one entry per supplied obligation id>","status":"covered|finding|unreviewed|not-applicable","evidence":"what you inspected and saw"}],"findings":[]}\nEvery finding, if any, needs id, lens, location, scenario, evidence, consequence and blocking. If you cannot evidence a finding, omit it rather than sending it incomplete.`;
+  }
+ }
+ }catch(e){if(transientProvider((e as Error).message))await store.transaction(s=>event(s,'provider-unavailable',{model,family:family(model!),taskId:id,purpose:'reviewer'})).catch(()=>{});throw e;}finally{await releaseActivity(store,id,operation);}}
