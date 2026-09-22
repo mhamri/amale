@@ -1,6 +1,7 @@
 import { For } from 'solid-js';
 import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
+import ModelTopology from '../../components/diagrams/ModelTopology';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
@@ -14,21 +15,25 @@ const roles = [
   {
     name: 'Coordinator',
     badge: 'minimal turns',
+    badgeClass: 'badge badge-soft badge-primary text-xs',
     body: 'Clarifies intent, chunks the work, defines acceptance criteria and integrates the results. One delegate call per chunk: no per-step instructions, no hand-written briefs, no micro-management.',
   },
   {
     name: 'Workers',
     badge: 'pi / OpenRouter',
-    body: 'Own a chunk end to end — implementation, checks and repair cycles. When a choice inside the chunk is uncertain they consult Jev directly through the bundled helper instead of escalating to the coordinator.',
+    badgeClass: 'badge badge-soft badge-info font-mono font-normal text-xs',
+    body: 'The routed Flash families — DeepSeek, GLM, MiMo and Solar — each own a chunk end to end: implementation, checks and repair cycles. When a choice inside the chunk is uncertain they consult Jev directly through the bundled helper instead of escalating to the coordinator.',
   },
   {
     name: 'Reviewer',
     badge: 'read-only',
+    badgeClass: 'badge badge-soft badge-secondary text-xs',
     body: 'The other Flash family independently verifies each chunk with structured coverage. Findings route back into the worker’s repair loop, not to the coordinator.',
   },
   {
     name: 'Jev',
     badge: 'bounded decisions',
+    badgeClass: 'badge badge-soft badge-accent text-xs',
     body: 'Answers bounded either/or questions for the workers and the coordinator. Dependencies, ownership, checks and review coverage are enforced by TypeScript code, not by a model.',
   },
 ];
@@ -84,14 +89,15 @@ export default function DocsOverview() {
           <p class="mt-4 text-base leading-relaxed">
             Four roles carry a run. The expensive model coordinates, cheap models execute, a second cheap family reviews, and a third cheap role answers the questions that would otherwise stall either of them.
           </p>
-          <div class="mt-6 grid gap-6 md:grid-cols-2">
+          <ModelTopology class="mt-8" />
+          <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             <For each={roles}>
               {(role) => (
                 <article class="card rounded-box border border-line bg-base-200 shadow-rest">
                   <div class="card-body gap-3 p-6">
                     <div class="flex flex-wrap items-center gap-2">
                       <h3 class="font-display text-title font-semibold tracking-tight">{role.name}</h3>
-                      <span class="badge badge-neutral text-xs">{role.badge}</span>
+                      <span class={role.badgeClass}>{role.badge}</span>
                     </div>
                     <p class="text-sm leading-relaxed text-dim">{role.body}</p>
                   </div>
