@@ -31,33 +31,56 @@ const TILE = { side: 0.72, half: 0.36, radius: 0.18 };
 // coordinator and the reviewer are dim glows, not labelled boxes.
 const NODES: SceneNode[] = [
   { x: 4.3, y: 4.5, r: 0.85, role: 'coordinator' },
+  // Worker models — routed cheap models that receive chunks from the coordinator.
   { x: 11.0, y: 5.2, r: 0.44, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
   { x: 13.6, y: 5.2, r: 0.44, role: 'worker', label: 'GLM', model: 'glm' },
   { x: 11.0, y: 7.05, r: 0.44, role: 'worker', label: 'MiMo', model: 'mimo' },
   { x: 13.6, y: 7.05, r: 0.44, role: 'worker', label: 'Solar', model: 'solar' },
+  // Jev — orchestration model for bounded questions from workers.
   { x: 8.3, y: 7.7, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
+  // Reviewer hosts — each finished chunk is reviewed by a different model
+  // family. Anthropic and OpenAI wear identity tiles, so they sit on the
+  // lower row with the other labelled models: their marks paint their own
+  // light fills (Anthropic's tan square, OpenAI's light tile surface), which
+  // must never sit under the copy. The anonymous reviewer is a dim glow and
+  // can stay higher.
   { x: 11.5, y: 1.35, r: 0.42, role: 'review' },
+  { x: 9.4, y: 7.7, r: 0.42, role: 'review', label: 'Anthropic', model: 'anthropic' },
+  { x: 15.5, y: 7.7, r: 0.42, role: 'review', label: 'OpenAI', model: 'openai' },
+  // Kimi — escalation model via Jev. Its mark paints a large light monogram,
+  // so it stays right of the prose measure with the other labelled tiles.
+  { x: 12.3, y: 8.0, r: 0.40, role: 'worker', label: 'Kimi', model: 'kimi' },
 ];
 
 const LINKS: SceneLink[] = [
+  // Coordinator distributes chunks to four worker models.
   { from: 0, to: 1, role: 'coordinator', phase: 0 },
   { from: 0, to: 2, role: 'coordinator', phase: 0.26 },
   { from: 0, to: 3, role: 'coordinator', phase: 0.52 },
   { from: 0, to: 4, role: 'coordinator', phase: 0.78 },
+  // Workers put bounded questions to Jev.
   { from: 2, to: 5, role: 'jev', phase: 0.14 },
   { from: 3, to: 5, role: 'jev', phase: 0.64 },
+  // Jev escalates to Kimi when needed.
+  { from: 5, to: 9, role: 'jev', phase: 0.38 },
+  // Each finished chunk is reviewed by a different model family.
   { from: 1, to: 6, role: 'review', phase: 0.42 },
   { from: 4, to: 6, role: 'review', phase: 0.92 },
+  { from: 1, to: 7, role: 'review', phase: 0.68 },
+  { from: 3, to: 8, role: 'review', phase: 0.18 },
+  // Accepted chunks travel back to the coordinator.
   { from: 6, to: 0, role: 'review', phase: 0.58 },
+  { from: 7, to: 0, role: 'review', phase: 0.82 },
+  { from: 8, to: 0, role: 'review', phase: 0.34 },
 ];
 
 const NODE_COUNT = NODES.length;
 const LINK_COUNT = LINKS.length;
 
 const ARIA_LABEL =
-  'The coordinator sends chunks of work out to four routed worker models, DeepSeek, GLM, MiMo and Solar. ' +
-  'Workers put bounded questions to Jev, a different model family reviews each finished chunk, ' +
-  'and accepted chunks travel back to the coordinator.';
+  'The coordinator sends chunks of work out to routed worker models — DeepSeek, GLM, MiMo, Solar and Kimi. ' +
+  'Workers put bounded questions to Jev, a different model family (Anthropic, OpenAI or the anonymous reviewer) ' +
+  'reviews each finished chunk, and accepted chunks travel back to the coordinator.';
 
 const ROLE_VARIABLE: Record<Role, string> = {
   coordinator: '--color-primary',
@@ -68,15 +91,23 @@ const ROLE_VARIABLE: Record<Role, string> = {
 
 // Every hue the scene can paint a node with: the role hues plus each model's
 // routed hue from the identity list.
+// Extract the bare custom-property name from a var(--color-*) expression so
+// the palette lookup does not double-wrap in var().
+const bareVar = (v: string) => v.replace(/^var\(/, '').replace(/\)$/, '');
+
 const HUE_VARIABLES = [
-  ...new Set([...Object.values(ROLE_VARIABLE), ...Object.values(MODELS).map((m) => m.hue)]),
+  ...new Set([
+    ...Object.values(ROLE_VARIABLE),
+    ...Object.values(MODELS).map((m) => bareVar(m.hue)),
+  ]),
 ];
 const SCENE_VARIABLES = ['--color-base-100', '--color-line', ...HUE_VARIABLES];
 
 // A model node glows in its own routed hue; the coordinator and the reviewer
-// keep their role hues.
+// keep their role hues. Returns a bare custom-property name (e.g.
+// '--color-secondary') so consumers can wrap it in var() themselves.
 const nodeHue = (node: SceneNode) =>
-  node.model ? MODELS[node.model].hue : ROLE_VARIABLE[node.role];
+  bareVar(node.model ? MODELS[node.model].hue : ROLE_VARIABLE[node.role]);
 
 const VERTEX_SOURCE = `
 attribute vec2 aPos;
@@ -432,9 +463,11 @@ export default function HeroCanvas() {
             identity layer, visible with no JavaScript, no WebGL, and over the
             live scene alike. The tile is the same rounded square either way,
             so a model without a published mark reads as a monogram tile, not
-            as a hole. Below lg the layer recedes so it reads as background
-            behind copy that spans the full band. */}
-        <g class="opacity-60 lg:opacity-100">
+            as a hole. Below lg the copy spans the full band and no tile
+            position can clear it, so the layer recedes to a level whose
+            worst-case light tile blend (Anthropic's tan, OpenAI's light
+            surface) still keeps dim body copy above the 4.5:1 floor. */}
+        <g class="opacity-20 lg:opacity-100">
         {NODES.map((node) => {
           if (!node.model) return null;
           const identity = MODELS[node.model];
@@ -491,9 +524,8 @@ export default function HeroCanvas() {
             <text
               x={node.x}
               y={node.y + TILE.half + 0.52}
-              class="font-mono"
               fill="var(--color-dim)"
-              font-size="0.4"
+              font-size="0.18"
               text-anchor="middle"
             >
               {node.label}
