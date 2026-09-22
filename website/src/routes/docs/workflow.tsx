@@ -1,6 +1,7 @@
 import { For } from 'solid-js';
 import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
+import RunLifecycle from '../../components/diagrams/RunLifecycle';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
@@ -12,7 +13,7 @@ const sections: DocsSection[] = [
 ];
 
 const h2 = 'scroll-mt-24 font-display text-display font-semibold tracking-tight';
-const source = 'badge badge-neutral font-mono text-xs font-normal';
+const source = 'badge badge-soft badge-info font-mono text-xs font-normal';
 
 const outcomes = [
   ['accepted', 'The chunk passed its checks and review. Integrate next.'],
@@ -41,6 +42,8 @@ export default function DocsWorkflow() {
         lead="A run is one loop: discover and specify, decompose into deliverable tasks, delegate each chunk to an isolated workspace, and accept only what survives checks, independent review and integration evidence."
         sections={sections}
       >
+        <RunLifecycle />
+
         <section>
           <div class="flex flex-wrap items-center gap-3">
             <h2 id="discovery" class={h2}>Discovery and specification</h2>

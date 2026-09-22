@@ -1,5 +1,6 @@
 import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
+import OperationMap from '../../components/diagrams/OperationMap';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
@@ -32,7 +33,8 @@ export default function DocsCommands() {
         lead="Every CLI operation available through the Amale runtime, grouped by purpose. Each entry states what the operation does and the input shape it expects, drawn from the shipped runtime reference files."
         sections={sections}
       >
-        
+        <OperationMap />
+
         <section>
           <h2 id="invocation" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Invocation shape
