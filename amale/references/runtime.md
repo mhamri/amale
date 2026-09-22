@@ -2,6 +2,8 @@
 
 Run `bun <skill>/scripts/cli.ts <operation> <workspace> <run-id> [input.json]` by default; fall back to `node <skill>/scripts/run.ts ...` only when Bun is absent, since modern Node directly executes the erasable TypeScript. Paths are arguments, not interpolated shell commands. There are no npm runtime dependencies.
 
+Printing never changes what an operation returns. A machine caller always reads JSON, because JSON stays the default whenever stdout is not an interactive terminal. A person at a terminal instead gets a readable report — a headline answering the question, then aligned detail rows — from `doctor`, `list`, `status`, `health`, `next`, `diagnose` and `preflight`; every other operation pretty-prints its JSON. Pass `--json` to force the machine record even at a terminal. Human output is therefore opt-in by being a person at a terminal, never by guessing, and an existing caller that parses JSON is unaffected.
+
 `doctor` takes no run; `list <workspace>` returns one summary per run — id, status, intent, acceptance criteria, task count, revision, the run it continues and its acceptance record — newest revision first. Read it before starting anything, because later work on an existing outcome continues that run rather than opening a new one. `install` links this canonical skill into the default Claude/Codex skill directories and refuses conflicting targets. Windows uses directory junctions; Unix uses directory symlinks.
 
 ## Input examples and operations

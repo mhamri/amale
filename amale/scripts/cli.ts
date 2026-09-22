@@ -11,6 +11,7 @@ import {bench,renderScorecard} from './bench.ts';
 import { selectModel } from './routing.ts';
 import * as effort from './effort.ts';
 import { trace, diagnostics } from './telemetry.ts';
+import { humanRequested, renderResult, stripFlags } from './render.ts';
 
 const esc=(s:unknown)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export async function statusHtml(store:core.Store){const s=await store.load();const content=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amale ${esc(s.id)}</title><style>body{max-width:1050px;margin:40px auto;padding:20px;font:16px/1.6 system-ui;background:#f7f6ef;color:#243832}article{padding:18px;border:1px solid #bdcbbb;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}.muted{color:#52665f}</style><h1>${esc(s.intent)}</h1><p>${esc(s.status)} · revision ${s.revision} · ${esc(s.host.model)}</p><h2>Next action</h2><pre>${esc(JSON.stringify(await core.next(store),null,2))}</pre><h2>Acceptance criteria</h2><ul>${s.criteria.map(c=>`<li>${esc(c)}</li>`).join('')}</ul><h2>Work graph</h2>${s.tasks.map(t=>`<article><h3>${esc(t.id)} · ${esc(t.title)}</h3><p>${esc(t.phase)} / ${esc(t.status)} / ${esc(t.depth)} / repair cycle ${t.cycles}</p><p>Depends on: ${esc(t.deps.join(', ')||'entry')}</p><p>${esc(t.goal)}</p><p class="muted">${esc(t.blocked??'')}</p></article>`).join('')}<h2>Decisions</h2>${s.decisions.map(d=>`<p>${esc(d.question)} → ${esc(d.choice??'host decision pending')} (${esc(d.source??'pending')})</p>`).join('')}<p>Evidence and full history remain in this run’s durable records.</p></html>`;const path=join(store.root,'status.html');await writeFile(path,content);return {path};}
@@ -87,9 +88,10 @@ case 'host-exception':return core.hostException(store,input);
  return core.next(store);
 }
 export async function main(args=process.argv.slice(2)){
- const [operation,workspace,runId]=args;
- if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export'].includes(operation))return executeMain(args);
+ const argv=stripFlags(args);
+ const [operation,workspace,runId]=argv;
+ if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export'].includes(operation))return executeMain(argv);
  const store=new core.Store(workspace,runId),operationTrace=await trace(store.root,'cli:'+operation,{runId});
- try{const value=await executeMain(args);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
+ try{const value=await executeMain(argv);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().then(value=>console.log(JSON.stringify(value,null,2))).catch(e=>{console.error(JSON.stringify({error:e.message}));process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().then(value=>console.log(renderResult(stripFlags(process.argv.slice(2))[0]??'',value,humanRequested(process.argv.slice(2),process.stdout.isTTY)))).catch(e=>{console.error(JSON.stringify({error:e.message}));process.exitCode=1;});
