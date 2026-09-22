@@ -45,8 +45,8 @@ export default function DocsWorkflow() {
         <RunLifecycle />
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="discovery" class={h2}>Discovery and specification</h2>
+          <h2 id="discovery" class={h2}>Discovery and specification</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/planning.md</span>
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
@@ -65,8 +65,8 @@ export default function DocsWorkflow() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="planning" class={h2}>Planning and task decomposition</h2>
+          <h2 id="planning" class={h2}>Planning and task decomposition</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/planning.md</span>
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
@@ -86,8 +86,8 @@ export default function DocsWorkflow() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="delegation" class={h2}>Delegation</h2>
+          <h2 id="delegation" class={h2}>Delegation</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/execution.md</span>
             <span class={source}>references/runtime.md</span>
           </div>
@@ -126,8 +126,8 @@ export default function DocsWorkflow() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="parallel" class={h2}>Parallel execution</h2>
+          <h2 id="parallel" class={h2}>Parallel execution</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/parallelism.md</span>
             <span class={source}>references/execution.md</span>
           </div>
@@ -171,8 +171,8 @@ export default function DocsWorkflow() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="delivery" class={h2}>Verified delivery</h2>
+          <h2 id="delivery" class={h2}>Verified delivery</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/execution.md</span>
             <span class={source}>references/review.md</span>
             <span class={source}>references/runtime.md</span>
