@@ -1,6 +1,7 @@
 import { For } from 'solid-js';
 import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
+import ReviewLoop from '../../components/diagrams/ReviewLoop';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
@@ -12,7 +13,7 @@ const sections: DocsSection[] = [
 ];
 
 const h2 = 'scroll-mt-24 font-display text-display font-semibold tracking-tight';
-const source = 'badge badge-neutral font-mono text-xs font-normal';
+const source = 'badge badge-soft badge-info font-mono text-xs font-normal';
 
 const repairStages = [
   ['Flash repair', 'Two ordinary repair cycles by routed Flash workers.'],
@@ -40,6 +41,8 @@ export default function DocsReviewAndRecovery() {
         lead="What keeps a delegated run honest: a reviewer from a different model family with structured coverage, bounded repair escalation, and state that survives a cleared chat, an exhausted provider or a compacted host."
         sections={sections}
       >
+        <ReviewLoop />
+
         <section>
           <div class="flex flex-wrap items-center gap-3">
             <h2 id="independent-review" class={h2}>Independent cross-family review</h2>

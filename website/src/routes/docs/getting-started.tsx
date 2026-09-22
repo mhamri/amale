@@ -1,6 +1,7 @@
 import { For } from 'solid-js';
 import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
+import InstallSequence from '../../components/diagrams/InstallSequence';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
@@ -42,6 +43,8 @@ export default function DocsGettingStarted() {
         lead="From a stable checkout to a first delegated run: what the machine needs, how the skill is installed, where credentials live, and the operations that start and resume a run."
         sections={sections}
       >
+        <InstallSequence />
+
         <section>
           <h2 id="prerequisites" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Prerequisites
