@@ -7,6 +7,7 @@
     "prebuild": "node scripts/prepare.mjs",
     "build": "vite build",
     "postbuild": "node scripts/postbuild.mjs",
+    "build:all": "node scripts/build.mjs",
     "check": "tsc --noEmit",
     "test:static": "node scripts/check-static.mjs",
     "preview": "node scripts/preview.mjs"

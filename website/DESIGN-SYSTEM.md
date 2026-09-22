@@ -14,8 +14,14 @@ Amale is a delivery workflow for coding agents: plan, build, review, verify,
 resume. The site's visual language is a **night ledger** — a calm, layered
 graphite workspace where warm brass marks action, teal marks "verified", and
 violet marks orchestration. Depth is deliberate: surfaces step lighter as they
-rise, separated by hairline borders and two quiet shadow levels. Motion is
-short, ease-out, and explains state changes; it never decorates.
+rise, separated by hairline borders and two quiet shadow levels.
+
+The site carries one deliberate visual layer on top of that calm base: a
+live hero canvas and a set of orchestration diagrams that show delegation
+happening rather than describing it in prose. Those visuals are the site's
+confident moment. Everything else stays quiet, so they read as instruments
+on a dark console, never as decoration — see **Visualization layer** below
+for what is allowed and what is required of each one.
 
 Two earlier directions are **rejected and must not return**:
 
@@ -119,7 +125,7 @@ in a headline as emphasis.
 - **Section wrapper** (every page section, copy verbatim):
 
   ```html
-  <section class="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 md:py-24">
+  <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
   ```
 
   Two adjacent wrappers must not stack their vertical rhythm — 96 pixels of
@@ -131,8 +137,8 @@ in a headline as emphasis.
     next section trims its top so the pair pulls together:
 
     ```html
-    <section class="mx-auto w-full max-w-6xl px-4 pb-4 pt-16 sm:px-6 md:pb-8 md:pt-24">
-    <section class="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 md:pt-8">
+    <section class="mx-auto w-full max-w-7xl px-4 pb-4 pt-16 sm:px-6 md:pb-8 md:pt-24">
+    <section class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 md:pt-8">
     ```
 
   - A section that follows one carrying no bottom padding keeps the full
@@ -148,7 +154,64 @@ in a headline as emphasis.
   and keeps the full rhythm on both sides.
 - Prose blocks: `max-w-prose`. Two-column feature grids:
   `grid gap-6 md:grid-cols-2`. Reading order stays single-column below `md`.
-- Footer/header containers: `mx-auto w-full max-w-6xl px-4 sm:px-6`.
+- Footer/header containers: `mx-auto w-full max-w-7xl px-4 sm:px-6`.
+
+## Responsive scale
+
+The site is read on a phone, on a tablet and on a desktop monitor, and it
+must look deliberate on all three. The failure to design against is a single
+`max-w-prose` column parked on the left of a 1440-pixel window with two
+thirds of the screen empty — a tablet page stretched onto a desktop. A
+desktop layout earns the extra width by putting something in it, never by
+stretching body copy past a readable measure.
+
+Four widths are the contract. Every page is checked at all four.
+
+| Width | Target | What must be true |
+| --- | --- | --- |
+| 320–389 px | Small phone | One column. Nothing overflows horizontally. Diagrams switch to their stacked form. |
+| 390–767 px | Phone | One column. Cards full width. Hero canvas keeps a 4:3 or taller box. |
+| 768–1023 px | Tablet | Two-column card grids (`md:grid-cols-2`). Docs sidebar still stacked above the article. |
+| 1024 px and up | Desktop | The prose column is paired with a second column of real content. Docs use the three-column shell. Card grids reach three columns at `xl`. |
+
+Rules that produce that:
+
+- **Container:** `mx-auto w-full max-w-7xl px-4 sm:px-6` (80rem / 1280 px) for
+  every section wrapper and for header and footer. Content inside may be
+  narrower; the container is not.
+- **Reading measure never grows.** Body copy stays `max-w-prose`
+  (about 65 characters) at every width. Width is spent on a second column,
+  not on longer lines.
+- **Paired section:** a section whose prose has a visual, diagram or panel
+  partner uses
+
+  ```html
+  <div class="grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
+  ```
+
+  so the prose keeps its measure on the left and the visual takes the rest of
+  the width. Below `lg` the pair stacks, prose first.
+- **Card grids:** `grid gap-6 md:grid-cols-2 xl:grid-cols-4` for a four-card
+  row of roles, `grid gap-6 md:grid-cols-2 xl:grid-cols-3` for three. Reading
+  order stays single column below `md`.
+- **Docs shell:** three columns from `xl`, two from `lg`, stacked below —
+  navigation, article, and the "On this page" list moved out of the article
+  into its own right rail:
+
+  ```html
+  <div class="grid gap-10 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_14rem]">
+  ```
+
+  `minmax(0,1fr)` on the article column is load-bearing for the same reason
+  `min-w-0` is: a grid item defaults to `min-width: auto`, so a wide `<pre>`
+  or a diagram would push the column open instead of scrolling. The right
+  rail is `hidden xl:block` and is the only copy of the on-page list at that
+  width; below `xl` the list renders inside the article as before, so the
+  page never shows it twice.
+- **Full-bleed visuals** may break the prose measure but never the container:
+  a diagram panel spans its grid column and stays inside `max-w-7xl`.
+- **Type** is already fluid (`text-hero`, `text-display` use `clamp`); do not
+  add width-conditional font-size utilities on top of them.
 
 ## Shape, borders, elevation
 
@@ -163,17 +226,25 @@ in a headline as emphasis.
 - Durations: 160ms for micro-interactions (hover, colour), 260ms for state
   changes (disclosure, tabs). Ease: `ease-out-soft`
   (`cubic-bezier(0.22, 1, 0.36, 1)` — available as a utility).
-- **One orchestrated moment per page**: the hero may use
-  `animate-rise` (0.6s fade + 0.75rem rise, `both`). Apply it to the hero
-  headline group at most, optionally staggering with
-  `[animation-delay:120ms]`. No other page-load or scroll-triggered
-  animations; no hover transitions on every card — hover feedback is a
-  160ms colour/border change only.
+- **Entrance motion stays one moment per page**: the hero headline group may
+  use `animate-rise` (0.6s fade + 0.75rem rise, `both`), optionally
+  staggered with `[animation-delay:120ms]`. No other page-load fade-ins, and
+  no hover transitions on every card — hover feedback is a 160ms
+  colour/border change only.
 - Motion answers actions: dropdowns, collapses and tabs animate as they
-  open; nothing loops continuously except an explicit `loading-spinner`.
+  open.
+- **Continuous motion is permitted only inside the visualization layer** —
+  the hero canvas and the orchestration diagrams described below. It is the
+  subject of those components, not decoration on top of them, and it obeys
+  the pause rules in that section. Nothing else loops except an explicit
+  `loading-spinner`.
 - **Reduced motion:** `style.css` kills all transitions, keyframes and
-  smooth scrolling under `prefers-reduced-motion: reduce`. Never add motion
-  that bypasses it (e.g. Web Animations API or inline `style` transitions).
+  smooth scrolling under `prefers-reduced-motion: reduce`. CSS-driven motion
+  is therefore covered automatically. Script-driven motion is not: every
+  canvas or JavaScript timeline must query
+  `matchMedia('(prefers-reduced-motion: reduce)')` itself, render one static
+  frame when it matches, and subscribe to that query's `change` event so a
+  visitor who turns the preference on mid-visit stops the motion.
 
 ## Component patterns (copy the class strings)
 
@@ -237,23 +308,45 @@ rel="noopener noreferrer"`. All internal hrefs go through `asset()` from
 procedures may use `steps steps-vertical` — only for content that truly is a
 sequence.
 
-**Badges / chips**: `badge badge-soft badge-primary|secondary|accent
-  text-xs` for a tinted chip, `badge badge-primary text-sm` for a filled one.
+**Badges / chips** — a chip always carries a hue that means something. The
+  solid `badge badge-neutral` is graphite on graphite: it clears contrast for
+  its own text but reads as an unpainted placeholder against a `base-200`
+  card, so it is **retired from content**. It survives only inside `base-100`
+  page chrome where no card sits behind it.
+
+  Use the soft variant with a light hue, chosen by what the chip labels:
+
+  | Chip means | Classes |
+  | --- | --- |
+  | Action, step count, the coordinator, a primary topic | `badge badge-soft badge-primary` |
+  | Verified, checked, passing, a worker that delivered | `badge badge-soft badge-secondary` |
+  | Orchestration: Jev, routing, model families, escalation | `badge badge-soft badge-accent` |
+  | A source file, a CLI operation name, a reference pointer | `badge badge-soft badge-info font-mono font-normal` |
+  | A limit, a caveat, work not yet exercised | `badge badge-soft badge-warning` |
+
+  Add `text-xs` for chips inside a card heading row and `text-sm` for chips
+  used as a standalone list of topics. A filled `badge badge-primary text-sm`
+  stays available for a single emphatic chip, at most one group per page.
+
   Never combine `badge-soft` with `badge-neutral` or any dark hue: daisyUI 5
   renders a soft badge as the badge colour itself over an 8% tint of that
   colour mixed into `base-100`, so `badge-soft badge-neutral` sets `neutral`
   `#262d35` text on `#111418` — **1.33:1**, unreadable on the dark theme. The
-  light hues read as text over the same treatment: primary `#e2a45c` on
-  `#1d1c1c` **7.85:1**, secondary `#5cc9b4` on `#151e21` **8.45:1**, accent
-  `#b7a3f2` on `#1a1c24` **7.72:1**. A neutral chip is the solid
-  `badge badge-neutral`: `neutral-content` `#dfe5eb` on `neutral` `#262d35`,
-  **10.96:1**.
+  light hues read as text over the same treatment and all clear AAA: primary
+  `#e2a45c` on `#1d1c1c` **7.85:1**, secondary `#5cc9b4` on `#151e21`
+  **8.45:1**, accent `#b7a3f2` on `#1a1c24` **7.73:1**, info `#7fc3e8` on
+  `#171e24` **8.75:1**, warning `#e2a45c` on `#1d1c1c` **7.85:1**, success
+  `#63cfa0` on `#161e1f` **8.82:1**, error `#ef8a80` on `#1e1b1e` **7.03:1**.
+  These fills are computed by reproducing daisyUI's
+  `color-mix(in oklab, <colour> 8%, base-100)` in sRGB and measuring WCAG
+  relative luminance; `scripts/check-static.mjs` recomputes them so a palette
+  edit that breaks a chip fails the build.
 
 **On-page navigation (docs layout)** — every docs page uses this shell:
 
 ```html
-<div class="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 md:py-24">
-  <div class="grid gap-10 lg:grid-cols-[16rem_1fr]">
+<div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+  <div class="grid gap-10 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_14rem]">
     <aside class="min-w-0 lg:sticky lg:top-24 lg:self-start">
       <nav aria-label="Documentation">
         <ul class="menu w-full gap-0.5 rounded-box border border-line bg-base-200 p-2 font-mono text-sm">
@@ -264,17 +357,83 @@ sequence.
         </ul>
       </nav>
     </aside>
-    <article class="min-w-0 max-w-prose"> … </article>
+    <article class="min-w-0"> … </article>
+    <aside class="hidden min-w-0 xl:sticky xl:top-24 xl:block xl:self-start">
+      <nav aria-label="On this page"> … </nav>
+    </aside>
   </div>
 </div>
 ```
 
-`min-w-0` on both the aside and article is load-bearing: both are children of
-`grid lg:grid-cols-[16rem_1fr]`, and a grid item's default `min-width: auto`
-lets wide `<pre>` blocks inside push the column open instead of scrolling.
-The accessibility floor forbids exactly that outcome — nothing may overflow
-horizontally at 320 CSS pixels — and `overflow-x-auto` on wide content alone
-is not sufficient here.
+`min-w-0` on every grid child, and `minmax(0,1fr)` on the article column, are
+load-bearing: a grid item's default `min-width: auto` lets a wide `<pre>` or a
+diagram inside push the column open instead of scrolling. The accessibility
+floor forbids exactly that outcome — nothing may overflow horizontally at 320
+CSS pixels — and `overflow-x-auto` on wide content alone is not sufficient
+here.
+
+Inside the article, running copy stays `max-w-prose`, applied to the prose
+blocks rather than to the `<article>`: a diagram panel, table or code block
+uses the full article column. The "On this page" list lives in the right rail
+from `xl` and inside the article below it, rendered once at any given width.
+
+## Visualization layer
+
+The site shows delegation instead of only describing it. Two component kinds
+carry that, and both are subject to the rules here.
+
+**Hero canvas** — one per site, on the landing page only. A WebGL scene whose
+subject is the workflow itself: one coordinator node segmenting work and
+handing chunks out to worker nodes, work flowing back for review, accepted
+chunks settling. It reads as an instrument on the night-ledger console, drawn
+in palette hues (brass for the coordinator and action, teal for accepted or
+verified, violet for orchestration and routing) on the `base-100` background.
+No photographic texture, no lens flare, no particle confetti.
+
+**Orchestration and topic diagrams** — SVG plus a small script timeline. Each
+one has a single subject named in its own caption: the model topology on the
+landing page and the documentation overview, and one diagram per remaining
+documentation page showing that page's subject (the run lifecycle, the review
+and repair loop, the install and first-run sequence, the operation map).
+
+Required of every visual in this layer, without exception:
+
+- **Server-rendered fallback first.** The component's markup renders complete
+  and meaningful with no JavaScript: a static SVG, or a labelled panel that
+  states what the visual would show. Canvas and timeline code runs only after
+  mount, inside `onMount`, never during server rendering.
+- **No-WebGL fallback.** If `getContext('webgl2')` and `getContext('webgl')`
+  both return null, the static fallback stays on screen and nothing throws.
+- **Reduced motion.** `matchMedia('(prefers-reduced-motion: reduce)')`
+  matching means one static frame and no animation loop, with a `change`
+  listener so toggling the preference takes effect immediately.
+- **Off-screen and hidden pause.** An `IntersectionObserver` stops the loop
+  when the visual scrolls out of view, and a `visibilitychange` listener stops
+  it when the tab is hidden. A loop must never run unseen.
+- **Teardown.** `onCleanup` cancels the animation frame, disconnects the
+  observer, removes every listener, and releases WebGL resources.
+- **Accessible.** A decorative canvas is `aria-hidden="true"` and the meaning
+  is carried by adjacent text. A diagram that carries meaning is
+  `role="img"` with an `aria-label` naming what it shows, or it exposes the
+  same structure as real text beside it. Labels inside a diagram are real
+  `<text>` in the SVG, so they are selectable and scale with the page.
+- **Sized in the layout, not by the window.** The wrapper sets an explicit
+  aspect ratio (`aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9]`), the canvas
+  fills it with `size-full`, and the drawing buffer is set from
+  `getBoundingClientRect()` times `devicePixelRatio`, capped at 2, on mount
+  and on resize. Nothing reads `window.innerWidth` to decide a layout.
+- **Cheap.** Target 60 frames per second on integrated graphics: no more than
+  a few hundred draw calls per frame, no per-frame allocation, no shader
+  recompilation after mount.
+
+Diagram panel wrapper, for any visual in this layer:
+
+```html
+<figure class="overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
+  <div class="aspect-[4/3] w-full sm:aspect-[16/10] lg:aspect-[16/9]"> … </div>
+  <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">…</figcaption>
+</figure>
+```
 
 **Header pattern** (fixed by this task, in `Header.tsx`): sticky
 `bg-base-100/85 backdrop-blur-md border-b border-line`; brand lockup is the
@@ -320,6 +479,10 @@ when decorative.
 ## Verified checks
 
 - `tsc --noEmit` passes; `npm run build` prerenders all routes.
-- Rendered inspection (headless Chromium) at 320/390/1440 px over every
-  prerendered route: no horizontal overflow, one `h1` per route, visible
-  keyboard focus, and reduced motion respected.
+- Rendered inspection (headless Chromium) at 320/390/768/1024/1440 px over
+  every prerendered route: no horizontal overflow, one `h1` per route,
+  visible keyboard focus, reduced motion respected, and at 1024 px and above
+  no page reduced to a single narrow column.
+- Every visual in the visualization layer is inspected with JavaScript
+  disabled (the server-rendered fallback must be meaningful), with WebGL
+  unavailable, and with `prefers-reduced-motion: reduce` forced.
