@@ -1,0 +1,173 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+@import "@fontsource/spline-sans-mono/400.css";
+@import "@fontsource/spline-sans-mono/500.css";
+@import "@fontsource/spline-sans-mono/600.css";
+@plugin "daisyui" { themes: false; logs: false; }
+
+/*
+ * Amale design system — "night ledger".
+ * One dark theme, layered graphite surfaces, a brass primary, a teal
+ * "verified" support hue and a violet accent used sparingly.
+ * Everything on every page is built from this theme plus daisyUI
+ * components and Tailwind utilities. No page-specific section styles
+ * belong in this file; the contract lives in website/DESIGN-SYSTEM.md.
+ */
+@plugin "daisyui/theme" {
+  name: "amale";
+  default: true;
+  color-scheme: dark;
+  /* Surfaces: page, raised surface, elevated surface. */
+  --color-base-100: #0f1216;
+  --color-base-200: #161c22;
+  --color-base-300: #20272f;
+  --color-base-content: #e8edf3;
+  /* Primary brass — actions, active states, the brand mark. */
+  --color-primary: #e2a45c;
+  --color-primary-content: #221505;
+  /* Secondary teal — verification, success, "checked" semantics. */
+  --color-secondary: #5cc9b4;
+  --color-secondary-content: #06231d;
+  /* Accent violet — orchestration highlights (Jev, routing). Use sparingly. */
+  --color-accent: #b7a3f2;
+  --color-accent-content: #1c1030;
+  /* Neutral — chips, badges, inert containers. */
+  --color-neutral: #262d35;
+  --color-neutral-content: #dfe5eb;
+  /* Status colours for daisyUI alert/badge components. */
+  --color-info: #7fc3e8;
+  --color-info-content: #0a2231;
+  --color-success: #63cfa0;
+  --color-success-content: #06251a;
+  --color-warning: #e2a45c;
+  --color-warning-content: #221505;
+  --color-error: #ef8a80;
+  --color-error-content: #2b0b08;
+  /* Shape: confident radii, hairline borders, calm depth. */
+  --radius-box: 0.875rem;
+  --radius-field: 0.5rem;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/*
+ * Tailwind theme extensions. These generate the utilities the design
+ * system names in DESIGN-SYSTEM.md: font-display, font-mono, text-hero,
+ * text-display, text-title, text-dim, border-line, bg-raised,
+ * ease-out-soft, animate-rise, shadow-raised.
+ */
+@theme {
+  --font-display: "Bricolage Grotesque Variable", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+
+  /* Fluid display sizes. Body text is the Tailwind default scale. */
+  --text-hero: clamp(2.5rem, 4.5vw + 1rem, 4.25rem);
+  --text-display: clamp(1.875rem, 2.5vw + 1rem, 2.625rem);
+  --text-title: 1.375rem;
+
+  /* Supporting roles outside the daisyUI semantic set. */
+  --color-dim: #a3adb9;   /* secondary text on base-100/200 — 8.26:1 / 7.55:1 */
+  --color-line: #2b333c;  /* hairline borders and dividers */
+  --color-raised: #161c22; /* alias of base-200 for card surfaces */
+
+  /* Depth: two quiet elevation steps, used with border-line. */
+  --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.25);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
+
+  /* Motion: short, purposeful, ease-out. See DESIGN-SYSTEM.md rules. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-rise: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+  }
+
+  body {
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+
+  /* One visible keyboard focus treatment across the whole site. */
+  :is(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Reduced motion: no scrolling animation, no transitions, no keyframes. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Shell chrome only. Page sections must not add styles here. */
+
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    z-index: 60;
+    border-radius: var(--radius-field);
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.625rem 1rem;
+    text-decoration: none;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+  }
+
+  /* daisyUI ships .footer-title uppercased at 60% opacity; the design
+     system uses sentence-case labels, and the dim role for hierarchy. */
+  .footer-title {
+    text-transform: none;
+    opacity: 1;
+  }
+
+  /* daisyUI's details-based dropdown expects native closed-details hiding,
+     but an absolutely positioned .dropdown-content whose containing block is
+     the positioned .dropdown itself escapes it and stays painted while the
+     menu is closed. Hide it explicitly until the details is open; when open
+     the rule stops matching and daisyUI's open-state styles take over. */
+  details.dropdown:not([open]) > .dropdown-content {
+    display: none;
+  }
+}

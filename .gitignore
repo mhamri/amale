@@ -13,3 +13,12 @@ node_modules/
 .env.*
 !.env.example
 .amale-live/
+
+# SolidStart build outputs and copied public documentation.
+/website/.output/
+/website/.nitro/
+/website/.vinxi/
+/website/dist/
+/website/public/sources/
+/website/public/workflow.html
+/website/public/.nojekyll
