@@ -1,6 +1,6 @@
 # Amale
 
-**عمله** is pronounced **ʿamaleh** (roughly **AH-mah-lah**) and means **workers / laborers** in Persian. *Amale* is the project's Latin-script name: coordinated workers contributing to a shared, verified outcome.
+**عمله** is pronounced **ʿamaleh** (roughly **Ah-mah-leh**) and means **workers / laborers** in Persian. *Amale* is the project's Latin-script name: coordinated workers contributing to a shared, verified outcome.
 
 **Why Amale exists: top-tier models are too expensive to do the work.** Without structure, an expensive model spends its premium context writing every edit, every check, every micro-decision. Amale turns that model into a director instead of a laborer: it segments work into chunks with clear outcomes, delegates each chunk to cheap Flash models, and only verifies direction at chunk boundaries. The result is the same verified delivery at a fraction of the token cost.
 
@@ -21,14 +21,21 @@ The host prepares workspaces and integrates results. This is not an unattended b
 
 Use Bun, or Node 24 or newer for the fallback launcher. Configure pi with OpenRouter, or provide `OPENROUTER_API_KEY` through your environment. Never put credentials in the repository.
 
-From a stable checkout location:
+First clone the repository to a stable location:
+
+```sh
+git clone https://github.com/mhamri/amale
+cd amale
+```
+
+Installation links `amale/` into the current user's Codex and Claude skill directories, so the clone must live somewhere you will not move or delete. From that checkout root, run:
 
 ```sh
 bun amale/scripts/run.ts doctor
 bun amale/scripts/run.ts install
 ```
 
-Installation links `amale/` into the current user's Codex and Claude skill directories and refuses conflicting destinations. Keep the checkout in place after installation. Invoke `/amale` with your task; the skill handles the workflow and resume steps.
+Installation refuses conflicting destinations; keep the checkout in place after installation. Invoke `/amale` with your task; the skill handles the workflow and resume steps.
 
 The host runs a synthetic startup preflight through its permitted execution channel before network work. Amale does not edit global permission settings. Network access and permission to send project context remain host-controlled.
 

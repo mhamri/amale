@@ -57,7 +57,7 @@ export default function DocsGettingStarted() {
               <span class="text-base-content">pi configured with OpenRouter</span>, or <span class="text-base-content">OPENROUTER_API_KEY</span> provided through your environment.
             </li>
             <li>
-              A <span class="text-base-content">stable checkout location</span>. Installation links the amale/ directory into your skill directories, so keep the checkout in place afterwards.
+              <span class="text-base-content">A <span class="font-mono text-sm">git clone</span> of the repository</span>. Clone <span class="font-mono text-sm">https://github.com/mhamri/amale</span> to a stable location. Installation links the amale/ directory into your skill directories, so the checkout must stay in place afterwards.
             </li>
             <li>
               <span class="text-base-content">No global package installation</span>. The runtime has no npm runtime dependencies; installation only links the skill directories.
@@ -70,14 +70,13 @@ export default function DocsGettingStarted() {
             Install the skill
           </h2>
           <p class="mt-4 text-base leading-relaxed">
-            Run both operations from the repository root, with Bun or with Node 24 or newer.
+            Clone the repository and run both operations from the checkout root, with Bun or with Node 24 or newer.
           </p>
           <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>sh</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amale/scripts/run.ts doctor
-bun amale/scripts/run.ts install`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`git clone https://github.com/mhamri/amale\ncd amale\nbun amale/scripts/run.ts doctor\nbun amale/scripts/run.ts install`}</code></pre>
           </figure>
           <p class="mt-6 text-base leading-relaxed">
             <span class="font-mono text-sm text-base-content">doctor</span> takes no run and changes nothing. <span class="font-mono text-sm text-base-content">install</span> writes the skill links and refuses conflicting destinations; it never touches repository files or credentials.
@@ -129,7 +128,7 @@ bun amale/scripts/run.ts install`}</code></pre>
             <For each={firstRun}>
               {(step, index) => (
                 <li class="flex gap-4 rounded-box border border-line bg-base-200 p-5 shadow-rest">
-                  <span class="badge badge-soft badge-primary h-fit font-mono text-xs">{index() + 1}</span>
+                  <span class="badge badge-soft badge-primary h-fit shrink-0 text-xs">{index() + 1}</span>
                   <div class="min-w-0">
                     <p class="font-sans text-lg font-semibold">{step.title}</p>
                     <p class="mt-2 text-sm leading-relaxed text-dim">{step.body}</p>
