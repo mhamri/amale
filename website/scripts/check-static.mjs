@@ -116,7 +116,7 @@ async function checkPage({ file, page, label }) {
   const expectsName = page === "index.html" || page === "docs/index.html" || page === "evidence/index.html";
   if (expectsName) {
     assert.match(html, /عمله/, "" + label + ": " + file + " must render عمله");
-    assert.match(html, /AH-mah-lah/, "" + label + ": " + file + " must render the pronunciation");
+    assert.match(html, /Ah-mah-leh/, "" + label + ": " + file + " must render the pronunciation");
     assert.match(html, /workers [/] laborers/, "" + label + ": " + file + " must render the meaning");
   }
 
@@ -211,6 +211,77 @@ function eachElement(html, visit) {
   }
 }
 
+/*
+ * A lightweight element tree, built on the same tag scanner as eachElement,
+ * so a check can ask what is inside a grid instead of guessing from a fixed
+ * character window. Offsets index into the same stripped source that
+ * eachElement scans, so a node's text is the raw markup between its opening
+ * and closing tags.
+ */
+function parseTree(html) {
+  const source = stripNonMarkup(html);
+  const root = { tag: '#root', cls: [], children: [], openEnd: 0, end: 0 };
+  const stack = [root];
+  let m;
+  TAG.lastIndex = 0;
+  while ((m = TAG.exec(source)) !== null) {
+    const closing = m[1] === '/';
+    const tag = m[2].toLowerCase();
+
+    if (closing) {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].tag === tag) {
+          stack[i].end = m.index;
+          stack.length = i;
+          break;
+        }
+      }
+      continue;
+    }
+
+    const node = {
+      tag,
+      cls: classTokens(m[3] || ''),
+      children: [],
+      openEnd: TAG.lastIndex,
+      end: TAG.lastIndex,
+    };
+    stack[stack.length - 1].children.push(node);
+    if (!VOID_ELEMENTS.has(tag) && m[4] !== '/') stack.push(node);
+  }
+  return { root, source };
+}
+
+function nodeText(node, source) {
+  return source.slice(node.openEnd, node.end).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/*
+ * Running text is a paragraph a reader settles into, not a label and a
+ * number. Five or more words that contain a letter is the working threshold:
+ * a label-and-number card reads "83 + 95 tests", "USD 0.02", "Verified live",
+ * none of which reaches five letter-bearing words, while every prose card in
+ * the card grids is a sentence.
+ */
+function isRunningProse(text) {
+  const words = text.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
+  return words.length >= 5;
+}
+
+/* Largest column count a grid declares at any breakpoint, or 0 when it
+ * declares none. Only numeric `grid-cols-N` utilities count; arbitrary track
+ * lists (`grid-cols-[16rem_minmax(0,1fr)_14rem]`) are documentation layout
+ * shells, not card grids. */
+function declaredColumnCount(cls) {
+  let max = 0;
+  for (const token of cls) {
+    const base = token.includes(':') ? token.slice(token.lastIndexOf(':') + 1) : token;
+    const m = base.match(/^grid-cols-(\d+)$/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max;
+}
+
 const SURFACE = /^bg-(?:base-200|base-300|raised)(?:\/\d+)?$/;
 const LIGHT_HUES = ['badge-primary', 'badge-secondary', 'badge-accent', 'badge-info', 'badge-success', 'badge-warning', 'badge-error'];
 
@@ -250,6 +321,192 @@ function checkChips({ file, label }, html) {
     `${label}: ${file} puts ${offenders[0]} on a card surface (bg-base-200/300/raised). ` +
     'A neutral or hueless chip reads as unpainted graphite on graphite; hue-code it per DESIGN-SYSTEM.md ' +
     'or move it into base-100 page chrome.');
+}
+
+/*
+ * Soft chips must carry a hairline edge in their own hue. The component layer
+ * of style.css adds border-color to every .badge-soft.badge-* pair; this check
+ * verifies that no soft chip on a page exists without a matching hue class,
+ * which would mean it escaped the hairline rule.
+ */
+
+function checkSoftChipEdges({ file, label }, html) {
+  const offenders = [];
+  eachElement(html, ({ cls, ancestors }) => {
+    if (!cls.includes('badge') || !cls.includes('badge-soft')) return;
+    const hasHue = LIGHT_HUES.some(h => cls.includes(h));
+    if (!hasHue) {
+      offenders.push(cls.join(' '));
+    }
+  });
+  assert.equal(offenders.length, 0,
+    `${label}: ${file} carries a soft chip without a hue class: ${offenders.join(', ')}. ` +
+    'Every soft chip must carry a hue class (badge-primary, badge-secondary, etc.) ' +
+    'so the component-layer hairline edge in style.css applies.');
+}
+
+/*
+ * font-mono marks a string the reader could type or search: a file path,
+ * a CLI operation name, or an environment variable. A chip carrying font-mono
+ * whose text does not match any of those patterns is a styling mistake.
+ */
+const TYPABLE_PATTERNS = [
+  /^\.?\.?\//,                  // file path starts with / or ./ or ../
+  /^\w[\w.-]*\.\w{1,6}$/,       // filename.ext (e.g. index.html, style.css)
+  /^\$\w+/,                     // $ENV_VAR
+  /^(?:NODE_ENV|SITE_BASE|PORT|HOST|PATH|HOME|USER|SHELL|LANG|LC_\w+)$/, // common env vars
+  /^(?:npm|npx|node|pnpm|yarn|bun|git|curl|wget|cat|ls|grep|find|echo|mkdir|cp|mv|rm)\b/, // CLI commands
+  /^(?:\.\/[\w./-]+|[\w./-]+\.\w{1,6})$/, // relative/absolute paths without leading /
+];
+
+function isTypableString(text) {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return true; // empty chip is not a violation
+  return TYPABLE_PATTERNS.some(p => p.test(trimmed));
+}
+
+function checkMonoChips({ file, label }, html) {
+  const offenders = [];
+  // Regex-based text extraction for font-mono badges
+  const monoBadgeRe = /<[^>]*class="[^"]*\bbadge\b[^"]*\bfont-mono\b[^"]*"[^>]*>([^<]*)<\/[^>]+>/gi;
+  let m;
+  while ((m = monoBadgeRe.exec(html)) !== null) {
+    const text = m[1].trim();
+    if (text.length === 0) continue;
+    if (!isTypableString(text)) {
+      offenders.push(text);
+    }
+  }
+  assert.equal(offenders.length, 0,
+    `${label}: ${file} carries font-mono chips whose text is not a typable string: ${offenders.join(', ')}. ` +
+    'font-mono marks file paths, CLI operation names, and environment variables — ' +
+    'chips naming a topic, count or status use the sans stack.');
+}
+
+/*
+ * Hole one: inherited monospace.
+ * A chip that declares no font-mono of its own but sits inside an ancestor
+ * carrying the font-mono utility renders in monospace anyway. Fail when a
+ * badge element has no font utility and any ancestor carries font-mono,
+ * unless the chip's text is a typable string (file path, CLI operation name,
+ * or environment variable).
+ */
+function checkInheritedMono({ file, label }, html) {
+  const offenders = [];
+  const { root, source } = parseTree(html);
+  const FONT_MONO = /\bfont-mono\b/;
+
+  function hasMono(cls) { return cls.some(c => FONT_MONO.test(c)); }
+
+  function walkInheritedMono(node, ancestorsHaveMono) {
+    const selfMono = hasMono(node.cls);
+    const effectiveMono = ancestorsHaveMono || selfMono;
+
+    if (node.cls.includes('badge') && !selfMono && ancestorsHaveMono) {
+      // This badge inherits font-mono from an ancestor. Check if its text
+      // is a typable string; if not, it's a violation.
+      const text = nodeText(node, source).trim();
+      if (text.length > 0 && !isTypableString(text)) {
+        offenders.push(text);
+      }
+    }
+    for (const child of node.children) {
+      walkInheritedMono(child, effectiveMono);
+    }
+  }
+  walkInheritedMono(root, false);
+
+  assert.equal(offenders.length, 0,
+    `${label}: ${file} has badge(s) inheriting font-mono from an ancestor with non-typable text: ` +
+    `${offenders.join(', ')}. A chip without its own font-mono that sits inside a font-mono ancestor ` +
+    'renders in monospace by inheritance. If the text is not a file path, CLI operation name, or ' +
+    'environment variable, remove font-mono from the ancestor or add font-sans to the chip.');
+}
+
+/*
+ * Hole two: the heading-and-chip row.
+ * DESIGN-SYSTEM.md binds a chip attached to a heading to a
+ * 'flex items-start justify-between gap-3' row with 'shrink-0' on the
+ * chip, so the chip holds the top-right corner when the heading wraps.
+ * Fail when an element whose class list contains both flex and
+ * justify-between directly contains a heading and a badge, and does not
+ * carry items-start, or whose badge lacks shrink-0.
+ */
+function checkHeadingChipRow({ file, label }, html) {
+  const { root } = parseTree(html);
+  const offenders = [];
+
+  const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+  const FLEX = /\bflex\b/;
+  const JUSTIFY_BETWEEN = /\bjustify-between\b/;
+  const ITEMS_START = /\bitems-start\b/;
+  const SHRINK_0 = /\bshrink-0\b/;
+
+  function checkNode(node) {
+    const cls = node.cls;
+    if (cls.some(c => FLEX.test(c)) && cls.some(c => JUSTIFY_BETWEEN.test(c))) {
+      // This is a flex justify-between container. Check if it contains
+      // both a heading and a badge as direct children.
+      const hasHeading = node.children.some(c => HEADINGS.has(c.tag));
+      const hasBadge = node.children.some(c => c.cls.includes('badge'));
+      if (hasHeading && hasBadge) {
+        const hasItemsStart = cls.some(c => ITEMS_START.test(c));
+        const badgeChild = node.children.find(c => c.cls.includes('badge'));
+        const badgeHasShrink0 = badgeChild && badgeChild.cls.some(c => SHRINK_0.test(c));
+
+        if (!hasItemsStart || !badgeHasShrink0) {
+          const missing = [];
+          if (!hasItemsStart) missing.push('items-start on the row');
+          if (!badgeHasShrink0) missing.push('shrink-0 on the badge');
+          offenders.push(`flex+justify-between row missing ${missing.join(' and ')}`);
+        }
+      }
+    }
+    for (const child of node.children) {
+      checkNode(child);
+    }
+  }
+  checkNode(root);
+
+  assert.equal(offenders.length, 0,
+    `${label}: ${file} has heading-and-chip rows with incorrect layout: ` +
+    `${offenders.join('; ')}. A chip attached to a heading must sit in a ` +
+    "'flex items-start justify-between gap-3' row with 'shrink-0' on the chip, " +
+    'per DESIGN-SYSTEM.md, so the chip holds the top-right corner when the heading wraps.');
+}
+
+/*
+ * No page may put four paragraph cards into one row. Card grids carrying
+ * prose stop at two columns.
+ *
+ * A prose card grid is a grid that declares a numeric column count above two
+ * at any breakpoint (`grid-cols-3`, `xl:grid-cols-4`, …) and has a descendant
+ * card holding a <p> of running text. A card whose paragraph is only a label
+ * and a number is not prose, so a grid of stat cards past two columns is not
+ * a violation. Prose in a card is attributed to that card's nearest grid
+ * ancestor, so a nested layout grid is never blamed for its children's cards.
+ */
+function checkProseGridColumns({ file, label }, html) {
+  const { root, source } = parseTree(html);
+  const offenders = new Set();
+  const walk = (node, ancestors) => {
+    for (const child of node.children) {
+      const chain = ancestors.concat(child);
+      if (child.tag === 'p' && isRunningProse(nodeText(child, source))) {
+        const card = [...chain].reverse().find(n => n.cls.includes('card'));
+        const grid = [...chain].reverse().find(n => n.cls.includes('grid'));
+        if (card && grid && declaredColumnCount(grid.cls) > 2) {
+          offenders.add(grid.cls.join(' '));
+        }
+      }
+      walk(child, chain);
+    }
+  };
+  walk(root, []);
+  const list = [...offenders];
+  assert.equal(list.length, 0,
+    `${label}: ${file} has a prose card grid declaring more than two columns: ${list.join('; ')}. ` +
+    'Card grids carrying prose stop at two columns per DESIGN-SYSTEM.md.');
 }
 
 function checkContainers({ file, label }, html) {
@@ -436,6 +693,11 @@ const pages = await Promise.all(routes.map(async route => {
 }));
 for (const route of pages) {
   checkChips(route, route.html);
+  checkSoftChipEdges(route, route.html);
+  checkMonoChips(route, route.html);
+  checkInheritedMono(route, route.html);
+  checkHeadingChipRow(route, route.html);
+  checkProseGridColumns(route, route.html);
   checkContainers(route, route.html);
   if (route.page.startsWith('docs/')) checkDiagramFigure(route, route.html);
 }
