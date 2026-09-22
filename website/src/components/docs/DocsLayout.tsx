@@ -34,8 +34,8 @@ export default function DocsLayout(props: {
   const sections = () => props.sections ?? [];
   return (
     <main id="main">
-      <div class="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 md:py-24">
-        <div class="grid gap-10 lg:grid-cols-[16rem_1fr]">
+      <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+        <div class="grid gap-10 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_14rem]">
           <aside class="min-w-0 lg:sticky lg:top-24 lg:self-start">
             <nav aria-label="Documentation">
               <ul class="menu w-full gap-0.5 rounded-box border border-line bg-base-200 p-2 font-mono text-sm">
@@ -60,16 +60,15 @@ export default function DocsLayout(props: {
               </ul>
             </nav>
           </aside>
-          <article class="min-w-0 max-w-prose">
-            <header class="border-b border-line pb-6">
-              <h1 class="font-display text-display font-semibold tracking-tight">{props.title}</h1>
-              <p class="mt-3 text-lg leading-relaxed text-dim">{props.lead}</p>
-            </header>
+          <article class="min-w-0">
+            <div class="max-w-prose">
+              <header class="border-b border-line pb-6">
+                <h1 class="font-display text-display font-semibold tracking-tight">{props.title}</h1>
+                <p class="mt-3 text-lg leading-relaxed text-dim">{props.lead}</p>
+              </header>
+            </div>
             <Show when={sections().length > 0}>
-              <nav
-                aria-label="On this page"
-                class="mt-8 rounded-box border border-line bg-base-200 p-5 shadow-rest"
-              >
+              <nav aria-label="On this page" class="mt-8 block rounded-box border border-line bg-base-200 p-5 shadow-rest xl:hidden">
                 <p class="font-mono text-sm text-dim">On this page</p>
                 <ul class="mt-3 space-y-2 text-sm">
                   <For each={sections()}>
@@ -86,6 +85,24 @@ export default function DocsLayout(props: {
             </Show>
             <div class="mt-10 space-y-12">{props.children}</div>
           </article>
+          <aside class="min-w-0 hidden xl:block xl:sticky xl:top-24 xl:self-start">
+            <nav aria-label="On this page">
+              <Show when={sections().length > 0}>
+                <p class="font-mono text-sm text-dim mb-3">On this page</p>
+                <ul class="space-y-2 text-sm">
+                  <For each={sections()}>
+                    {(section) => (
+                      <li>
+                        <a class="link link-hover text-primary" href={`#${section.id}`}>
+                          {section.label}
+                        </a>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </Show>
+            </nav>
+          </aside>
         </div>
       </div>
     </main>

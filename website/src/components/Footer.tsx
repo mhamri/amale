@@ -14,7 +14,7 @@ const projectLinks = [
 export default function Footer() {
   return (
     <footer class="border-t border-line bg-base-200/50">
-      <div class="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
+      <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
         <div class="footer gap-10 sm:footer-horizontal">
           <aside class="max-w-sm">
             <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amale home">
