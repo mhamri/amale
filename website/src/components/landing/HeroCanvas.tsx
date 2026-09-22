@@ -1,4 +1,6 @@
 import { onCleanup, onMount } from 'solid-js';
+import { MODELS, type ModelId } from '../../lib/models';
+import { asset } from '../../lib/paths';
 
 type Role = 'coordinator' | 'worker' | 'jev' | 'review';
 
@@ -7,22 +9,34 @@ type SceneNode = {
   y: number;
   r: number;
   role: Role;
-  label: string;
-  labelSide: 'below' | 'right';
+  /** Rendered only for model nodes: the identity layer labels models, while
+   * the coordinator and reviewer stay anonymous dim anchors whose roles the
+   * aria-label and the topology diagram carry. */
+  label?: string;
+  /** Set when the node is a routed model and wears a logo tile. */
+  model?: ModelId;
 };
 type SceneLink = { from: number; to: number; role: Role; phase: number };
 
 const DESIGN_WIDTH = 16;
 const DESIGN_HEIGHT = 9;
 
+// One tile size and shape for every model node, whether it carries a vendor
+// mark or a monogram.
+const TILE = { side: 0.72, half: 0.36, radius: 0.18 };
+
+// The scene is a full-bleed background for copy that reads top-left, so the
+// crisp identity layer — the model tiles and their labels — gathers in the
+// lower right, below the headline zone and right of the prose measure. The
+// coordinator and the reviewer are dim glows, not labelled boxes.
 const NODES: SceneNode[] = [
-  { x: 3.1, y: 4.5, r: 0.85, role: 'coordinator', label: 'Coordinator', labelSide: 'below' },
-  { x: 11.3, y: 1.7, r: 0.44, role: 'worker', label: 'DeepSeek', labelSide: 'right' },
-  { x: 11.9, y: 3.6, r: 0.44, role: 'worker', label: 'GLM', labelSide: 'right' },
-  { x: 11.9, y: 5.4, r: 0.44, role: 'worker', label: 'MiMo', labelSide: 'right' },
-  { x: 11.3, y: 7.3, r: 0.44, role: 'worker', label: 'Solar', labelSide: 'right' },
-  { x: 7.2, y: 7.7, r: 0.42, role: 'jev', label: 'Jev', labelSide: 'below' },
-  { x: 7.2, y: 1.3, r: 0.42, role: 'review', label: 'Review', labelSide: 'below' },
+  { x: 4.3, y: 4.5, r: 0.85, role: 'coordinator' },
+  { x: 11.0, y: 5.2, r: 0.44, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
+  { x: 13.6, y: 5.2, r: 0.44, role: 'worker', label: 'GLM', model: 'glm' },
+  { x: 11.0, y: 7.05, r: 0.44, role: 'worker', label: 'MiMo', model: 'mimo' },
+  { x: 13.6, y: 7.05, r: 0.44, role: 'worker', label: 'Solar', model: 'solar' },
+  { x: 8.3, y: 7.7, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
+  { x: 11.5, y: 1.35, r: 0.42, role: 'review' },
 ];
 
 const LINKS: SceneLink[] = [
@@ -52,13 +66,31 @@ const ROLE_VARIABLE: Record<Role, string> = {
   review: '--color-secondary',
 };
 
+// Every hue the scene can paint a node with: the role hues plus each model's
+// routed hue from the identity list.
+const HUE_VARIABLES = [
+  ...new Set([...Object.values(ROLE_VARIABLE), ...Object.values(MODELS).map((m) => m.hue)]),
+];
+const SCENE_VARIABLES = ['--color-base-100', '--color-line', ...HUE_VARIABLES];
+
+// A model node glows in its own routed hue; the coordinator and the reviewer
+// keep their role hues.
+const nodeHue = (node: SceneNode) =>
+  node.model ? MODELS[node.model].hue : ROLE_VARIABLE[node.role];
+
 const VERTEX_SOURCE = `
 attribute vec2 aPos;
 void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
 // The design box is fitted inside the canvas exactly the way SVG
 // preserveAspectRatio "xMidYMid meet" fits a viewBox, so the shader and the
-// fallback SVG put every node in the same place at every aspect ratio.
+// fallback SVG put every node, tile and label in the same place at every
+// aspect ratio.
+//
+// The hero scene is a full-bleed background: the headline and body copy sit
+// on top of it, so every additive glow is held far below the luminance that
+// would cost the text its documented contrast ratios — a packet, its rail and
+// a node ring together stay under half the AA threshold for dim body copy.
 const FRAGMENT_SOURCE = `
 precision mediump float;
 uniform vec2 uRes;
@@ -91,33 +123,33 @@ void main(){
   vec3 color = uBase;
 
   vec2 offCentre = (p - vec2(${DESIGN_WIDTH}.0, ${DESIGN_HEIGHT}.0) * 0.5) / vec2(9.0, 6.0);
-  color += uLine * 0.20 * (1.0 - clamp(length(offCentre), 0.0, 1.0));
+  color += uLine * 0.08 * (1.0 - clamp(length(offCentre), 0.0, 1.0));
 
   vec2 drift = vec2(p.x, p.y + uTime * 0.05);
   vec2 cell = abs(fract(drift) - 0.5);
-  color += uLine * 0.26 * glow(min(cell.x, cell.y), 0.015);
+  color += uLine * 0.03 * glow(min(cell.x, cell.y), 0.015);
 
   for (int i = 0; i < ${LINK_COUNT}; i++){
     vec2 a = uLink[i].xy;
     vec2 b = uLink[i].zw;
     float rail = segmentDistance(p, a, b);
-    color += uLine * 0.70 * glow(rail, 0.020);
+    color += uLine * 0.07 * glow(rail, 0.020);
 
     float travel = fract(uTime * 0.2 + uLinkPhase[i]);
     float eased = travel * travel * (3.0 - 2.0 * travel);
     vec2 packet = a + (b - a) * eased;
     float alive = sin(travel * 3.1415926);
     float toPacket = length(p - packet);
-    color += uLinkColor[i] * alive * (0.95 * glow(toPacket, 0.05) + 0.32 * glow(toPacket, 0.16));
-    color += uLinkColor[i] * alive * 0.45 * glow(rail, 0.028) * smoothstep(0.7, 0.0, toPacket);
+    color += uLinkColor[i] * alive * (0.075 * glow(toPacket, 0.05) + 0.025 * glow(toPacket, 0.16));
+    color += uLinkColor[i] * alive * 0.035 * glow(rail, 0.028) * smoothstep(0.7, 0.0, toPacket);
   }
 
   for (int i = 0; i < ${NODE_COUNT}; i++){
     float toNode = length(p - uNode[i]);
     float radius = uNodeRadius[i];
     float breathe = 0.86 + 0.14 * sin(uTime * 1.1 + float(i) * 1.7);
-    color += uNodeColor[i] * 0.50 * glow(toNode, radius * 0.66) * breathe;
-    color += uNodeColor[i] * 0.95 * glow(abs(toNode - radius), radius * 0.10);
+    color += uNodeColor[i] * 0.05 * glow(toNode, radius * 0.66) * breathe;
+    color += uNodeColor[i] * 0.09 * glow(abs(toNode - radius), radius * 0.10);
     color = mix(color, uBase, 0.72 * smoothstep(radius * 0.95, radius * 0.78, toNode));
   }
 
@@ -163,9 +195,10 @@ function buildProgram(gl: WebGLRenderingContext) {
 }
 
 // The palette lives once, in the daisyUI theme in style.css. Letting the
-// browser resolve each custom property to an rgb() triple keeps the canvas and
-// the fallback SVG reading the same source instead of duplicating hex values.
-function readPalette(host: HTMLElement) {
+// browser resolve each custom property to an rgb() triple keeps the canvas
+// and the fallback SVG reading the same source instead of duplicating hex
+// values.
+function readPalette(host: HTMLElement, variables: string[]) {
   const probe = document.createElement('span');
   probe.style.position = 'absolute';
   probe.style.visibility = 'hidden';
@@ -180,14 +213,8 @@ function readPalette(host: HTMLElement) {
       ? [channels[0] / 255, channels[1] / 255, channels[2] / 255]
       : [0.5, 0.5, 0.5];
   };
-  const palette = {
-    base: read('--color-base-100'),
-    line: read('--color-line'),
-    coordinator: read(ROLE_VARIABLE.coordinator),
-    worker: read(ROLE_VARIABLE.worker),
-    jev: read(ROLE_VARIABLE.jev),
-    review: read(ROLE_VARIABLE.review),
-  };
+  const palette: Record<string, [number, number, number]> = {};
+  for (const variable of variables) palette[variable] = read(variable);
   probe.remove();
   return palette;
 }
@@ -254,7 +281,7 @@ export default function HeroCanvas() {
 
     if (!gl || !program || !buffer) return;
 
-    const palette = readPalette(canvas.parentElement ?? document.body);
+    const palette = readPalette(canvas.parentElement ?? document.body, SCENE_VARIABLES);
     const nodePositions = new Float32Array(NODE_COUNT * 2);
     const nodeRadii = new Float32Array(NODE_COUNT);
     const nodeColors = new Float32Array(NODE_COUNT * 3);
@@ -266,14 +293,14 @@ export default function HeroCanvas() {
       nodePositions[i * 2] = node.x;
       nodePositions[i * 2 + 1] = node.y;
       nodeRadii[i] = node.r;
-      nodeColors.set(palette[node.role], i * 3);
+      nodeColors.set(palette[nodeHue(node)], i * 3);
     });
     LINKS.forEach((link, i) => {
       linkEnds[i * 4] = NODES[link.from].x;
       linkEnds[i * 4 + 1] = NODES[link.from].y;
       linkEnds[i * 4 + 2] = NODES[link.to].x;
       linkEnds[i * 4 + 3] = NODES[link.to].y;
-      linkColors.set(palette[link.role], i * 3);
+      linkColors.set(palette[ROLE_VARIABLE[link.role]], i * 3);
       linkPhases[i] = link.phase;
     });
 
@@ -287,8 +314,8 @@ export default function HeroCanvas() {
     const uniform = (name: string) => gl.getUniformLocation(program, name);
     const resolution = uniform('uRes');
     const elapsed = uniform('uTime');
-    gl.uniform3fv(uniform('uBase'), palette.base);
-    gl.uniform3fv(uniform('uLine'), palette.line);
+    gl.uniform3fv(uniform('uBase'), palette['--color-base-100']);
+    gl.uniform3fv(uniform('uLine'), palette['--color-line']);
     gl.uniform2fv(uniform('uNode'), nodePositions);
     gl.uniform1fv(uniform('uNodeRadius'), nodeRadii);
     gl.uniform3fv(uniform('uNodeColor'), nodeColors);
@@ -359,7 +386,26 @@ export default function HeroCanvas() {
         role="img"
         aria-label={ARIA_LABEL}
       >
-        <g ref={fallback} class="transition-opacity duration-500 ease-out-soft">
+        <defs>
+          <clipPath id="hero-tile-clip">
+            <rect
+              x={-TILE.half}
+              y={-TILE.half}
+              width={TILE.side}
+              height={TILE.side}
+              rx={TILE.radius}
+            />
+          </clipPath>
+        </defs>
+        {/* The fallback is the scene for no-JS, no-WebGL and reduced-motion
+            visitors: same quiet background weight as the live frame, with the
+            identity tiles above it. The presentation attribute keeps the
+            mounted opacity-0 toggle in charge of the fade. */}
+        <g
+          ref={fallback}
+          class="transition-opacity duration-500 ease-out-soft"
+          opacity="0.25"
+        >
           {LINKS.map((link) => (
             <line
               x1={NODES[link.from].x}
@@ -377,23 +423,84 @@ export default function HeroCanvas() {
               cy={node.y}
               r={node.r}
               fill="var(--color-base-100)"
-              stroke={`var(${ROLE_VARIABLE[node.role]})`}
+              stroke={`var(${nodeHue(node)})`}
               stroke-width="0.04"
             />
           ))}
         </g>
-        {NODES.map((node) => (
-          <text
-            x={node.labelSide === 'right' ? node.x + node.r + 0.28 : node.x}
-            y={node.labelSide === 'right' ? node.y : node.y + node.r + 0.62}
-            fill="var(--color-dim)"
-            font-size="0.4"
-            text-anchor={node.labelSide === 'right' ? 'start' : 'middle'}
-            dominant-baseline={node.labelSide === 'right' ? 'central' : 'auto'}
-          >
-            {node.label}
-          </text>
-        ))}
+        {/* Model tiles sit outside the fading fallback group: they are the
+            identity layer, visible with no JavaScript, no WebGL, and over the
+            live scene alike. The tile is the same rounded square either way,
+            so a model without a published mark reads as a monogram tile, not
+            as a hole. Below lg the layer recedes so it reads as background
+            behind copy that spans the full band. */}
+        <g class="opacity-60 lg:opacity-100">
+        {NODES.map((node) => {
+          if (!node.model) return null;
+          const identity = MODELS[node.model];
+          return (
+            <g transform={`translate(${node.x} ${node.y})`}>
+              <rect
+                x={-TILE.half}
+                y={-TILE.half}
+                width={TILE.side}
+                height={TILE.side}
+                rx={TILE.radius}
+                fill={identity.tileFill ?? 'var(--color-base-200)'}
+              />
+              <g clip-path="url(#hero-tile-clip)">
+                {identity.logo ? (
+                  <image
+                    href={asset(identity.logo)}
+                    x={-TILE.half}
+                    y={-TILE.half}
+                    width={TILE.side}
+                    height={TILE.side}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                ) : (
+                  <text
+                    class="font-mono"
+                    x="0"
+                    y="0"
+                    font-size="0.26"
+                    font-weight="600"
+                    text-anchor="middle"
+                    dominant-baseline="central"
+                    fill={identity.hue}
+                  >
+                    {identity.monogram}
+                  </text>
+                )}
+              </g>
+              <rect
+                x={-TILE.half}
+                y={-TILE.half}
+                width={TILE.side}
+                height={TILE.side}
+                rx={TILE.radius}
+                fill="none"
+                stroke={identity.hue}
+                stroke-width="0.035"
+              />
+            </g>
+          );
+        })}
+        {NODES.map((node) =>
+          node.label ? (
+            <text
+              x={node.x}
+              y={node.y + TILE.half + 0.52}
+              class="font-mono"
+              fill="var(--color-dim)"
+              font-size="0.4"
+              text-anchor="middle"
+            >
+              {node.label}
+            </text>
+          ) : null,
+        )}
+        </g>
       </svg>
     </div>
   );
