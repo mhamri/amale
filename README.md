@@ -47,6 +47,33 @@ The host runs a synthetic startup preflight through its permitted execution chan
 
 `diagnose` reads durable state, runtime traces, host-reported actions and a **process-health** assessment: coordinator decisions per task, worker-side Jev usage, delegation vs manual dispatch, and model-family distribution, with warnings that name the exact anti-pattern when a run drifts back into expensive-model micro-management. `host-action` records native edits, delegation, permission outcomes and next steps across sessions. `diagnostic-export` creates a local summary with free text and source identifiers omitted; it never uploads it. See the [command reference](amale/references/runtime.md#host-actions-and-diagnostic-export).
 
+### Checking a finished run
+
+Run these from the repository the run worked in. `<skill>` is the installed skill directory, typically `~/.claude/skills/amale`.
+
+```sh
+bun <skill>/scripts/run.ts list .
+bun <skill>/scripts/run.ts health . <run-id>
+```
+
+`list` gives each run's id, status, intent and task count. `health` answers whether the run was delegated or driven by hand. Read two things from it:
+
+- `warnings` — empty means none of the six anti-patterns fired: manual loop stepping, coordinator micro-decisions, no worker-side Jev, recording ceremony, single-vendor fixation, or one task carrying the whole feature.
+- `coordinatorDecisions` — should be at or near zero, and `delegations` should be at least `tasks`.
+
+`health` deliberately stays quiet about chunks that failed and recovered, because a run that stumbles and retries is still a healthy run. To see what the stumbles cost, read the outcomes and the check receipts from the newest revision:
+
+```sh
+last=$(ls .amale/runs/<run-id>/revision-*.json | tail -1)
+jq -r '[.events[]|select(.type=="delegate-finished")|.detail.outcome]
+       |group_by(.)|map({(.[0]):length})|add' "$last"
+jq -r '.tasks[]|"\(.id): \(.status) [\([.receipts[]|.id+":"+(.code|tostring)]|join(", "))]"' "$last"
+```
+
+The first prints outcomes by kind — `accepted`, `failed`, `escalated`, `route-pending`. Anything other than `accepted` was retried or needed a decision. The second prints every registered check and its exit code; acceptance already requires all of them to be `0` at the accepted fingerprint, so a non-zero value means the task was never accepted.
+
+A run is fine when `health` reports no warnings and every task is `accepted`. Investigate when a warning names an anti-pattern, when a task sits in any other status, or when the failure count is high enough that retries dominate the run.
+
 ## Development
 
 ```sh
