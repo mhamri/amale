@@ -318,11 +318,18 @@ sequence.
 
   | Chip means | Classes |
   | --- | --- |
-  | Action, step count, the coordinator, a primary topic | `badge badge-soft badge-primary` |
-  | Verified, checked, passing, a worker that delivered | `badge badge-soft badge-secondary` |
+  | An action, a step number in a sequence, the coordinator, a primary topic | `badge badge-soft badge-primary` |
+  | Verified, checked, passing, a count of passing tests or checks, a setting that is in force, a worker that delivered | `badge badge-soft badge-secondary` |
   | Orchestration: Jev, routing, model families, escalation | `badge badge-soft badge-accent` |
   | A source file, a CLI operation name, a reference pointer | `badge badge-soft badge-info font-mono font-normal` |
   | A limit, a caveat, work not yet exercised | `badge badge-soft badge-warning` |
+
+  When two rows could both apply, the more specific meaning wins, and
+  "verified" is more specific than "a number". A chip reading
+  `83 + 95 tests` labels tests that passed, so it is secondary, not primary;
+  `Strict mode` labels a setting that is in force, so it is secondary too.
+  Primary is for a step's position in a sequence (`3`, `Step 3`) and for the
+  page's own subject, not for any number that happens to be a count.
 
   Add `text-xs` for chips inside a card heading row and `text-sm` for chips
   used as a standalone list of topics. A filled `badge badge-primary text-sm`
