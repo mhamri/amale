@@ -191,9 +191,13 @@ Rules that produce that:
 
   so the prose keeps its measure on the left and the visual takes the rest of
   the width. Below `lg` the pair stacks, prose first.
-- **Card grids:** `grid gap-6 md:grid-cols-2 xl:grid-cols-4` for a four-card
-  row of roles, `grid gap-6 md:grid-cols-2 xl:grid-cols-3` for three. Reading
-  order stays single column below `md`.
+- **Card grids:** `grid gap-6 md:grid-cols-2` is the default, and it is the
+  ceiling for any card carrying a paragraph. Four paragraph cards in one row
+  give each about 200 pixels of text width inside the documentation shell,
+  which wraps every card to a narrow ragged tower and is harder to read than
+  two roomy columns. Go past two columns only for cards that hold a label and
+  a number, never a sentence. A four-item set of role cards is
+  `grid gap-6 md:grid-cols-2`. Reading order stays single column below `md`.
 - **Docs shell:** three columns from `xl`, two from `lg`, stacked below —
   navigation, article, and the "On this page" list moved out of the article
   into its own right rail:
@@ -335,6 +339,29 @@ sequence.
   used as a standalone list of topics. A filled `badge badge-primary text-sm`
   stays available for a single emphatic chip, at most one group per page.
 
+  **A chip must read as a chip.** daisyUI's soft fill is only an 8% tint, so on
+  a `base-200` card the chip body is nearly the card colour and the chip looks
+  like coloured text. Every soft chip therefore carries a hairline edge in its
+  own hue, added once in the component layer of `style.css` rather than per
+  page, so no page can ship a chip without it.
+
+  **Monospace is a meaning, not a decoration.** `font-mono` marks a string the
+  reader could type or search: a file path, a CLI operation name, an
+  environment variable. A chip naming a topic, a count or a status is body
+  text and stays in the sans stack. Two chip groups on the same page must not
+  differ in typeface unless they differ in that meaning.
+
+  **A chip attached to a heading pins to the top right.** In a card whose
+  heading can wrap, the heading and its chip sit in a
+  `flex items-start justify-between gap-3` row with `shrink-0` on the chip, so
+  the chip holds the top-right corner instead of drifting down beside the
+  second line of a wrapped heading.
+
+  **A run of source chips gets its own line.** File and operation chips that
+  cite where a section comes from never share a line with the heading they
+  follow; they sit in a `mt-3 flex flex-wrap gap-2` row beneath it, so one
+  citation and four citations look the same.
+
   Never combine `badge-soft` with `badge-neutral` or any dark hue: daisyUI 5
   renders a soft badge as the badge colour itself over an 8% tint of that
   colour mixed into `base-100`, so `badge-soft badge-neutral` sets `neutral`
@@ -404,6 +431,21 @@ in palette hues (brass for the coordinator and action, teal for accepted or
 verified, violet for orchestration and routing) on the `base-100` background.
 No photographic texture, no lens flare, no particle confetti.
 
+The hero canvas is a **full-bleed background**, not a panel beside the copy.
+It spans the whole hero band edge to edge, sits behind the headline at low
+enough contrast that the type stays at its documented ratios, and carries no
+`figcaption` — a caption under a background is a panel again. Whatever the
+scene needs explaining goes in body copy further down the page, next to the
+thing it explains.
+
+Each model node wears a **logo tile**: a rounded square carrying the vendor's
+real mark when `website/public/models/` holds one, and otherwise a monogram
+in that model's routed hue. The tile is the same size and shape either way, so
+a missing logo reads as a deliberate mark rather than a hole. Adding a
+correctly named file to that folder upgrades a monogram to a logo with no code
+change. Logos are third-party marks used to name the models Amale routes to;
+they are not redrawn, recoloured or combined with the Amale mark.
+
 **Orchestration and topic diagrams** — SVG plus a small script timeline. Each
 one has a single subject named in its own caption: the model topology on the
 landing page and the documentation overview, and one diagram per remaining
@@ -426,6 +468,13 @@ Required of every visual in this layer, without exception:
   it when the tab is hidden. A loop must never run unseen.
 - **Teardown.** `onCleanup` cancels the animation frame, disconnects the
   observer, removes every listener, and releases WebGL resources.
+- **Every label sits inside the shape it labels.** A label belonging to a box
+  must fall entirely within that box's rectangle, not merely within the
+  `viewBox`. A label that straddles a card edge reads as cut off even though
+  the SVG never overflows, and neither the type check nor the static check can
+  see it. Labels that belong to a connector rather than a box sit clear of
+  every box. Measured with `getBBox` against each `rect` at 320, 768 and 1440
+  CSS pixels, the count of labels straddling a card edge must be zero.
 - **Accessible.** A decorative canvas is `aria-hidden="true"` and the meaning
   is carried by adjacent text. A diagram that carries meaning is
   `role="img"` with an `aria-label` naming what it shows, or it exposes the
@@ -453,7 +502,7 @@ Diagram panel wrapper, for any visual in this layer:
 `bg-base-100/85 backdrop-blur-md border-b border-line`; brand lockup is the
 mark plus the wordmark `amale` in `font-display` — the Arabic-script word
 عمله never appears in the lockup or any document title; it may appear only
-in body copy, always with its pronunciation (AH-mah-lah), its meaning
+in body copy, always with its pronunciation (Ah-mah-leh), its meaning
 (workers / laborers) and its **Persian origin** (the word is Persian, not
 Arabic). Mobile menu is a daisyUI `dropdown` built on a native
 `<details>`/`<summary>`, so it is keyboard operable without JS. One shell-only
