@@ -39,7 +39,7 @@ function MenuList() {
 export default function Header() {
   return (
     <header class="sticky top-0 z-50 border-b border-line bg-base-100/85 backdrop-blur-md">
-      <div class="navbar mx-auto w-full max-w-6xl px-3 sm:px-6">
+      <div class="navbar mx-auto w-full max-w-7xl px-4 sm:px-6">
         <Brand />
         <div class="ms-auto flex items-center gap-1.5">
           <nav aria-label="Primary" class="hidden md:block">
