@@ -44,8 +44,8 @@ export default function DocsReviewAndRecovery() {
         <ReviewLoop />
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="independent-review" class={h2}>Independent cross-family review</h2>
+          <h2 id="independent-review" class={h2}>Independent cross-family review</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/review.md</span>
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
@@ -65,8 +65,8 @@ export default function DocsReviewAndRecovery() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="coverage" class={h2}>Coverage before verdict</h2>
+          <h2 id="coverage" class={h2}>Coverage before verdict</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/review.md</span>
             <span class={source}>references/runtime.md</span>
           </div>
@@ -107,8 +107,8 @@ export default function DocsReviewAndRecovery() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="repair" class={h2}>Repair escalation</h2>
+          <h2 id="repair" class={h2}>Repair escalation</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/review.md</span>
           </div>
           <p class="mt-4 text-base leading-relaxed">
@@ -145,8 +145,8 @@ export default function DocsReviewAndRecovery() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="resume" class={h2}>Resume after interruption</h2>
+          <h2 id="resume" class={h2}>Resume after interruption</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/recovery.md</span>
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
@@ -174,8 +174,8 @@ export default function DocsReviewAndRecovery() {
         </section>
 
         <section>
-          <div class="flex flex-wrap items-center gap-3">
-            <h2 id="diagnostics" class={h2}>Diagnose, host actions and export</h2>
+          <h2 id="diagnostics" class={h2}>Diagnose, host actions and export</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
             <span class={source}>references/runtime.md</span>
             <span class={source}>references/recovery.md</span>
           </div>
