@@ -339,14 +339,22 @@ sequence.
   renders a soft badge as the badge colour itself over an 8% tint of that
   colour mixed into `base-100`, so `badge-soft badge-neutral` sets `neutral`
   `#262d35` text on `#111418` — **1.33:1**, unreadable on the dark theme. The
-  light hues read as text over the same treatment and all clear AAA. These are
-  the ratios `scripts/check-static.mjs` measures and prints on every passing
-  run: primary **7.85:1**, secondary **8.45:1**, accent **7.72:1**, info
-  **8.72:1**, success **8.84:1**, warning **7.85:1**, error **7.00:1**. The
-  checker computes them by reproducing daisyUI's
-  `color-mix(in oklab, <colour> 8%, base-100)` in sRGB and measuring WCAG
-  relative luminance, and it fails the build when any of them drops below
-  4.5:1, so a palette edit that makes a chip unreadable cannot ship.
+  light hues read as text over the same treatment and all clear AAA:
+
+  - primary `#e2a45c` on `#1d1c1c` **7.85:1**
+  - secondary `#5cc9b4` on `#151e21` **8.45:1**
+  - accent `#b7a3f2` on `#1a1c24` **7.72:1**
+  - info `#7fc3e8` on `#171e24` **8.72:1**
+  - warning `#e2a45c` on `#1d1c1c` **7.85:1**
+  - success `#63cfa0` on `#161e1f` **8.84:1**
+  - error `#ef8a80` on `#1e1b1e` **7.00:1**
+
+  `scripts/check-static.mjs` derives each fill by reproducing daisyUI's
+  `color-mix(in oklab, <colour> 8%, base-100)` in sRGB, measures the WCAG
+  ratio, and fails the build both when a ratio drops below 4.5:1 and when the
+  hue or ratio above stops matching what it computes. The list is therefore
+  enforced rather than hand-maintained: editing the palette without editing
+  these lines fails, and editing these lines without the palette fails too.
 
 **On-page navigation (docs layout)** — every docs page uses this shell:
 
