@@ -6,7 +6,7 @@
   "scripts": {
     "test": "bun test tests/*.test.ts",
     "check": "tsc",
-    "test:node": "node --test tests/*.test.ts"
+    "test:node": "node scripts/test.mjs"
   },
   "engines": {
     "node": ">=24"
