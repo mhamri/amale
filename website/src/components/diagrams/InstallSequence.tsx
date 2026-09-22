@@ -292,12 +292,12 @@ export default function InstallSequence() {
           <Head points="410,80 402,76 402,84" />
           <Flow d="M 582 80 H 598" />
           <Head points="606,80 598,76 598,84" />
-          <Flow d="M 691 124 V 304 H 366" />
+          <Flow d="M 691 124 V 248 H 366 V 304" />
           <Head points="360,304 368,300 368,308" />
-          <T x={528} y={290} s={11} mid>checkpoint written during the run</T>
-          <Flow d="M 366 304 H 488" />
-          <Head points="494,304 486,300 486,308" />
-          <T x={427} y={292} s={11} mid>invoke again</T>
+          <T x={528} y={228} s={11} mid>checkpoint written during the run</T>
+          <Flow d="M 360 348 H 500" />
+          <Head points="506,348 498,344 498,352" />
+          <T x={430} y={364} s={11} mid>invoke again</T>
           <Flow d="M 610 260 C 610 190 655 180 655 134" tone="accent" />
           <Head points="655,124 651,132 659,132" tone="accent" />
           <T x={598} y={208} s={11} mid>same run · no old chat</T>
