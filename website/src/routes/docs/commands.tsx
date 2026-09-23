@@ -64,6 +64,9 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
           <h2 id="run-lifecycle" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Run lifecycle
           </h2>
+          <div class="mt-3 flex flex-wrap gap-2 w-full">
+            <span class="badge badge-soft badge-info font-mono text-xs font-normal">references/runtime.md</span>
+          </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
             <p>
               These operations create, inspect and close runs. A closed session is not a background scheduler; invoking the skill again lists the workspace's runs and resumes the one matching your request.

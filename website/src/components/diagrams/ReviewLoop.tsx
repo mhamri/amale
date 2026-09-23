@@ -321,7 +321,7 @@ export default function ReviewLoop() {
           <T x={400} y={432} s={10} mid>changed strategy — the worker reruns</T>
           <Flow d="M 240 348 H 174" tone="accent" />
           <Head points="168,348 176,344 176,352" tone="accent" />
-          <T x={204} y={338} s={9.5} mid>invoke again</T>
+          <T x={204} y={338} s={9} mid>invoke again</T>
           <Flow d="M 93 300 V 146" tone="accent" />
           <Head points="93,136 89,143 97,143" tone="accent" />
         </svg>
