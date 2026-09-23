@@ -1,7 +1,7 @@
 import { For } from 'solid-js';
 import PageMeta from '../components/PageMeta';
 import { asset } from '../lib/paths';
-import { Glow, GridDots } from '../components/decor';
+import { Blobs, Glow, GridDots, LightRays } from '../components/decor';
 
 const claims = [
   {
@@ -100,26 +100,56 @@ export default function CaseStudyPage() {
       />
       <main id="main">
         {/* ── Hero ── */}
-        <section class="relative isolate overflow-hidden mx-auto w-full max-w-7xl px-4 pt-16 pb-4 sm:px-6 md:pt-24 md:pb-8">
-          <div class="decor-field" aria-hidden="true">
-            <Glow hue="primary" size={640} cx={0.15} cy={0.2} opacity={0.3} />
-            <GridDots hue="secondary" spacing={28} cx={0.85} cy={0.1} opacity={0.25} />
+        <section class="relative isolate min-h-[30rem] overflow-hidden pb-4 pt-32 md:pb-8 md:pt-32">
+          {/*
+            The title band is the page's own light: a broad lamp cone and warm
+            bloom wash the whole hero, with stronger brass and violet masses
+            toward the outer edges. The wash stays low enough that the heading
+            and its paragraphs keep their contrast over it. The section is
+            full-bleed and the field is masked on all four sides, so the wash
+            fades into the page background and no edge of the band is ever
+            visible. Two nested masks keep the fade to plain mask-image, which
+            every browser supports without mask-composite.
+          */}
+          <div
+            class="decor-field"
+            aria-hidden="true"
+            style={{
+              'mask-image': 'linear-gradient(to bottom, transparent 0%, black 12%, black 82%, transparent 100%)',
+              '-webkit-mask-image': 'linear-gradient(to bottom, transparent 0%, black 12%, black 82%, transparent 100%)',
+            }}
+          >
+            <div
+              class="absolute inset-0"
+              style={{
+                'mask-image': 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
+                '-webkit-mask-image': 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
+              }}
+            >
+              <LightRays hue="primary" cx={0.5} cy={-0.12} spread={180} opacity={0.4} />
+              <Glow hue="primary" size={1500} cx={0.44} cy={0.4} opacity={0.32} />
+              <Blobs hue="primary" size={1000} cx={0.9} cy={0.35} blur={80} opacity={0.55} />
+              <Blobs hue="accent" size={900} cx={0.15} cy={1.08} blur={85} opacity={0.5} />
+              <GridDots hue="secondary" spacing={28} cx={0.85} cy={0.1} opacity={0.25} />
+            </div>
           </div>
-          <h1 class="font-display text-hero font-semibold tracking-tight">
-            How Amale built this site
-          </h1>
-          <p class="mt-5 text-lg leading-relaxed text-dim max-w-prose" data-reveal>
-            Every claim the landing page makes about the skill is backed by a measured figure
-            from the two runs that built this website. Nothing here is a benchmark. These are
-            local estimates from the records that exist.
-          </p>
-          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
-            The project's name is <span lang="fa" dir="rtl">عمله</span>, transliterated as{' '}
-            <em>ʿamalah</em> and pronounced <strong class="text-base-content">Ah-mah-leh</strong>
-            . It is a Persian word meaning <strong>workers / laborers</strong> — people
-            contributing effort to a shared result. <em>Amale</em> is the project's Latin-script
-            name.
-          </p>
+          <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
+            <h1 class="font-display text-hero font-semibold tracking-tight">
+              How Amale built this site
+            </h1>
+            <p class="mt-5 text-lg leading-relaxed text-dim max-w-prose" data-reveal>
+              Every claim the landing page makes about the skill is backed by a measured figure
+              from the two runs that built this website. Nothing here is a benchmark. These are
+              local estimates from the records that exist.
+            </p>
+            <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
+              The project's name is <span lang="fa" dir="rtl">عمله</span>, transliterated as{' '}
+              <em>ʿamalah</em> and pronounced <strong class="text-base-content">Ah-mah-leh</strong>
+              . It is a Persian word meaning <strong>workers / laborers</strong> — people
+              contributing effort to a shared result. <em>Amale</em> is the project's Latin-script
+              name.
+            </p>
+          </div>
         </section>
 
         {/* ── The two runs ── */}
