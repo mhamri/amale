@@ -120,6 +120,9 @@ async function checkPage({ file, page, label }) {
     assert.match(html, /workers [/] laborers/, "" + label + ": " + file + " must render the meaning");
   }
 
+  assert.ok(!html.includes('AH-mah-lah'),
+    "" + label + ": " + file + " must not render the old pronunciation AH-mah-lah");
+
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/);
   if (titleMatch) {
     assert.ok(!titleMatch[1].includes('عمله'),
@@ -261,6 +264,33 @@ function nodeText(node, source) {
 }
 
 /*
+ * The text an element writes itself: the fragments directly inside it, with
+ * every child element's content removed. A card's heading and its number must
+ * never be glued into one sentence that neither of them writes, so a grid of
+ * stat cards holding a label and a number stays a label-and-number grid.
+ *
+ * An element whose children are all inline carries its whole text instead: a
+ * sentence broken into <span>s reads as one run to a reader, and it is a run
+ * this gate measures, while a <h3> beside a <p> is two blocks that stay apart.
+ */
+const INLINE_ELEMENTS = new Set([
+  'a', 'abbr', 'b', 'br', 'cite', 'code', 'em', 'i', 'kbd', 'mark', 'q',
+  's', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'wbr',
+]);
+
+function ownText(node, source) {
+  if (node.children.length === 0) return nodeText(node, source);
+  if (node.children.every(child => INLINE_ELEMENTS.has(child.tag))) return nodeText(node, source);
+  let text = '';
+  let cursor = node.openEnd;
+  for (const child of node.children) {
+    text += source.slice(cursor, child.openEnd);
+    cursor = child.end;
+  }
+  return (text + source.slice(cursor, node.end)).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/*
  * A chip is one token, not a sentence: its own inline markup must not split
  * the string it names, so tags between characters are removed without adding
  * a space. A chip rendering `planning.md` from `{topic}.md` reads as one
@@ -374,9 +404,29 @@ const TYPABLE_PATTERNS = [
   /^(?:\.\/[\w./-]+|[\w./-]+\.\w{1,6})$/, // relative/absolute paths without leading /
 ];
 
+/*
+ * The skill's own CLI operation names, from amale/scripts/cli.ts.
+ * DESIGN-SYSTEM.md counts a CLI operation name as a typable string, so a chip
+ * naming one of these has not taken monospace as decoration. The list is
+ * closed on purpose: a bare word counts as typable only when it is one of
+ * these operations, so a status chip such as 'read-only' and a step number
+ * such as '1' still fail.
+ */
+const CLI_OPERATIONS = new Set([
+  'accept', 'amend', 'artifact', 'bench', 'block', 'catalog', 'check', 'claim', 'configure',
+  'decide', 'decide-batch', 'delegate', 'delegate-batch', 'diagnose', 'diagnostic-export',
+  'doctor', 'effort-configure', 'effort-finish', 'effort-reconcile', 'effort-request',
+  'effort-start', 'fingerprint', 'finish', 'health', 'host-action', 'host-decision',
+  'host-exception', 'html', 'install', 'integrated', 'invalidate', 'list', 'next', 'plan',
+  'pools', 'preflight', 'reconcile-execution', 'record-decision', 'repair', 'requeue',
+  'result', 'resume', 'review', 'review-check', 'review-packet', 'reviewer', 'route', 'save',
+  'start', 'status', 'unlock', 'wait', 'worker',
+]);
+
 function isTypableString(text) {
   const trimmed = text.trim();
   if (trimmed.length === 0) return true; // empty chip is not a violation
+  if (CLI_OPERATIONS.has(trimmed)) return true; // a CLI operation name
   return TYPABLE_PATTERNS.some(p => p.test(trimmed));
 }
 
@@ -400,17 +450,21 @@ function checkMonoChips({ file, label }, html) {
 
 /*
  * Hole one: inherited monospace.
- * A chip that declares no font-mono of its own but sits inside an ancestor
- * carrying the font-mono utility renders in monospace anyway. Fail when a
- * badge element has no font utility and any ancestor carries font-mono,
- * unless the chip's text is a typable string (file path, CLI operation name,
- * or environment variable).
+ * A chip that declares no font utility of its own but sits inside an ancestor
+ * carrying the font-mono utility — or inside a <pre>, <code>, <kbd> or <samp>
+ * element, which is monospace without any utility at all — renders in
+ * monospace anyway. Fail when a badge declares no font utility of its own,
+ * the nearest ancestor-or-self declaration is monospace, and the chip's text
+ * is not a typable string (file path, CLI operation name, or environment
+ * variable).
  */
 function checkInheritedMono({ file, label }, html) {
   const offenders = [];
   const { root, source } = parseTree(html);
   const FONT_MONO = /\bfont-mono\b/;
   const FONT_SANS = /\bfont-sans\b/;
+  // Elements that render monospace without carrying the utility at all.
+  const MONO_ELEMENTS = new Set(['pre', 'code', 'kbd', 'samp', 'tt']);
 
   function hasMono(cls) { return cls.some(c => FONT_MONO.test(c)); }
   function hasSans(cls) { return cls.some(c => FONT_SANS.test(c)); }
@@ -422,7 +476,8 @@ function checkInheritedMono({ file, label }, html) {
   // font-sans — the remedy this check names — is not a defect.
   function walkInheritedMono(node, nearestFont) {
     const selfMono = hasMono(node.cls);
-    const effective = selfMono ? 'mono' : hasSans(node.cls) ? 'sans' : nearestFont;
+    const monospaceHere = selfMono || MONO_ELEMENTS.has(node.tag);
+    const effective = monospaceHere ? 'mono' : hasSans(node.cls) ? 'sans' : nearestFont;
 
     if (node.cls.includes('badge') && effective === 'mono' && !selfMono) {
       // This badge inherits font-mono from an ancestor. Check if its text
@@ -448,40 +503,39 @@ function checkInheritedMono({ file, label }, html) {
 /*
  * Hole two: the heading-and-chip row.
  * DESIGN-SYSTEM.md binds a chip attached to a heading to a
- * 'flex items-start justify-between gap-3' row with 'shrink-0' on the
- * chip, so the chip holds the top-right corner when the heading wraps.
- * Fail when an element whose class list contains both flex and
- * justify-between directly contains a heading and a badge, and does not
- * carry items-start, or whose badge lacks shrink-0.
+ * 'flex items-start justify-between gap-3' row with 'shrink-0' on the chip,
+ * so the chip holds the top-right corner when the heading wraps.
+ *
+ * Any element whose own children pair a heading with a chip is a heading row,
+ * whatever its class list says today. Gating only rows that already declare
+ * justify-between lets the other shape that cost repair cycles through: a
+ * 'flex flex-wrap items-center gap-2' row never declared justify-between, so
+ * it was invisible to that gate, and a 'flex items-center justify-between
+ * gap-2' row pins nothing because the chip still drifts down beside the
+ * second line of a wrapped heading. The row must be flex, must align its
+ * items to the start, must push them apart, and the chip must refuse to
+ * shrink.
  */
 function checkHeadingChipRow({ file, label }, html) {
   const { root } = parseTree(html);
   const offenders = [];
 
   const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
-  const FLEX = /\bflex\b/;
-  const JUSTIFY_BETWEEN = /\bjustify-between\b/;
-  const ITEMS_START = /\bitems-start\b/;
-  const SHRINK_0 = /\bshrink-0\b/;
+  const has = (node, pattern) => node.cls.some(c => pattern.test(c));
 
   function checkNode(node) {
-    const cls = node.cls;
-    if (cls.some(c => FLEX.test(c)) && cls.some(c => JUSTIFY_BETWEEN.test(c))) {
-      // This is a flex justify-between container. Check if it contains
-      // both a heading and a badge as direct children.
-      const hasHeading = node.children.some(c => HEADINGS.has(c.tag));
-      const hasBadge = node.children.some(c => c.cls.includes('badge'));
-      if (hasHeading && hasBadge) {
-        const hasItemsStart = cls.some(c => ITEMS_START.test(c));
-        const badgeChild = node.children.find(c => c.cls.includes('badge'));
-        const badgeHasShrink0 = badgeChild && badgeChild.cls.some(c => SHRINK_0.test(c));
-
-        if (!hasItemsStart || !badgeHasShrink0) {
-          const missing = [];
-          if (!hasItemsStart) missing.push('items-start on the row');
-          if (!badgeHasShrink0) missing.push('shrink-0 on the badge');
-          offenders.push(`flex+justify-between row missing ${missing.join(' and ')}`);
-        }
+    const heading = node.children.find(child => HEADINGS.has(child.tag));
+    const chip = node.children.find(child => child.cls.includes('badge'));
+    if (heading && chip) {
+      const missing = [];
+      if (!has(node, /\bflex\b/)) missing.push('flex on the row');
+      if (!has(node, /\bitems-start\b/)) missing.push('items-start on the row');
+      if (!has(node, /\bjustify-between\b/)) missing.push('justify-between on the row');
+      if (!has(chip, /\bshrink-0\b/)) missing.push('shrink-0 on the chip');
+      if (missing.length > 0) {
+        offenders.push(
+          `<${heading.tag}>+chip row (${node.cls.join(' ') || 'no classes'}) lacks ${missing.join(', ')}`,
+        );
       }
     }
     for (const child of node.children) {
@@ -491,7 +545,7 @@ function checkHeadingChipRow({ file, label }, html) {
   checkNode(root);
 
   assert.equal(offenders.length, 0,
-    `${label}: ${file} has heading-and-chip rows with incorrect layout: ` +
+    `${label}: ${file} has heading-and-chip rows that do not pin the chip: ` +
     `${offenders.join('; ')}. A chip attached to a heading must sit in a ` +
     "'flex items-start justify-between gap-3' row with 'shrink-0' on the chip, " +
     'per DESIGN-SYSTEM.md, so the chip holds the top-right corner when the heading wraps.');
@@ -502,33 +556,35 @@ function checkHeadingChipRow({ file, label }, html) {
  * prose stop at two columns.
  *
  * A prose card grid is a grid that declares a numeric column count above two
- * at any breakpoint (`grid-cols-3`, `xl:grid-cols-4`, …) and has a descendant
- * card holding a <p> of running text. A card whose paragraph is only a label
- * and a number is not prose, so a grid of stat cards past two columns is not
- * a violation. A prose card is any descendant card holding a <p> of running
- * text, so the grid that is blamed is the one that actually contains the
- * card, even when a nested layout grid sits between them.
+ * at any breakpoint (`grid-cols-3`, `xl:grid-cols-4`, …) and carries prose:
+ * a descendant card that writes running text, or a grid cell that writes
+ * running text itself. Own text is what counts, never a card's whole subtree,
+ * because gluing a heading and a number together makes a sentence neither of
+ * them wrote: a stat card reading "Behavioral tests 83 + 95 tests" is still a
+ * label and a number, so a grid of stat cards past two columns does not fire.
+ * Blaming the grid that actually contains the card, rather than the nearest
+ * ancestor, catches a nested layout grid sitting between the two.
  */
 function checkProseGridColumns({ file, label }, html) {
   const { root, source } = parseTree(html);
   const offenders = new Set();
 
-  // A grid carrying prose is any grid with a descendant card holding running
-  // text. Blaming the grid that actually contains the card catches a nested
-  // layout grid sitting between the card and its paragraph.
-  const hasRunningText = (node) =>
-    (node.tag === 'p' && isRunningProse(nodeText(node, source))) ||
-    node.children.some(hasRunningText);
+  // Running text anywhere inside the card, in whatever element the author
+  // chose to hold it: a sentence is a sentence whether it sits in a <p>, a
+  // <div> or a <span>. A gate that only reads <p> misses a card whose
+  // paragraph is a plain block of text.
+  const carriesProse = (node) =>
+    isRunningProse(ownText(node, source)) || node.children.some(carriesProse);
   const proseCards = (node, found) => {
-    if (node.cls.includes('card') && hasRunningText(node)) found.push(node);
+    if (node.cls.includes('card') && carriesProse(node)) found.push(node);
     for (const child of node.children) proseCards(child, found);
+    return found;
   };
 
   const walk = (node) => {
     if (node.cls.includes('grid') && declaredColumnCount(node.cls) > 2) {
-      const cards = [];
-      proseCards(node, cards);
-      if (cards.length > 0) offenders.add(node.cls.join(' '));
+      const cellCarriesProse = node.children.some(child => isRunningProse(ownText(child, source)));
+      if (cellCarriesProse || proseCards(node, []).length > 0) offenders.add(node.cls.join(' '));
     }
     for (const child of node.children) walk(child);
   };
@@ -678,6 +734,23 @@ async function checkSoftBadges() {
     reported.push(`${hue} ${ratio.toFixed(2)}:1`);
   }
 
+  // The rule that actually reaches the page: daisyUI paints .badge-soft in the
+  // utilities layer, which outranks the components layer whatever the
+  // specificity, so the edge a reader sees comes from this rule — drawn in the
+  // chip's own hue through --badge-color and marked !important to outrank
+  // daisyUI's 10% tint. Asserting only the per-hue rules above would police
+  // CSS the browser never applies, which is the same no-op the routes are
+  // gated against.
+  const edge = css.match(/\.badge-soft\s*\{([^}]*)\}/);
+  assert.ok(edge,
+    'style.css must add the soft-chip hairline edge once for .badge-soft in the component layer');
+  assert.match(edge[1], /border-color\s*:/,
+    '.badge-soft must set border-color — the hairline edge every soft chip carries');
+  assert.ok(edge[1].includes('--badge-color'),
+    ".badge-soft must draw its edge in the chip's own hue (--badge-color), not a fixed colour");
+  assert.match(edge[1], /border-color[^;]*!important/,
+    ".badge-soft must mark its border-color !important, or daisyUI's utilities-layer 10% tint wins");
+
   return reported;
 }
 
@@ -725,25 +798,45 @@ async function checkContrast() {
 }
 
 
-await Promise.all(routes.map(checkPage));
-await checkOutputSanity();
-await checkDesignTokens();
-const softRatios = await checkSoftBadges();
-await checkContrast();
-
-const pages = await Promise.all(routes.map(async route => {
-  const html = await readPage(route.file);
-  return { ...route, html };
-}));
-for (const route of pages) {
-  checkChips(route, route.html);
-  checkSoftChipEdges(route, route.html);
-  checkMonoChips(route, route.html);
-  checkInheritedMono(route, route.html);
-  checkHeadingChipRow(route, route.html);
-  checkProseGridColumns(route, route.html);
-  checkContainers(route, route.html);
-  if (route.page.startsWith('docs/')) checkDiagramFigure(route, route.html);
+/*
+ * Every assertion reports; the first failure does not hide the rest. A gate
+ * nobody can see fire gets read as a no-op, and these checks each name a
+ * different defect on a different route, so one run has to list them all. Any
+ * failure still exits non-zero.
+ */
+const failures = [];
+async function attempt(work) {
+  try {
+    return await work();
+  } catch (error) {
+    failures.push(error?.message ?? String(error));
+    return undefined;
+  }
 }
 
-console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, no colourless chip on a card surface, every container at max-w-7xl and a diagram figure on every documentation route.`);
+const pages = await Promise.all(routes.map(async route => ({
+  ...route,
+  html: await readPage(route.file),
+})));
+
+await Promise.all(routes.map(route => attempt(() => checkPage(route))));
+await attempt(checkOutputSanity);
+await attempt(checkDesignTokens);
+const softRatios = (await attempt(checkSoftBadges)) ?? [];
+await attempt(checkContrast);
+
+for (const route of pages) {
+  await attempt(() => checkChips(route, route.html));
+  await attempt(() => checkSoftChipEdges(route, route.html));
+  await attempt(() => checkMonoChips(route, route.html));
+  await attempt(() => checkInheritedMono(route, route.html));
+  await attempt(() => checkHeadingChipRow(route, route.html));
+  await attempt(() => checkProseGridColumns(route, route.html));
+  await attempt(() => checkContainers(route, route.html));
+  if (route.page.startsWith('docs/')) await attempt(() => checkDiagramFigure(route, route.html));
+}
+
+assert.equal(failures.length, 0,
+  `Static verification failed with ${failures.length} problem(s):\n  - ${failures.join('\n  - ')}`);
+
+console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, a hue-coded hairline edge on every soft chip, no colourless chip on a card surface, no monospace chip naming something a reader cannot type, no unpinned heading-and-chip row, no prose card grid past two columns, every container at max-w-7xl and a diagram figure on every documentation route.`);
