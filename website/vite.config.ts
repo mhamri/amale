@@ -13,7 +13,7 @@ export default defineConfig({
   nitro: {
     preset: 'static',
     baseURL: base,
-    prerender: { crawlLinks: true, failOnError: true },
+    prerender: { crawlLinks: true, failOnError: true, routes: ['/evidence/'] },
   },
 });
 

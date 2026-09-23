@@ -1,9 +1,3 @@
-/**
- * /evidence/ is kept only as a redirect to /case-study/, so links written
- * against the old route keep working. The meta refresh target and the
- * fallback link both go through asset(), so each resolves under
- * SITE_BASE=/ and SITE_BASE=/amale/.
- */
 import { Meta } from '@solidjs/meta';
 import PageMeta from '../components/PageMeta';
 import { asset } from '../lib/paths';
