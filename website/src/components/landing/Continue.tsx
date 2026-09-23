@@ -29,7 +29,7 @@ export default function Continue() {
       </div>
       <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
         <h2 data-reveal class="font-display text-display font-semibold tracking-tight">
-          Read it before you trust it.
+          Read before you trust it.
         </h2>
         <p data-reveal class="mt-4 max-w-prose leading-relaxed text-dim">
           Five documentation pages take the workflow apart, and the case study proves each claim

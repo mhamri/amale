@@ -6,7 +6,7 @@ const roles = [
     name: 'Coordinator',
     chip: 'minimal turns',
     chipClass: 'badge badge-soft badge-primary shrink-0 text-xs',
-    body: 'The expensive model, kept to minimal turns. Clarifies intent, chunks the work, defines acceptance criteria and integrates results. One delegate call per chunk, no micro-management.',
+    body: 'The expensive model, kept to minimal turns. Clarifies intent, chunks work, defines acceptance criteria and integrates results. One delegate call per chunk.',
   },
   {
     name: 'Workers',
@@ -24,7 +24,7 @@ const roles = [
     name: 'Jev',
     chip: 'bounded decisions',
     chipClass: 'badge badge-soft badge-accent shrink-0 text-xs',
-    body: 'A cheap decision model that answers bounded either/or questions for workers and the coordinator. It does not enforce constraints: TypeScript code, not any model, enforces dependencies, ownership, checks and review coverage.',
+    body: 'A cheap decision model answering bounded either/or questions for workers and the coordinator. TypeScript code, not any model, enforces dependencies, ownership, checks and review coverage.',
   },
 ];
 
@@ -35,7 +35,7 @@ const mechanics = [
   },
   {
     lead: 'Only genuine boundaries escalate.',
-    body: 'Exhausted repair allowances (Flash → Kimi → host), missing evidence and ambiguous intent reach the expensive model; ordinary uncertainty goes to Jev.',
+    body: 'Exhausted repair allowances (Flash to Kimi to host), missing evidence and ambiguous intent reach the expensive model; ordinary uncertainty goes to Jev.',
   },
   {
     lead: 'Progress lives on disk.',

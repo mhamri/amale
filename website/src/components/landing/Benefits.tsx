@@ -60,7 +60,7 @@ export default function Benefits() {
         Delegated work, verified delivery.
       </h2>
       <p data-reveal class="mt-4 max-w-prose leading-relaxed text-dim">
-        Amale runs delivery as delegation: cheap workers, independent review, resumable state.
+        Cheap workers carry each chunk, an independent reviewer checks it, and the state on disk lets you resume any session.
       </p>
       <div class="mt-8 grid gap-6 md:grid-cols-2">
         {items.map((item) => (
