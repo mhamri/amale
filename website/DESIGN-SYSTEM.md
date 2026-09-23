@@ -14,7 +14,7 @@ Amale is a delivery workflow for coding agents: plan, build, review, verify,
 resume. The site's visual language is a **night ledger** — a calm, layered
 graphite workspace where warm brass marks action, teal marks "verified", and
 violet marks orchestration. Depth is deliberate: surfaces step lighter as they
-rise, separated by hairline borders and two quiet shadow levels.
+rise, separated by hairline borders and three quiet shadow levels.
 
 The site carries one deliberate visual layer on top of that calm base: a
 live hero canvas and a set of orchestration diagrams that show delegation
@@ -22,6 +22,13 @@ happening rather than describing it in prose. Those visuals are the site's
 confident moment. Everything else stays quiet, so they read as instruments
 on a dark console, never as decoration — see **Visualization layer** below
 for what is allowed and what is required of each one.
+
+Under both of those sits one **ambient layer**, shared by every route and
+placed by the shell: the desk lamp falling from above the page, the screen's
+own light answering it from below, and the ledger's dot field. It is light and
+texture on the page background, never a shape over the copy — see **Depth
+vocabulary** below for the names, and for the entrance motion that goes with
+them.
 
 Two earlier directions are **rejected and must not return**:
 
@@ -273,20 +280,124 @@ type or search.
 
 - Radius: `rounded-box` (0.875rem) for cards/panels/code blocks,
   `rounded-field` (0.5rem) for buttons, inputs, small chips.
-- Every card or panel carries `border border-line bg-base-200` plus
-  `shadow-rest`; modals, dropdowns and focused panels use `shadow-raised`.
+- Every card or panel carries `border border-line bg-base-200` plus a shadow
+  tier from the table below.
 - Dividers are `border-line` (1px). Never use pure black or pure white.
+- The page background is painted from the **root element**, not from `body`:
+  `html { background-color: var(--color-base-100) }` in the base layer. A
+  `body` background is an ordinary in-flow background and paints above every
+  negative-z-index layer, which would hide the whole ambient decor field.
+  Painted from the root it becomes the canvas, and decor layers sit on it.
+
+## Depth vocabulary
+
+One shared set of names for depth, declared in `style.css` and built by the
+components in `src/components/decor/`. Pages compose these; they do not invent
+shadows, glows or entrance motion of their own.
+
+**Shadow tiers.** Three steps, each paired with `border-line`. The surface
+steps lighter as it rises, so the shadow is a cue for how far a panel stands
+above the desk, never decoration on its own.
+
+| Tier | Utility | For |
+| --- | --- | --- |
+| Resting | `shadow-rest` | a card sitting on the page |
+| Raised | `shadow-raised` | a panel lifted over the page (sticky header, dropdown, hovered menu) |
+| Floating | `shadow-floating` | a menu or dialog over everything |
+
+**Hue glows.** One per brand hue — `primary` brass, `secondary` teal, `accent`
+violet — as a hairline of that hue at the panel's own edge plus a wide halo
+behind it. A glow is layered *on top of* a tier, never in place of one, so a
+glowing panel keeps its shadow: `shadow-rest-glow-primary`,
+`shadow-raised-glow-secondary`, `shadow-floating-glow-accent`, and the other
+six pairings. Status colours are not brand hues; tinted status fills stay
+`alert-soft` / `badge-soft`.
+
+**Decor layers.** Each renders one element carrying `data-decor` and
+`aria-hidden="true"`, positioned absolutely against its host, never taking a
+pointer event, and painted at `z-index: -1` so it can never lift or lower the
+contrast of anything written on top of it.
+
+| Component | `data-decor` | What it draws |
+| --- | --- | --- |
+| `Glow` | `radial-glow` | a soft blooming disc, at a point (`cx`/`cy`, `size`) |
+| `GridDots` | `grid-dots` | the ledger's dot field, densest at `cx`/`cy` and fading with distance |
+| `Rings` | `ring` | one thin circle, a gauge bezel, never filled |
+| `LightRays` | `light-rays` | a warm core plus a wider halo, a cone falling from an apex (`cx`/`cy`, `angle` in degrees clockwise from straight down, `spread` in degrees) |
+| `Blobs` | `blob` | a blurred colour mass with no edge (`size`, `blur`) |
+| `Drifter` | `drift` | a wrapper (`direction`, `distance`) whose contents breathe slowly |
+
+Every component takes `hue` (a brand hue), `opacity` and `class`; `Glow`,
+`GridDots`, `Rings` and `Blobs` also take `cx`/`cy` as fractions of the host
+box. Colour, geometry and intensity travel as custom properties
+(`--decor-hue`, `--decor-opacity`, `--decor-size`, `--decor-x`/`--decor-y`,
+`--dots-spacing`, `--rays-*`, `--blob-blur`, `--drift-distance`), so placement
+is CSS's job and a component only names what it is.
+
+**The field must not fight the copy.** Layers are allowed to stack, so each
+one carries a low peak. Measured on the built site with every shell layer at
+full strength, the brightest pixel of lit page background is `rgb(54,53,44)`,
+which leaves `dim` text at 5.42:1 and `base-content` text at 10.48:1 — above
+the 4.5:1 floor. Raise any layer's opacity or its peak and that figure has to
+be measured again, not assumed.
+
+**A decor field.** Layers go in a clipped field inside a host that is its own
+stacking context, and the host must be `isolate` so a `z-index: -1` layer
+paints above the host's background and below its content:
+```html
+<section class="relative isolate">
+  <div class="decor-field" aria-hidden="true">
+    <Glow hue="secondary" size={720} cx={0.2} cy={0.1} />
+    <GridDots hue="secondary" spacing={28} cx={0.8} cy={0} opacity={0.3} />
+  </div>
+  …content…
+</section>
+```
+
+`.decor-field` is `position: absolute; inset: 0; z-index: -1;
+overflow: hidden; pointer-events: none`, so a shape hanging off the edge can
+never make the page scroll sideways and never needs a `will-change`. The
+shell uses the same field pinned to the viewport (`.decor-field fixed`) in
+`app.tsx`, and the footer carries its own inside its band.
+
+**Ambient drift.** A `Drifter` moves its contents slowly for ever — 13s
+vertically, 17s horizontally — so the light on a page breathes instead of
+sitting still. It stops dead under `prefers-reduced-motion: reduce`.
+
+**The `data-reveal` contract.** Any element carrying `data-reveal` fades and
+rises in once, over 0.6s, and is finished well inside 700ms:
+
+- The reveal is driven by `style.css`, so it starts at first paint and never
+  waits on hydration; `Reveal` in the shell only defers elements the reader
+  cannot see yet, releasing each one as it scrolls into view with a stagger of
+  40ms up to a ceiling of 80ms.
+- The whole rule is scoped to `@media (scripting: enabled)`, so with
+  JavaScript disabled the prerendered HTML shows every marked element at full
+  strength. Nothing is hidden for a reader who has no script.
+- It is scoped to `prefers-reduced-motion: no-preference`, and a held element
+  is forced back to full opacity under `reduce`; there is no animation and no
+  held state for a reader who asked for stillness.
+- `Reveal` never touches an element that is already on screen: re-hiding one
+  would be a visible flicker.
+- A page may set its own ladder with an inline `--reveal-delay`, but the total
+  must stay inside 700ms.
+- Never put `data-reveal` on an element that already sets its own opacity (a
+  decor layer, a tinted band): the animation ends at opacity 1 and would
+  override it. Wrap it in a plain element.
 
 ## Motion
 
 - Durations: 160ms for micro-interactions (hover, colour), 260ms for state
   changes (disclosure, tabs). Ease: `ease-out-soft`
   (`cubic-bezier(0.22, 1, 0.36, 1)` — available as a utility).
-- **Entrance motion stays one moment per page**: the hero headline group may
-  use `animate-rise` (0.6s fade + 0.75rem rise, `both`), optionally
-  staggered with `[animation-delay:120ms]`. No other page-load fade-ins, and
-  no hover transitions on every card — hover feedback is a 160ms
-  colour/border change only.
+- **Entrance motion stays one moment per page**, and that moment is the
+  `data-reveal` contract above: every marked element fades and rises in on
+  load, and `Reveal` holds the ones below the fold until they scroll into
+  view, releasing each with a 40ms-to-80ms stagger. The hero headline group
+  may still use `animate-rise` (0.6s fade + 0.75rem rise, `both`), optionally
+  staggered with `[animation-delay:120ms]`, as part of that same moment.
+  Nothing else fades on load, and no hover transitions on every card — hover
+  feedback is a 160ms colour/border change only.
 - Motion answers actions: dropdowns, collapses and tabs animate as they
   open.
 - **Continuous motion is permitted only inside the visualization layer** —
@@ -559,7 +670,9 @@ Diagram panel wrapper, for any visual in this layer:
 ```
 
 **Header pattern** (fixed by this task, in `Header.tsx`): sticky
-`bg-base-100/85 backdrop-blur-md border-b border-line`; brand lockup is the
+`bg-base-100/85 backdrop-blur-md border-b border-line shadow-rest` — the
+sticky bar is the shell's one raised surface, so it carries the resting tier;
+brand lockup is the
 mark plus the wordmark `amale` in `font-display` — the Arabic-script word
 عمله never appears in the lockup or any document title; it may appear only
 in body copy, always with its pronunciation (Ah-mah-leh), its meaning
@@ -592,8 +705,11 @@ when decorative.
 - Import nothing into `style.css`; no `<style>` blocks, no global CSS files.
 - Compose from: daisyUI component classes, Tailwind utilities, and the
   tokens above (`text-dim`, `border-line`, `bg-raised`, `shadow-rest`,
-  `shadow-raised`, `ease-out-soft`, `animate-rise`, `text-hero`,
-  `text-display`, `text-title`, `font-display`, `font-mono`).
+  `shadow-raised`, `shadow-floating`, `shadow-raised-glow-accent`,
+  `ease-out-soft`, `animate-rise`, `text-hero`, `text-display`, `text-title`,
+  `font-display`, `font-mono`) plus the depth vocabulary in
+  `src/components/decor/` (`Glow`, `GridDots`, `Rings`, `LightRays`, `Blobs`,
+  `Drifter`) and the `data-reveal` contract.
 - Prefer a daisyUI component over hand-rolled markup for every standard UI
   element (button, menu, alert, badge, table, collapse, steps, stat, kbd).
 - Interactive disclosures use daisyUI `collapse` or native `details` — both
@@ -602,6 +718,11 @@ when decorative.
 ## Verified checks
 
 - `tsc --noEmit` passes; `npm run build` prerenders all routes.
+- The depth vocabulary is checked on every route: at least one `aria-hidden`
+  `[data-decor]` layer from the shell, every `data-reveal` element in the
+  first viewport fully visible after load, and under
+  `prefers-reduced-motion: reduce` nothing animating and no marked element
+  held hidden.
 - Rendered inspection (headless Chromium) at 320/390/768/1024/1440 px over
   every prerendered route: no horizontal overflow, one `h1` per route,
   visible keyboard focus, reduced motion respected, and at 1024 px and above
