@@ -294,7 +294,7 @@ export default function InstallSequence() {
           <Box x={420} y={148} w={180} h={70} step={5} tone="dim">
             <T x={434} y={170} s={12} f="fill-primary" mono b>6</T>
             <T x={434} y={192} s={15} f="fill-base-content" b>run state on disk</T>
-            <T x={434} y={208} s={9} mono>.amale/ revisions + artifacts</T>
+            <T x={434} y={208} s={9} mono>.amale/ checkpoint</T>
           </Box>
 
           <Box x={240} y={278} w={180} h={70} step={6} tone="accent">
@@ -325,9 +325,11 @@ export default function InstallSequence() {
         </svg>
       </div>
       <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">
-        The install and first-run sequence: clone the repository, then doctor, install and preflight
-        prepare the machine and credential, invoking the skill starts a run that checkpoints to{' '}
-        <span class="font-mono">.amale</span> and resumes when invoked again.
+        The install and first-run sequence: clone{' '}
+        <span class="break-all font-mono">https://github.com/mhamri/amale</span> to a stable location you keep,
+        then doctor, install and preflight prepare the machine and credential; invoking the skill
+        starts a run that checkpoints to <span class="font-mono">.amale</span> and resumes when
+        invoked again.
       </figcaption>
     </figure>
   );

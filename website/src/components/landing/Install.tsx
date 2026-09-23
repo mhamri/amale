@@ -17,7 +17,7 @@ const installFacts = [
     body: 'checks local setup before anything network-facing; it does not prove network connectivity — the startup preflight covers that separately.',
   },
   {
-    title: 'Fallback launcher',
+    lead: 'Fallback launcher.',
     body: 'Node 24 or newer runs the erasable TypeScript directly when Bun is absent, so the same commands work without a second toolchain install.',
   },
 ];
@@ -37,7 +37,6 @@ export default function Install() {
           <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>shell</span>
-              <span class="badge badge-soft badge-primary font-sans text-xs">two commands</span>
             </div>
             <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{installCommands}</code></pre>
           </figure>
