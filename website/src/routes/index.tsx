@@ -5,6 +5,7 @@ import Division from '../components/landing/Division';
 import Install from '../components/landing/Install';
 import Author from '../components/landing/Author';
 import Continue from '../components/landing/Continue';
+import FinalCall from '../components/landing/FinalCall';
 
 export default function Home() {
   return (
@@ -20,6 +21,7 @@ export default function Home() {
         <Install />
         <Author />
         <Continue />
+        <FinalCall />
       </main>
     </>
   );
