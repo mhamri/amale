@@ -278,9 +278,9 @@ export default function RunLifecycle() {
             <T x={484} y={334} s={10.5}>coverage entry per obligation id</T>
           </Box>
 
-          <Box x={470} y={400} w={290} h={44} step={6} tone="secondary">
+          <Box x={470} y={400} w={290} h={46} step={6} tone="secondary">
             <T x={484} y={427} s={13.5} f="fill-secondary" b>verified delivery</T>
-            <T x={580} y={427} s={9} mid>accept · integrate · finish</T>
+            <T x={580} y={441} s={9} mid>accept · integrate · finish</T>
           </Box>
 
           <Flow d="M 178 74 H 200" />
