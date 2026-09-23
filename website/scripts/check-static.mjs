@@ -179,7 +179,11 @@ function stripNonMarkup(html) {
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ');
+    // A comment is not content: removing it must not glue the text around it
+    // together and must not split a token either. The renderer emits its
+    // hydration markers as comments between expressions, so a chip rendering
+    // `{topic}.md` must still read as one typable string.
+    .replace(/<!--[\s\S]*?-->/g, '');
 }
 
 function classTokens(attrs) {
@@ -254,6 +258,17 @@ function parseTree(html) {
 
 function nodeText(node, source) {
   return source.slice(node.openEnd, node.end).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/*
+ * A chip is one token, not a sentence: its own inline markup must not split
+ * the string it names, so tags between characters are removed without adding
+ * a space. A chip rendering `planning.md` from `{topic}.md` reads as one
+ * typable string whether the renderer emitted it as bare text or as nested
+ * spans.
+ */
+function chipText(node, source) {
+  return source.slice(node.openEnd, node.end).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
 /*
@@ -366,17 +381,17 @@ function isTypableString(text) {
 }
 
 function checkMonoChips({ file, label }, html) {
+  const { root, source } = parseTree(html);
   const offenders = [];
-  // Regex-based text extraction for font-mono badges
-  const monoBadgeRe = /<[^>]*class="[^"]*\bbadge\b[^"]*\bfont-mono\b[^"]*"[^>]*>([^<]*)<\/[^>]+>/gi;
-  let m;
-  while ((m = monoBadgeRe.exec(html)) !== null) {
-    const text = m[1].trim();
-    if (text.length === 0) continue;
-    if (!isTypableString(text)) {
-      offenders.push(text);
+  const walk = (node) => {
+    const declaresMono = node.cls.some(c => /\bfont-mono\b/.test(c));
+    if (node.cls.includes('badge') && declaresMono) {
+      const text = chipText(node, source);
+      if (text.length > 0 && !isTypableString(text)) offenders.push(text);
     }
-  }
+    for (const child of node.children) walk(child);
+  };
+  walk(root);
   assert.equal(offenders.length, 0,
     `${label}: ${file} carries font-mono chips whose text is not a typable string: ${offenders.join(', ')}. ` +
     'font-mono marks file paths, CLI operation names, and environment variables — ' +
@@ -405,7 +420,7 @@ function checkInheritedMono({ file, label }, html) {
     if (node.cls.includes('badge') && !selfMono && ancestorsHaveMono) {
       // This badge inherits font-mono from an ancestor. Check if its text
       // is a typable string; if not, it's a violation.
-      const text = nodeText(node, source).trim();
+      const text = chipText(node, source);
       if (text.length > 0 && !isTypableString(text)) {
         offenders.push(text);
       }
@@ -483,26 +498,34 @@ function checkHeadingChipRow({ file, label }, html) {
  * at any breakpoint (`grid-cols-3`, `xl:grid-cols-4`, …) and has a descendant
  * card holding a <p> of running text. A card whose paragraph is only a label
  * and a number is not prose, so a grid of stat cards past two columns is not
- * a violation. Prose in a card is attributed to that card's nearest grid
- * ancestor, so a nested layout grid is never blamed for its children's cards.
+ * a violation. A prose card is any descendant card holding a <p> of running
+ * text, so the grid that is blamed is the one that actually contains the
+ * card, even when a nested layout grid sits between them.
  */
 function checkProseGridColumns({ file, label }, html) {
   const { root, source } = parseTree(html);
   const offenders = new Set();
-  const walk = (node, ancestors) => {
-    for (const child of node.children) {
-      const chain = ancestors.concat(child);
-      if (child.tag === 'p' && isRunningProse(nodeText(child, source))) {
-        const card = [...chain].reverse().find(n => n.cls.includes('card'));
-        const grid = [...chain].reverse().find(n => n.cls.includes('grid'));
-        if (card && grid && declaredColumnCount(grid.cls) > 2) {
-          offenders.add(grid.cls.join(' '));
-        }
-      }
-      walk(child, chain);
-    }
+
+  // A grid carrying prose is any grid with a descendant card holding running
+  // text. Blaming the grid that actually contains the card catches a nested
+  // layout grid sitting between the card and its paragraph.
+  const hasRunningText = (node) =>
+    (node.tag === 'p' && isRunningProse(nodeText(node, source))) ||
+    node.children.some(hasRunningText);
+  const proseCards = (node, found) => {
+    if (node.cls.includes('card') && hasRunningText(node)) found.push(node);
+    for (const child of node.children) proseCards(child, found);
   };
-  walk(root, []);
+
+  const walk = (node) => {
+    if (node.cls.includes('grid') && declaredColumnCount(node.cls) > 2) {
+      const cards = [];
+      proseCards(node, cards);
+      if (cards.length > 0) offenders.add(node.cls.join(' '));
+    }
+    for (const child of node.children) walk(child);
+  };
+  walk(root);
   const list = [...offenders];
   assert.equal(list.length, 0,
     `${label}: ${file} has a prose card grid declaring more than two columns: ${list.join('; ')}. ` +
@@ -631,6 +654,20 @@ async function checkSoftBadges() {
       `DESIGN-SYSTEM.md records soft badge ${hue} at ${record.hue} but style.css declares ${hueHex}`);
     assert.ok(Math.abs(ratio - record.ratio) <= 0.1,
       `Soft badge ${hue} computes ${ratio.toFixed(2)}:1 but DESIGN-SYSTEM.md records ${record.ratio}:1`);
+
+    // The hairline edge is what makes a soft chip read as a chip on a
+    // base-200 card. It lives once in the component layer, so a route that
+    // uses the hue is covered; if this rule disappears, every soft chip on
+    // every route loses its edge and the pages cannot supply it themselves.
+    const edge = css.match(new RegExp(`\\.badge-soft\\.badge-${hue}\\s*\\{([^}]*)\\}`));
+    assert.ok(edge,
+      `style.css must give every soft chip a hairline edge in its own hue: no .badge-soft.badge-${hue} rule`);
+    assert.match(edge[1], /border-color\s*:/,
+      `.badge-soft.badge-${hue} must set border-color — the hairline edge in the chip's own hue`);
+    assert.ok(
+      edge[1].includes(`var(--color-${hue})`) || edge[1].toLowerCase().includes(hueHex.toLowerCase()),
+      `.badge-soft.badge-${hue} must draw its edge in the chip's own hue (${hueHex})`);
+
     reported.push(`${hue} ${ratio.toFixed(2)}:1`);
   }
 
