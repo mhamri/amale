@@ -99,17 +99,23 @@ Two loaded families and the system stack for body text.
 
 Type scale (Tailwind utilities, all available now):
 
-| Level | Classes | Size |
-| --- | --- | --- |
-| Hero `h1` | `font-display text-hero font-semibold tracking-tight` | clamp(2.5rem → 4.25rem) |
-| Docs `h1` | `font-display text-display font-semibold tracking-tight` | clamp(1.875rem → 2.625rem) |
-| `h2` | `font-display text-display font-semibold tracking-tight` | clamp(1.875rem → 2.625rem) |
-| `h3` | `font-display text-title font-semibold tracking-tight` | 1.375rem |
-| `h4` / lead-in | `font-sans text-lg font-semibold` | 1.125rem |
-| Body | `text-base leading-relaxed` | 1rem |
-| Small / meta | `text-sm text-dim` | 0.875rem |
-| Label / data | `font-mono text-sm text-dim` (sentence case) | 0.875rem |
-| Code | `font-mono text-sm leading-relaxed` | 0.875rem |
+| Level | Classes | Size | Line height |
+| --- | --- | --- | --- |
+| Hero `h1` | `font-display text-hero font-semibold tracking-tight` | clamp(2.5rem → 4.25rem) | 1.05 |
+| Docs `h1` | `font-display text-display font-semibold tracking-tight` | clamp(1.875rem → 2.625rem) | 1.15 |
+| `h2` | `font-display text-display font-semibold tracking-tight` | clamp(1.875rem → 2.625rem) | 1.15 |
+| `h3` | `font-display text-title font-semibold tracking-tight` | 1.375rem | 1.3 |
+| `h4` / lead-in | `font-sans text-lg font-semibold` | 1.125rem | Tailwind default |
+| Body | `text-base leading-relaxed` | 1rem | 1.625 |
+| Small / meta | `text-sm text-dim` | 0.875rem | Tailwind default |
+| Label / data | `font-mono text-sm text-dim` (sentence case) | 0.875rem | Tailwind default |
+| Code | `font-mono text-sm leading-relaxed` | 0.875rem | 1.625 |
+
+The display line heights live on the tokens themselves
+(`--text-hero--line-height`, `--text-display--line-height`,
+`--text-title--line-height` in `style.css`), so every heading gets them from
+its size class. Without them Tailwind sets 1.5, which spreads a wrapped
+headline into separate lines.
 
 One `h1` per page. Landing and evidence pages use Hero `h1` (`text-hero`);
 documentation pages use Docs `h1` (`text-display`) for the page title in the
@@ -170,7 +176,7 @@ Four widths are the contract. Every page is checked at all four.
 | Width | Target | What must be true |
 | --- | --- | --- |
 | 320–389 px | Small phone | One column. Nothing overflows horizontally. Diagrams switch to their stacked form. |
-| 390–767 px | Phone | One column. Cards full width. Hero canvas keeps a 4:3 or taller box. |
+| 390–767 px | Phone | One column. Cards full width. The hero scene is its own band under the copy, zoomed onto the model tiles. |
 | 768–1023 px | Tablet | Two-column card grids (`md:grid-cols-2`). Docs sidebar still stacked above the article. |
 | 1024 px and up | Desktop | The prose column is paired with a second column of real content. Docs use the three-column shell. Card grids reach three columns at `xl`. |
 
@@ -255,7 +261,10 @@ explanation of the scene belong to the benefits and author sections, not to the
 hero. The scene is never covered by the copy: **at 1024 CSS pixels and wider no
 headline, paragraph or button may overlap any model tile.** The copy therefore
 sits in one compact block on the left (about a third of the band) and every
-labelled model tile in the scene stays right of the prose measure. Model name
+labelled model tile in the scene stays right of the prose measure. **Below
+1024 CSS pixels the scene leaves the background** and becomes its own band
+under the buttons — 8:9 on a phone, 16:10 from `sm` — zoomed onto the model
+tiles so they read at phone width. Model name
 labels under a tile are supporting label copy: below body scale, and in the
 sans stack, because a model name is a topic rather than a string a reader could
 type or search.
@@ -467,9 +476,12 @@ The site shows delegation instead of only describing it. Two component kinds
 carry that, and both are subject to the rules here.
 
 **Hero canvas** — one per site, on the landing page only. A WebGL scene whose
-subject is the workflow itself: one coordinator node segmenting work and
-handing chunks out to worker nodes, work flowing back for review, accepted
-chunks settling. It reads as an instrument on the night-ledger console, drawn
+subject is the workflow itself: Claude Code or Codex running the coordinator,
+the coordinator handing chunks to the four Flash workers (DeepSeek, GLM, MiMo,
+Solar), workers asking Jev bounded questions, another Flash family reviewing
+each chunk, a chunk that keeps failing repair escalating to Kimi, and accepted
+chunks travelling back. The scene must match what the skill does: Anthropic
+and OpenAI are the coordinator hosts, never the reviewers. It reads as an instrument on the night-ledger console, drawn
 in palette hues (brass for the coordinator and action, teal for accepted or
 verified, violet for orchestration and routing) on the `base-100` background.
 No photographic texture, no lens flare, no particle confetti.

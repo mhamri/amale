@@ -31,61 +31,44 @@ const TILE = { side: 0.72, half: 0.36, radius: 0.18 };
 // a reader cannot type or search, so monospace would be decoration.
 const LABEL = { size: 0.15, gap: 0.42 };
 
-// The scene is a full-bleed background for copy that reads top-left, so the
-// crisp identity layer — the model tiles and their labels — gathers right of
-// the prose measure, from x 10.5 of the 16 design units. The coordinator and
-// the anonymous reviewer are dim glows, not labelled boxes.
+// Every labelled tile sits at x >= 10.5 of the 16 design units, clear of the
+// copy block at lg and wider; Problem.tsx crops the band to that region below
+// lg. The coordinator hub is an unlabelled glow left of the tiles.
 const NODES: SceneNode[] = [
   { x: 7.5, y: 4.6, r: 0.9, role: 'coordinator' },
-  // The four Flash workers — the cheap models that receive chunks.
-  { x: 10.9, y: 2.2, r: 0.42, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
-  { x: 12.9, y: 2.2, r: 0.42, role: 'worker', label: 'GLM', model: 'glm' },
-  { x: 14.9, y: 2.2, r: 0.42, role: 'worker', label: 'MiMo', model: 'mimo' },
-  { x: 10.9, y: 4.6, r: 0.42, role: 'worker', label: 'Solar', model: 'solar' },
-  // Kimi — escalation model Jev reaches for when a bounded question is harder
-  // than a Flash model can settle.
-  { x: 12.9, y: 4.6, r: 0.40, role: 'worker', label: 'Kimi', model: 'kimi' },
-  // Jev — orchestration model for bounded questions from workers.
-  { x: 14.9, y: 4.6, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
-  // Reviewer hosts — each finished chunk is reviewed by a different model
-  // family. Their marks paint their own light fills (Anthropic's tan square,
-  // OpenAI's and MiMo's light tile surface), so they stay right of the prose
-  // measure with the other labelled tiles. The anonymous reviewer is a dim
-  // glow and carries no mark.
-  { x: 11.9, y: 7.0, r: 0.42, role: 'review', label: 'Anthropic', model: 'anthropic' },
-  { x: 13.9, y: 7.0, r: 0.42, role: 'review', label: 'OpenAI', model: 'openai' },
-  { x: 9.2, y: 7.4, r: 0.38, role: 'review' },
+  { x: 11.9, y: 2.2, r: 0.42, role: 'coordinator', label: 'Claude Code', model: 'anthropic' },
+  { x: 13.9, y: 2.2, r: 0.42, role: 'coordinator', label: 'Codex', model: 'openai' },
+  { x: 10.9, y: 4.6, r: 0.42, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
+  { x: 12.9, y: 4.6, r: 0.42, role: 'worker', label: 'GLM', model: 'glm' },
+  { x: 14.9, y: 4.6, r: 0.42, role: 'worker', label: 'MiMo', model: 'mimo' },
+  { x: 10.9, y: 7.0, r: 0.42, role: 'worker', label: 'Solar', model: 'solar' },
+  { x: 12.9, y: 7.0, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
+  { x: 14.9, y: 7.0, r: 0.42, role: 'worker', label: 'Kimi', model: 'kimi' },
 ];
 
 const LINKS: SceneLink[] = [
-  // Coordinator distributes chunks to the four Flash workers.
-  { from: 0, to: 1, role: 'coordinator', phase: 0 },
-  { from: 0, to: 2, role: 'coordinator', phase: 0.26 },
-  { from: 0, to: 3, role: 'coordinator', phase: 0.52 },
-  { from: 0, to: 4, role: 'coordinator', phase: 0.78 },
-  // Workers put bounded questions to Jev.
-  { from: 3, to: 6, role: 'jev', phase: 0.14 },
-  { from: 4, to: 6, role: 'jev', phase: 0.64 },
-  // Jev escalates to Kimi when needed.
-  { from: 6, to: 5, role: 'jev', phase: 0.38 },
-  // Each finished chunk is reviewed by a different model family.
-  { from: 1, to: 7, role: 'review', phase: 0.42 },
-  { from: 4, to: 8, role: 'review', phase: 0.92 },
-  { from: 2, to: 9, role: 'review', phase: 0.18 },
-  { from: 5, to: 8, role: 'review', phase: 0.68 },
-  // Accepted chunks travel back to the coordinator.
-  { from: 7, to: 0, role: 'review', phase: 0.58 },
-  { from: 8, to: 0, role: 'review', phase: 0.82 },
-  { from: 9, to: 0, role: 'review', phase: 0.34 },
+  { from: 1, to: 0, role: 'coordinator', phase: 0 },
+  { from: 2, to: 0, role: 'coordinator', phase: 0.5 },
+  { from: 0, to: 3, role: 'coordinator', phase: 0.12 },
+  { from: 0, to: 6, role: 'coordinator', phase: 0.62 },
+  { from: 1, to: 4, role: 'coordinator', phase: 0.37 },
+  { from: 2, to: 5, role: 'coordinator', phase: 0.87 },
+  { from: 4, to: 7, role: 'jev', phase: 0.24 },
+  { from: 6, to: 7, role: 'jev', phase: 0.74 },
+  { from: 3, to: 4, role: 'review', phase: 0.44 },
+  { from: 4, to: 5, role: 'review', phase: 0.94 },
+  { from: 5, to: 8, role: 'worker', phase: 0.3 },
+  { from: 3, to: 0, role: 'review', phase: 0.58 },
+  { from: 6, to: 0, role: 'review', phase: 0.08 },
 ];
 
 const NODE_COUNT = NODES.length;
 const LINK_COUNT = LINKS.length;
 
 const ARIA_LABEL =
-  'The coordinator sends chunks of work out to the four routed Flash models — DeepSeek, GLM, MiMo and Solar. ' +
-  'Workers put bounded questions to Jev, which escalates to Kimi when a question is harder than a Flash model can settle. ' +
-  'A different model family (Anthropic, OpenAI or a third, anonymous reviewer) reviews each finished chunk, and accepted chunks travel back to the coordinator.';
+  'Claude Code or Codex runs the coordinator, which hands chunks of work to four cheap Flash models: DeepSeek, GLM, MiMo and Solar. ' +
+  'Workers put bounded questions to Jev. A model from another Flash family reviews each finished chunk, ' +
+  'a chunk that keeps failing its repairs escalates to Kimi, and accepted chunks travel back to the coordinator.';
 
 const ROLE_VARIABLE: Record<Role, string> = {
   coordinator: '--color-primary',
@@ -464,15 +447,9 @@ export default function HeroCanvas() {
             />
           ))}
         </g>
-        {/* Model tiles sit outside the fading fallback group: they are the
-            identity layer, visible with no JavaScript, no WebGL, and over the
-            live scene alike. The tile is the same rounded square either way,
-            so a model without a published mark reads as a monogram tile, not
-            as a hole. Below lg the copy spans the full band and no tile
-            position can clear it, so the layer recedes to a level whose
-            worst-case light tile blend (Anthropic's tan, OpenAI's and MiMo's
-            light surfaces) still keeps dim body copy above the 4.5:1 floor. */}
-        <g class="opacity-20 lg:opacity-100">
+        {/* Model tiles sit outside the fading fallback group, so they stay
+            visible with no JavaScript, no WebGL, and over the live scene. */}
+        <g>
         {NODES.map((node) => {
           if (!node.model) return null;
           const identity = MODELS[node.model];
