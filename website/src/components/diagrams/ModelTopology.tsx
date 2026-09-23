@@ -201,7 +201,7 @@ export default function ModelTopology(props: { caption?: string; class?: string 
           data-topo-svg
           data-topo-variant="narrow"
           class="h-full w-full md:hidden"
-          viewBox="0 0 320 246"
+          viewBox="0 0 320 248"
           role="img"
           aria-label={ARIA_LABEL}
         >
@@ -250,13 +250,14 @@ export default function ModelTopology(props: { caption?: string; class?: string 
           <text x="88" y="203" text-anchor="middle" font-size="11" class="fill-base-content font-semibold">Kimi</text>
           <text x="88" y="219" text-anchor="middle" font-size="9" class="fill-dim">deeper specialist</text>
 
-          {/* Script timeline, one lit step at a time. */}
+          {/* Script timeline, one lit step at a time. Sits in the empty band
+              below every box: clear of every rect, never straddling an edge. */}
           <g font-size="9" class="font-mono">
-            <text data-topo-step x="16" y="242" class="fill-dim">1 delegate</text>
-            <text data-topo-step x="86" y="242" class="fill-dim">2 consult</text>
-            <text data-topo-step x="148" y="242" class="fill-dim">3 review</text>
-            <text data-topo-step x="204" y="242" class="fill-dim">4 escalate</text>
-            <text data-topo-step x="266" y="242" class="fill-dim">5 return</text>
+            <text data-topo-step x="16" y="240" class="fill-dim">1 delegate</text>
+            <text data-topo-step x="86" y="240" class="fill-dim">2 consult</text>
+            <text data-topo-step x="148" y="240" class="fill-dim">3 review</text>
+            <text data-topo-step x="204" y="240" class="fill-dim">4 escalate</text>
+            <text data-topo-step x="266" y="240" class="fill-dim">5 return</text>
           </g>
 
           {/* Active-stage overlays, lit one at a time by the script. */}

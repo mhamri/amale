@@ -231,17 +231,17 @@ export default function OperationMap() {
           class="size-full sm:hidden"
           preserveAspectRatio="xMidYMid meet"
         >
-          <Stop x={3} y={6} w={42} h={16} step={0} tone="primary" label="plan" ls={10} />
-          <Stop x={51} y={6} w={42} h={16} step={1} tone="primary" label="delegate" ls={10} />
-          <Stop x={99} y={6} w={42} h={16} step={2} tone="primary" label="execute" ls={10} />
-          <Stop x={147} y={6} w={42} h={16} step={3} tone="secondary" label="review" ls={10} />
-          <Stop x={195} y={6} w={42} h={16} step={4} tone="accent" label="decide" ls={10} />
-          <Stop x={243} y={6} w={42} h={16} step={5} tone="info" label="operate" ls={10} />
-          <Flow d="M 46 14 H 50" />
-          <Flow d="M 94 14 H 98" />
-          <Flow d="M 142 14 H 146" />
-          <Flow d="M 190 14 H 194" />
-          <Flow d="M 238 14 H 242" />
+          <Stop x={3} y={6} w={42} h={20} step={0} tone="primary" ls={8} label="plan" />
+          <Stop x={51} y={6} w={42} h={20} step={1} tone="primary" ls={8} label="delegate" />
+          <Stop x={99} y={6} w={42} h={20} step={2} tone="primary" ls={8} label="execute" />
+          <Stop x={147} y={6} w={42} h={20} step={3} tone="secondary" ls={8} label="review" />
+          <Stop x={195} y={6} w={42} h={20} step={4} tone="accent" ls={8} label="decide" />
+          <Stop x={243} y={6} w={42} h={20} step={5} tone="info" ls={8} label="operate" />
+          <Flow d="M 46 16 H 50" />
+          <Flow d="M 94 16 H 98" />
+          <Flow d="M 142 16 H 146" />
+          <Flow d="M 190 16 H 194" />
+          <Flow d="M 238 16 H 242" />
 
           <T x={6} y={36} s={8.5} f="fill-primary" b>plan</T>
           <T x={44} y={36} s={7} mono>plan · amend · invalidate · record-decision</T>
