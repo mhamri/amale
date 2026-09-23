@@ -4,25 +4,25 @@ const roles = [
   {
     name: 'Coordinator',
     chip: 'minimal turns',
-    chipClass: 'badge badge-soft badge-primary text-xs',
+    chipClass: 'badge badge-soft badge-primary shrink-0 text-xs',
     body: 'The expensive model, kept to minimal turns. Clarifies intent, chunks the work, defines acceptance criteria and integrates results. One delegate call per chunk — no per-step instructions, no hand-written briefs, no micro-management.',
   },
   {
     name: 'Workers',
     chip: 'routed Flash pool',
-    chipClass: 'badge badge-soft badge-accent text-xs',
+    chipClass: 'badge badge-soft badge-accent shrink-0 text-xs',
     body: 'The routed Flash families — DeepSeek, GLM, MiMo and Solar — each own a chunk end to end: implementation, checks and repair cycles. When a decision inside the chunk is uncertain they consult Jev directly through a bundled helper instead of escalating to the coordinator.',
   },
   {
     name: 'Reviewer',
     chip: 'read-only',
-    chipClass: 'badge badge-soft badge-secondary text-xs',
+    chipClass: 'badge badge-soft badge-secondary shrink-0 text-xs',
     body: 'Always the other model family, reading only. Independently verifies each chunk with structured coverage and routes findings back into the worker\'s repair loop rather than to the coordinator.',
   },
   {
     name: 'Jev',
     chip: 'bounded decisions',
-    chipClass: 'badge badge-soft badge-accent text-xs',
+    chipClass: 'badge badge-soft badge-accent shrink-0 text-xs',
     body: 'A cheap decision model that answers bounded either/or questions for workers and the coordinator. It does not enforce constraints: TypeScript code, not any model, enforces dependencies, ownership, checks and review coverage.',
   },
 ];
@@ -74,7 +74,7 @@ export default function Division() {
         {roles.map((role) => (
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">{role.name}</h3>
                 <span class={role.chipClass}>{role.chip}</span>
               </div>
