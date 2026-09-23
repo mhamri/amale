@@ -2,6 +2,7 @@ import PageMeta from '../components/PageMeta';
 import Problem from '../components/landing/Problem';
 import Division from '../components/landing/Division';
 import Install from '../components/landing/Install';
+import Author from '../components/landing/Author';
 import Continue from '../components/landing/Continue';
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
         <Problem />
         <Division />
         <Install />
+        <Author />
         <Continue />
       </main>
     </>
