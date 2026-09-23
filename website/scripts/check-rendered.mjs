@@ -25,7 +25,7 @@ const routes = [
   '/docs/workflow/',
   '/docs/review-and-recovery/',
   '/docs/commands/',
-  '/evidence/',
+  '/case-study/',
 ];
 
 function fileURL(relative) {
