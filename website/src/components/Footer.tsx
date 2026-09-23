@@ -4,7 +4,7 @@ import { Glow, GridDots } from './decor';
 const siteLinks = [
   { label: 'Overview', href: asset('') },
   { label: 'Docs', href: asset('docs/') },
-  { label: 'Evidence', href: asset('evidence/') },
+  { label: 'Case study', href: asset('case-study/') },
 ];
 
 const projectLinks = [

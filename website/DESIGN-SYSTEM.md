@@ -1,7 +1,7 @@
 # Amale website design system
 
 This document is a binding contract. Every page — the landing page, the five
-documentation pages and the evidence page — is built from the tokens and
+documentation pages and the case-study page — is built from the tokens and
 component patterns below, using daisyUI components and Tailwind utilities
 only. **No page may add global CSS.** The only stylesheet in the site is
 `website/src/style.css`; it holds the theme, the base layer and shell chrome
@@ -124,7 +124,7 @@ The display line heights live on the tokens themselves
 its size class. Without them Tailwind sets 1.5, which spreads a wrapped
 headline into separate lines.
 
-One `h1` per page. Landing and evidence pages use Hero `h1` (`text-hero`);
+One `h1` per page. Landing and case-study pages use Hero `h1` (`text-hero`);
 documentation pages use Docs `h1` (`text-display`) for the page title in the
 docs header. Heading levels nest in order; do not skip levels. Chrome that
 repeats on every route is not a heading at all: the footer's column labels are
@@ -157,7 +157,7 @@ in a headline as emphasis.
   - A section that follows one carrying no bottom padding keeps the full
     wrapper: its own top padding is then the entire seam.
 
-  - A page that is one continuous document — the evidence page and every
+  - A page that is one continuous document — the case-study page and every
     documentation page — uses a single wrapper and sets the rhythm between
     blocks inside it (`mt-12` between heading groups, `space-y-12` between
     sections) instead of stacking wrappers.

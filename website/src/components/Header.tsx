@@ -3,7 +3,7 @@ import { asset } from '../lib/paths';
 const primaryLinks = [
   { label: 'Overview', href: asset('') },
   { label: 'Docs', href: asset('docs/') },
-  { label: 'Evidence', href: asset('evidence/') },
+  { label: 'Case study', href: asset('case-study/') },
 ];
 
 const github = { label: 'GitHub', href: 'https://github.com/mhamri/amale' };

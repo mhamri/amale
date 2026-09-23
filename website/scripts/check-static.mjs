@@ -14,7 +14,7 @@ const routes = [
   { file: 'docs/workflow/index.html',        page: 'docs/workflow/index.html',        label: '/docs/workflow/' },
   { file: 'docs/review-and-recovery/index.html', page: 'docs/review-and-recovery/index.html', label: '/docs/review-and-recovery/' },
   { file: 'docs/commands/index.html',        page: 'docs/commands/index.html',        label: '/docs/commands/' },
-  { file: 'evidence/index.html',            page: 'evidence/index.html',            label: '/evidence/' },
+  { file: 'case-study/index.html',          page: 'case-study/index.html',          label: '/case-study/' },
 ];
 
 const base = process.env.SITE_BASE || '/';
@@ -113,7 +113,7 @@ async function checkPage({ file, page, label }) {
   assert.match(html, /<h1[\s>]/, `${label}: ${file} must contain a prerendered <h1>`);
   assert.match(html, /<title[^>]*>[^<]+<\/title>/, `${label}: ${file} must contain a <title>`);
 
-  const expectsName = page === "index.html" || page === "docs/index.html" || page === "evidence/index.html";
+  const expectsName = page === "index.html" || page === "docs/index.html" || page === "case-study/index.html";
   if (expectsName) {
     assert.match(html, /عمله/, "" + label + ": " + file + " must render عمله");
     assert.match(html, /Ah-mah-leh/, "" + label + ": " + file + " must render the pronunciation");
