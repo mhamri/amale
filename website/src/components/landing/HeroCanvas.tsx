@@ -25,62 +25,67 @@ const DESIGN_HEIGHT = 9;
 // mark or a monogram.
 const TILE = { side: 0.72, half: 0.36, radius: 0.18 };
 
+// The model name under a tile is supporting label copy, so it is set below
+// body scale: 0.15 of the 16-unit design box is at most 13.5 CSS pixels in the
+// widest fit of the band. It stays in the sans stack — a model name is a topic
+// a reader cannot type or search, so monospace would be decoration.
+const LABEL = { size: 0.15, gap: 0.42 };
+
 // The scene is a full-bleed background for copy that reads top-left, so the
-// crisp identity layer — the model tiles and their labels — gathers in the
-// lower right, below the headline zone and right of the prose measure. The
-// coordinator and the reviewer are dim glows, not labelled boxes.
+// crisp identity layer — the model tiles and their labels — gathers right of
+// the prose measure, from x 10.5 of the 16 design units. The coordinator and
+// the anonymous reviewer are dim glows, not labelled boxes.
 const NODES: SceneNode[] = [
-  { x: 4.3, y: 4.5, r: 0.85, role: 'coordinator' },
-  // Worker models — routed cheap models that receive chunks from the coordinator.
-  { x: 11.0, y: 5.2, r: 0.44, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
-  { x: 13.6, y: 5.2, r: 0.44, role: 'worker', label: 'GLM', model: 'glm' },
-  { x: 11.0, y: 7.05, r: 0.44, role: 'worker', label: 'MiMo', model: 'mimo' },
-  { x: 13.6, y: 7.05, r: 0.44, role: 'worker', label: 'Solar', model: 'solar' },
+  { x: 7.5, y: 4.6, r: 0.9, role: 'coordinator' },
+  // The four Flash workers — the cheap models that receive chunks.
+  { x: 10.9, y: 2.2, r: 0.42, role: 'worker', label: 'DeepSeek', model: 'deepseek' },
+  { x: 12.9, y: 2.2, r: 0.42, role: 'worker', label: 'GLM', model: 'glm' },
+  { x: 14.9, y: 2.2, r: 0.42, role: 'worker', label: 'MiMo', model: 'mimo' },
+  { x: 10.9, y: 4.6, r: 0.42, role: 'worker', label: 'Solar', model: 'solar' },
+  // Kimi — escalation model Jev reaches for when a bounded question is harder
+  // than a Flash model can settle.
+  { x: 12.9, y: 4.6, r: 0.40, role: 'worker', label: 'Kimi', model: 'kimi' },
   // Jev — orchestration model for bounded questions from workers.
-  { x: 8.3, y: 7.7, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
+  { x: 14.9, y: 4.6, r: 0.42, role: 'jev', label: 'Jev', model: 'jev' },
   // Reviewer hosts — each finished chunk is reviewed by a different model
-  // family. Anthropic and OpenAI wear identity tiles, so they sit on the
-  // lower row with the other labelled models: their marks paint their own
-  // light fills (Anthropic's tan square, OpenAI's light tile surface), which
-  // must never sit under the copy. The anonymous reviewer is a dim glow and
-  // can stay higher.
-  { x: 11.5, y: 1.35, r: 0.42, role: 'review' },
-  { x: 9.4, y: 7.7, r: 0.42, role: 'review', label: 'Anthropic', model: 'anthropic' },
-  { x: 15.5, y: 7.7, r: 0.42, role: 'review', label: 'OpenAI', model: 'openai' },
-  // Kimi — escalation model via Jev. Its mark paints a large light monogram,
-  // so it stays right of the prose measure with the other labelled tiles.
-  { x: 12.3, y: 8.0, r: 0.40, role: 'worker', label: 'Kimi', model: 'kimi' },
+  // family. Their marks paint their own light fills (Anthropic's tan square,
+  // OpenAI's and MiMo's light tile surface), so they stay right of the prose
+  // measure with the other labelled tiles. The anonymous reviewer is a dim
+  // glow and carries no mark.
+  { x: 11.9, y: 7.0, r: 0.42, role: 'review', label: 'Anthropic', model: 'anthropic' },
+  { x: 13.9, y: 7.0, r: 0.42, role: 'review', label: 'OpenAI', model: 'openai' },
+  { x: 9.2, y: 7.4, r: 0.38, role: 'review' },
 ];
 
 const LINKS: SceneLink[] = [
-  // Coordinator distributes chunks to four worker models.
+  // Coordinator distributes chunks to the four Flash workers.
   { from: 0, to: 1, role: 'coordinator', phase: 0 },
   { from: 0, to: 2, role: 'coordinator', phase: 0.26 },
   { from: 0, to: 3, role: 'coordinator', phase: 0.52 },
   { from: 0, to: 4, role: 'coordinator', phase: 0.78 },
   // Workers put bounded questions to Jev.
-  { from: 2, to: 5, role: 'jev', phase: 0.14 },
-  { from: 3, to: 5, role: 'jev', phase: 0.64 },
+  { from: 3, to: 6, role: 'jev', phase: 0.14 },
+  { from: 4, to: 6, role: 'jev', phase: 0.64 },
   // Jev escalates to Kimi when needed.
-  { from: 5, to: 9, role: 'jev', phase: 0.38 },
+  { from: 6, to: 5, role: 'jev', phase: 0.38 },
   // Each finished chunk is reviewed by a different model family.
-  { from: 1, to: 6, role: 'review', phase: 0.42 },
-  { from: 4, to: 6, role: 'review', phase: 0.92 },
-  { from: 1, to: 7, role: 'review', phase: 0.68 },
-  { from: 3, to: 8, role: 'review', phase: 0.18 },
+  { from: 1, to: 7, role: 'review', phase: 0.42 },
+  { from: 4, to: 8, role: 'review', phase: 0.92 },
+  { from: 2, to: 9, role: 'review', phase: 0.18 },
+  { from: 5, to: 8, role: 'review', phase: 0.68 },
   // Accepted chunks travel back to the coordinator.
-  { from: 6, to: 0, role: 'review', phase: 0.58 },
-  { from: 7, to: 0, role: 'review', phase: 0.82 },
-  { from: 8, to: 0, role: 'review', phase: 0.34 },
+  { from: 7, to: 0, role: 'review', phase: 0.58 },
+  { from: 8, to: 0, role: 'review', phase: 0.82 },
+  { from: 9, to: 0, role: 'review', phase: 0.34 },
 ];
 
 const NODE_COUNT = NODES.length;
 const LINK_COUNT = LINKS.length;
 
 const ARIA_LABEL =
-  'The coordinator sends chunks of work out to routed worker models — DeepSeek, GLM, MiMo, Solar and Kimi. ' +
-  'Workers put bounded questions to Jev, a different model family (Anthropic, OpenAI or the anonymous reviewer) ' +
-  'reviews each finished chunk, and accepted chunks travel back to the coordinator.';
+  'The coordinator sends chunks of work out to the four routed Flash models — DeepSeek, GLM, MiMo and Solar. ' +
+  'Workers put bounded questions to Jev, which escalates to Kimi when a question is harder than a Flash model can settle. ' +
+  'A different model family (Anthropic, OpenAI or a third, anonymous reviewer) reviews each finished chunk, and accepted chunks travel back to the coordinator.';
 
 const ROLE_VARIABLE: Record<Role, string> = {
   coordinator: '--color-primary',
@@ -465,14 +470,14 @@ export default function HeroCanvas() {
             so a model without a published mark reads as a monogram tile, not
             as a hole. Below lg the copy spans the full band and no tile
             position can clear it, so the layer recedes to a level whose
-            worst-case light tile blend (Anthropic's tan, OpenAI's light
-            surface) still keeps dim body copy above the 4.5:1 floor. */}
+            worst-case light tile blend (Anthropic's tan, OpenAI's and MiMo's
+            light surfaces) still keeps dim body copy above the 4.5:1 floor. */}
         <g class="opacity-20 lg:opacity-100">
         {NODES.map((node) => {
           if (!node.model) return null;
           const identity = MODELS[node.model];
           return (
-            <g transform={`translate(${node.x} ${node.y})`}>
+            <g transform={`translate(${node.x} ${node.y})`} data-model={node.model}>
               <rect
                 x={-TILE.half}
                 y={-TILE.half}
@@ -493,7 +498,6 @@ export default function HeroCanvas() {
                   />
                 ) : (
                   <text
-                    class="font-mono"
                     x="0"
                     y="0"
                     font-size="0.26"
@@ -516,22 +520,19 @@ export default function HeroCanvas() {
                 stroke={identity.hue}
                 stroke-width="0.035"
               />
+              {node.label ? (
+                <text
+                  y={TILE.half + LABEL.gap}
+                  fill="var(--color-dim)"
+                  font-size={`${LABEL.size}`}
+                  text-anchor="middle"
+                >
+                  {node.label}
+                </text>
+              ) : null}
             </g>
           );
         })}
-        {NODES.map((node) =>
-          node.label ? (
-            <text
-              x={node.x}
-              y={node.y + TILE.half + 0.52}
-              fill="var(--color-dim)"
-              font-size="0.18"
-              text-anchor="middle"
-            >
-              {node.label}
-            </text>
-          ) : null,
-        )}
         </g>
       </svg>
     </div>

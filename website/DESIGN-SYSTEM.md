@@ -217,6 +217,49 @@ Rules that produce that:
 - **Type** is already fluid (`text-hero`, `text-display` use `clamp`); do not
   add width-conditional font-size utilities on top of them.
 
+## Landing page structure
+
+The landing page is one ordered narrative. The order is fixed — a reader must
+meet the offer, the reasons, the proof, the author and the close in that
+sequence — and `src/routes/index.tsx` renders `<main id="main">` with exactly
+these sections, in this order, one component each:
+
+| # | Section | Component | id |
+| --- | --- | --- | --- |
+| 1 | Hero | `landing/Problem.tsx` | — (first `<section>` of `main`) |
+| 2 | Benefits | `landing/Benefits.tsx` | `benefits` |
+| 3 | Division / model topology | `landing/Division.tsx` | — |
+| 4 | Install | `landing/Install.tsx` | — |
+| 5 | Author credibility | `landing/Author.tsx` | `author` |
+| 6 | Continue | `landing/Continue.tsx` | — |
+| 7 | Final call to action | `landing/FinalCall.tsx` | `final-cta` |
+
+The final call to action is always the **last** `<section>` of `main`: it
+repeats the offer and the one action, and nothing follows it but the footer.
+Where a section carries a fragment id it is the section element's own `id`, so
+an in-page link lands on the whole band.
+
+**The hero rule.** The hero carries exactly four things over the full-bleed
+scene, and nothing else:
+
+1. one `<h1>` of at most 12 words that states the benefit the reader gets —
+   never a statistic, a price or a token count;
+2. one short description paragraph, at most 45 words in total across every
+   `<p>` in the hero, saying what the reader gets;
+3. one primary call to action, `btn btn-primary`, pointing at the getting
+   started documentation page through `asset()`;
+4. one `Sponsor` button pointing at `SPONSOR_URL` from `src/lib/links.ts`.
+
+Measured rebuild figures, the pronunciation and origin of the name, and every
+explanation of the scene belong to the benefits and author sections, not to the
+hero. The scene is never covered by the copy: **at 1024 CSS pixels and wider no
+headline, paragraph or button may overlap any model tile.** The copy therefore
+sits in one compact block on the left (about a third of the band) and every
+labelled model tile in the scene stays right of the prose measure. Model name
+labels under a tile are supporting label copy: below body scale, and in the
+sans stack, because a model name is a topic rather than a string a reader could
+type or search.
+
 ## Shape, borders, elevation
 
 - Radius: `rounded-box` (0.875rem) for cards/panels/code blocks,
@@ -441,10 +484,15 @@ thing it explains.
 Each model node wears a **logo tile**: a rounded square carrying the vendor's
 real mark when `website/public/models/` holds one, and otherwise a monogram
 in that model's routed hue. The tile is the same size and shape either way, so
-a missing logo reads as a deliberate mark rather than a hole. Adding a
-correctly named file to that folder upgrades a monogram to a logo with no code
-change. Logos are third-party marks used to name the models Amale routes to;
-they are not redrawn, recoloured or combined with the Amale mark.
+a missing logo reads as a deliberate mark rather than a hole. The shipped
+mechanism reads the model's `logo` field in `website/src/lib/models.ts`, not
+the directory listing: a mark appears only when the file is in that folder
+**and** the field points at it, so adding a file alone upgrades nothing. A
+mark drawn in `currentColor` — MiMo's and OpenAI's — resolves to black inside
+an `<image>`, so its identity entry also sets a light `tileFill`; that is a
+tile surface, not a recolouring of the mark. Logos are third-party marks used
+to name the models Amale routes to; they are not redrawn, recoloured or
+combined with the Amale mark.
 
 **Orchestration and topic diagrams** — SVG plus a small script timeline. Each
 one has a single subject named in its own caption: the model topology on the
