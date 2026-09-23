@@ -31,12 +31,12 @@ export default function Continue() {
           been exercised and what has not, and the primary sources ship with the build so every
           claim can be checked in full.
         </p>
-        <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-2">
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Documentation</h3>
-                <span class="badge badge-soft badge-primary text-xs">Five pages</span>
+                <span class="badge badge-soft badge-primary shrink-0 text-xs">Five pages</span>
               </div>
               <ul class="flex flex-wrap gap-2">
                 {docsTopics.map((topic) => (
@@ -54,9 +54,9 @@ export default function Continue() {
           </article>
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Evidence</h3>
-                <span class="badge badge-soft badge-secondary text-xs">Verified and untested</span>
+                <span class="badge badge-soft badge-secondary shrink-0 text-xs">Verified and untested</span>
               </div>
               <p class="text-sm leading-relaxed text-dim">
                 The record behind the workflow: the live checks and behavioral suite that were
@@ -70,9 +70,9 @@ export default function Continue() {
           </article>
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Primary sources</h3>
-                <span class="badge badge-soft badge-info text-xs">Eight files</span>
+                <span class="badge badge-soft badge-info shrink-0 text-xs">Eight files</span>
               </div>
               <ul class="flex flex-wrap gap-2">
                 {sourceTopics.map((topic) => (
