@@ -1,4 +1,6 @@
-const installCommands = `bun amale/scripts/run.ts doctor
+const installCommands = `git clone https://github.com/mhamri/amale
+cd amale
+bun amale/scripts/run.ts doctor
 bun amale/scripts/run.ts install`;
 
 const installFacts = [
@@ -15,7 +17,7 @@ const installFacts = [
     body: 'checks local setup before anything network-facing; it does not prove network connectivity — the startup preflight covers that separately.',
   },
   {
-    title: 'Fallback launcher',
+    lead: 'Fallback launcher.',
     body: 'Node 24 or newer runs the erasable TypeScript directly when Bun is absent, so the same commands work without a second toolchain install.',
   },
 ];
@@ -29,13 +31,12 @@ export default function Install() {
             Install once, then invoke /amale with your task.
           </h2>
           <p class="mt-4 max-w-prose leading-relaxed text-dim">
-            Two commands set the skill up. Run them from a stable checkout location; the checkout
-            stays in place afterwards, because the skill directories link back into it.
+            Clone the repository and run both commands from the checkout root. The checkout must stay
+            in place afterwards, because the skill directories link back into it.
           </p>
           <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>shell</span>
-              <span class="badge badge-soft badge-primary text-xs">two commands</span>
             </div>
             <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{installCommands}</code></pre>
           </figure>
@@ -72,9 +73,11 @@ export default function Install() {
           </article>
           <div class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
-              <div class="flex items-center justify-between gap-2">
+              <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Credentials</h3>
-                <span class="badge badge-soft badge-warning text-xs">Never in the repository</span>
+                <span class="badge badge-soft badge-warning shrink-0 text-xs">
+                  Never in the repository
+                </span>
               </div>
               <p class="text-sm leading-relaxed text-dim">
                 Configure pi with OpenRouter, or provide{' '}
