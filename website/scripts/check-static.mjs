@@ -727,6 +727,12 @@ async function checkSoftBadges() {
       `style.css must give every soft chip a hairline edge in its own hue: no .badge-soft.badge-${hue} rule`);
     assert.match(edge[1], /border-color\s*:/,
       `.badge-soft.badge-${hue} must set border-color — the hairline edge in the chip's own hue`);
+    // The generic .badge-soft rule is !important, and among !important
+    // declarations specificity decides. A per-hue rule without !important
+    // would therefore lose to the generic rule whatever its higher
+    // specificity, leaving the hue-specific edge dead code in the browser.
+    assert.match(edge[1], /border-color[^;]*!important/,
+      `.badge-soft.badge-${hue} must mark its border-color !important, or the generic !important .badge-soft edge wins the cascade and the hue-specific edge never applies`);
     assert.ok(
       edge[1].includes(`var(--color-${hue})`) || edge[1].toLowerCase().includes(hueHex.toLowerCase()),
       `.badge-soft.badge-${hue} must draw its edge in the chip's own hue (${hueHex})`);
