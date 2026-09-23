@@ -141,9 +141,6 @@ void main(){
 
   vec3 color = uBase;
 
-  vec2 offCentre = (p - vec2(${DESIGN_WIDTH}.0, ${DESIGN_HEIGHT}.0) * 0.5) / vec2(9.0, 6.0);
-  color += uLine * 0.08 * (1.0 - clamp(length(offCentre), 0.0, 1.0));
-
   vec2 drift = vec2(p.x, p.y + uTime * 0.05);
   vec2 cell = abs(fract(drift) - 0.5);
   color += uLine * 0.03 * glow(min(cell.x, cell.y), 0.015);
@@ -238,10 +235,7 @@ function readPalette(host: HTMLElement, variables: string[]) {
   return palette;
 }
 
-// A soft glow field looks the same upscaled, so the drawing buffer is capped.
-// Fill cost then stays flat on integrated graphics at any window size or
-// device pixel ratio.
-const MAX_BUFFER_WIDTH = 1280;
+const MAX_DEVICE_PIXEL_RATIO = 2;
 
 export default function HeroCanvas() {
   let canvas!: HTMLCanvasElement;
@@ -353,7 +347,7 @@ export default function HeroCanvas() {
     const resize = () => {
       const box = canvas.getBoundingClientRect();
       if (box.width < 1 || box.height < 1) return;
-      const density = Math.min(window.devicePixelRatio || 1, 2, MAX_BUFFER_WIDTH / box.width);
+      const density = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO);
       const width = Math.max(1, Math.round(box.width * density));
       const height = Math.max(1, Math.round(box.height * density));
       if (canvas.width !== width || canvas.height !== height) {
