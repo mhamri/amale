@@ -410,14 +410,21 @@ function checkInheritedMono({ file, label }, html) {
   const offenders = [];
   const { root, source } = parseTree(html);
   const FONT_MONO = /\bfont-mono\b/;
+  const FONT_SANS = /\bfont-sans\b/;
 
   function hasMono(cls) { return cls.some(c => FONT_MONO.test(c)); }
+  function hasSans(cls) { return cls.some(c => FONT_SANS.test(c)); }
 
-  function walkInheritedMono(node, ancestorsHaveMono) {
+  // `nearestFont` carries the font utility that actually wins for a node:
+  // the declaration on the nearest ancestor-or-self that declares one.
+  // A font-sans declaration stops monospace inheritance at that node and
+  // for everything below it, so a chip that corrects the inheritance with
+  // font-sans — the remedy this check names — is not a defect.
+  function walkInheritedMono(node, nearestFont) {
     const selfMono = hasMono(node.cls);
-    const effectiveMono = ancestorsHaveMono || selfMono;
+    const effective = selfMono ? 'mono' : hasSans(node.cls) ? 'sans' : nearestFont;
 
-    if (node.cls.includes('badge') && !selfMono && ancestorsHaveMono) {
+    if (node.cls.includes('badge') && effective === 'mono' && !selfMono) {
       // This badge inherits font-mono from an ancestor. Check if its text
       // is a typable string; if not, it's a violation.
       const text = chipText(node, source);
@@ -426,10 +433,10 @@ function checkInheritedMono({ file, label }, html) {
       }
     }
     for (const child of node.children) {
-      walkInheritedMono(child, effectiveMono);
+      walkInheritedMono(child, effective);
     }
   }
-  walkInheritedMono(root, false);
+  walkInheritedMono(root, undefined);
 
   assert.equal(offenders.length, 0,
     `${label}: ${file} has badge(s) inheriting font-mono from an ancestor with non-typable text: ` +
