@@ -39,8 +39,8 @@ export default function Author() {
         class="relative isolate overflow-hidden rounded-box border border-line bg-base-200 shadow-rest-glow-primary"
       >
         <div class="decor-field" aria-hidden="true">
-          <Glow hue="primary" size={480} cx={0.1} cy={0.15} opacity={0.45} />
-          <GridDots hue="primary" spacing={28} cx={0.9} cy={0.95} opacity={0.3} />
+          <Glow hue="primary" diameterPx={480} centreXFraction={0.1} centreYFraction={0.15} opacity={0.45} />
+          <GridDots hue="primary" spacingPx={28} centreXFraction={0.9} centreYFraction={0.95} opacity={0.3} />
         </div>
         <div class="flex flex-col items-center gap-6 p-6 sm:flex-row sm:items-start sm:gap-8 md:p-8">
           <img

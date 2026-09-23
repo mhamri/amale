@@ -99,18 +99,7 @@ export default function CaseStudyPage() {
         description="How Amale built this site: every claim the landing page makes, proven with measured figures from the run records that built it."
       />
       <main id="main">
-        {/* ── Hero ── */}
         <section class="relative isolate min-h-[30rem] overflow-hidden pb-4 pt-32 md:pb-8 md:pt-32">
-          {/*
-            The title band is the page's own light: a broad lamp cone and warm
-            bloom wash the whole hero, with stronger brass and violet masses
-            toward the outer edges. The wash stays low enough that the heading
-            and its paragraphs keep their contrast over it. The section is
-            full-bleed and the field is masked on all four sides, so the wash
-            fades into the page background and no edge of the band is ever
-            visible. Two nested masks keep the fade to plain mask-image, which
-            every browser supports without mask-composite.
-          */}
           <div
             class="decor-field"
             aria-hidden="true"
@@ -126,11 +115,11 @@ export default function CaseStudyPage() {
                 '-webkit-mask-image': 'linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%)',
               }}
             >
-              <LightRays hue="primary" cx={0.5} cy={-0.12} spread={180} opacity={0.4} />
-              <Glow hue="primary" size={1500} cx={0.44} cy={0.4} opacity={0.32} />
-              <Blobs hue="primary" size={1000} cx={0.9} cy={0.35} blur={80} opacity={0.55} />
-              <Blobs hue="accent" size={900} cx={0.15} cy={1.08} blur={85} opacity={0.5} />
-              <GridDots hue="secondary" spacing={28} cx={0.85} cy={0.1} opacity={0.25} />
+              <LightRays hue="primary" apexXFraction={0.5} apexYFraction={-0.12} spreadDegrees={180} opacity={0.4} />
+              <Glow hue="primary" diameterPx={1500} centreXFraction={0.44} centreYFraction={0.4} opacity={0.32} />
+              <Blobs hue="primary" diameterPx={1000} centreXFraction={0.9} centreYFraction={0.35} blurPx={80} opacity={0.55} />
+              <Blobs hue="accent" diameterPx={900} centreXFraction={0.15} centreYFraction={1.08} blurPx={85} opacity={0.5} />
+              <GridDots hue="secondary" spacingPx={28} centreXFraction={0.85} centreYFraction={0.1} opacity={0.25} />
             </div>
           </div>
           <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
@@ -152,7 +141,6 @@ export default function CaseStudyPage() {
           </div>
         </section>
 
-        {/* ── The two runs ── */}
         <section class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 md:pt-8" data-reveal>
           <h2 class="font-display text-display font-semibold tracking-tight">
             The two runs
@@ -212,11 +200,10 @@ export default function CaseStudyPage() {
           </p>
         </section>
 
-        {/* ── Terminal images ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
           <div class="decor-field" aria-hidden="true">
-            <Glow hue="secondary" size={720} cx={0.8} cy={0.3} opacity={0.25} />
-            <GridDots hue="primary" spacing={32} cx={0.2} cy={0.8} opacity={0.3} />
+            <Glow hue="secondary" diameterPx={720} centreXFraction={0.8} centreYFraction={0.3} opacity={0.25} />
+            <GridDots hue="primary" spacingPx={32} centreXFraction={0.2} centreYFraction={0.8} opacity={0.3} />
           </div>
           <h2 class="font-display text-display font-semibold tracking-tight">
             The skill's own output
@@ -262,10 +249,9 @@ export default function CaseStudyPage() {
           </div>
         </section>
 
-        {/* ── Claims and proof ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
           <div class="decor-field" aria-hidden="true">
-            <Glow hue="accent" size={560} cx={0.9} cy={0.5} opacity={0.2} />
+            <Glow hue="accent" diameterPx={560} centreXFraction={0.9} centreYFraction={0.5} opacity={0.2} />
           </div>
           <h2 class="font-display text-display font-semibold tracking-tight">
             Claim and proof
@@ -291,7 +277,6 @@ export default function CaseStudyPage() {
           </div>
         </section>
 
-        {/* ── Defects caught ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
           <h2 class="font-display text-display font-semibold tracking-tight">
             Defects independent review caught before merge
@@ -320,7 +305,6 @@ export default function CaseStudyPage() {
           </div>
         </section>
 
-        {/* ── Jev decisions ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
           <h2 class="font-display text-display font-semibold tracking-tight">
             In-task decisions
@@ -341,7 +325,6 @@ export default function CaseStudyPage() {
           </ul>
         </section>
 
-        {/* ── Honest limits ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
           <h2 class="font-display text-display font-semibold tracking-tight">
             What the runtime learned
@@ -365,7 +348,6 @@ export default function CaseStudyPage() {
           </div>
         </section>
 
-        {/* ── How the skill is tested ── */}
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
           <h2 class="font-display text-display font-semibold tracking-tight">
             How the skill is tested

@@ -9,10 +9,10 @@ export default function FinalCall() {
       class="relative isolate mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24"
     >
       <div class="decor-field" aria-hidden="true">
-        <Drifter direction="vertical" distance={16}>
-          <LightRays hue="primary" cx={0.5} cy={-0.06} angle={0} spread={126} opacity={0.24} />
+        <Drifter direction="vertical" distancePx={16}>
+          <LightRays hue="primary" apexXFraction={0.5} apexYFraction={-0.06} angleDegrees={0} spreadDegrees={126} opacity={0.24} />
         </Drifter>
-        <Glow hue="primary" size={520} cx={0.5} cy={0.16} opacity={0.2} />
+        <Glow hue="primary" diameterPx={520} centreXFraction={0.5} centreYFraction={0.16} opacity={0.2} />
       </div>
       <div data-reveal class="max-w-prose">
         <h2 class="font-display text-display font-semibold tracking-tight">

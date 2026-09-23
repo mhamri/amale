@@ -28,9 +28,9 @@ export default function Install() {
   return (
     <section class="relative isolate mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <div class="decor-field" aria-hidden="true">
-        <Glow hue="secondary" size={560} cx={0.9} cy={0.12} opacity={0.22} />
-        <Rings hue="secondary" size={460} cx={0.06} cy={0.9} opacity={0.22} />
-        <GridDots hue="primary" spacing={32} cx={0.14} cy={0.1} opacity={0.18} />
+        <Glow hue="secondary" diameterPx={560} centreXFraction={0.9} centreYFraction={0.12} opacity={0.22} />
+        <Rings hue="secondary" diameterPx={460} centreXFraction={0.06} centreYFraction={0.9} opacity={0.22} />
+        <GridDots hue="primary" spacingPx={32} centreXFraction={0.14} centreYFraction={0.1} opacity={0.18} />
       </div>
       <div class="grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
         <div class="min-w-0" data-reveal>
