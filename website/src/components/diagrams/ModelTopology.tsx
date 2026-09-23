@@ -58,15 +58,15 @@ const WIDE_ROUTES: Route[] = [
   route([100, 200], [100, 236]),
   route([230, 140], [286, 140]),
   route([170, 200], [170, 220], [270, 220], [270, 236]),
-  route([200, 110], [200, 80], [360, 80], [360, 38], [342, 36]),
+  route([370, 110], [370, 36], [346, 36]),
 ];
 
 const NARROW_ROUTES: Route[] = [
   route([110, 46], [110, 64], [88, 64], [88, 76]),
-  route([160, 110], [170, 110], [170, 162], [176, 162]),
+  route([160, 110], [162, 110], [162, 162], [172, 162]),
   route([160, 96], [176, 96]),
-  route([88, 164], [88, 180]),
-  route([140, 80], [140, 62], [200, 62], [200, 48]),
+  route([88, 164], [88, 176]),
+  route([252, 80], [252, 28], [236, 28]),
 ];
 
 /* Brass for the coordinator's chunk, violet for orchestration, teal for verified flow. */
@@ -208,18 +208,19 @@ export default function ModelTopology(props: { caption?: string; class?: string 
           {/* Base edges with direction arrows. */}
           <g class="stroke-dim" stroke-width="1.5" fill="none" opacity="0.55">
             <path d="M110 46 V64 H88 V72" />
-            <path d="M160 110 H170 V162 H174" />
+            <path d="M160 110 H162 V162 H172" />
             <path d="M160 96 H174" />
-            <path d="M88 164 V174" />
-            <path d="M140 80 V62 H200 V50" />
+            <path d="M88 164 V176" />
+            <path d="M252 80 V28 H236" />
           </g>
           <g class="fill-dim" opacity="0.55">
             <polygon points="82,72 94,72 88,80" />
             <polygon points="172,156 172,168 180,162" />
             <polygon points="174,90 174,102 180,96" />
             <polygon points="82,176 94,176 88,184" />
-            <polygon points="194,54 206,54 200,46" />
+            <polygon points="236,22 236,34 230,28" />
           </g>
+          <text x="246" y="56" text-anchor="end" font-size="8" class="fill-dim font-mono">accepted chunk</text>
 
           {/* Coordinator host. */}
           <rect x="90" y="10" width="140" height="36" rx="8" class="fill-base-100 stroke-primary" stroke-width="1.5" />
@@ -266,7 +267,7 @@ export default function ModelTopology(props: { caption?: string; class?: string 
             <polygon points="82,72 94,72 88,80" class="fill-primary" />
           </g>
           <g data-topo-glow opacity="0">
-            <path d="M160 110 H170 V162 H174" class="stroke-accent fill-none" stroke-width="2.5" />
+            <path d="M160 110 H162 V162 H172" class="stroke-accent fill-none" stroke-width="2.5" />
             <polygon points="172,156 172,168 180,162" class="fill-accent" />
           </g>
           <g data-topo-glow opacity="0">
@@ -274,12 +275,12 @@ export default function ModelTopology(props: { caption?: string; class?: string 
             <polygon points="174,90 174,102 180,96" class="fill-secondary" />
           </g>
           <g data-topo-glow opacity="0">
-            <path d="M88 164 V174" class="stroke-accent fill-none" stroke-width="2.5" />
+            <path d="M88 164 V176" class="stroke-accent fill-none" stroke-width="2.5" />
             <polygon points="82,176 94,176 88,184" class="fill-accent" />
           </g>
           <g data-topo-glow opacity="0">
-            <path d="M140 80 V62 H200 V50" class="stroke-secondary fill-none" stroke-width="2.5" />
-            <polygon points="194,54 206,54 200,46" class="fill-secondary" />
+            <path d="M252 80 V28 H236" class="stroke-secondary fill-none" stroke-width="2.5" />
+            <polygon points="236,22 236,34 230,28" class="fill-secondary" />
           </g>
 
           <g data-topo-packet transform="translate(-40 -40)" opacity="0" class="text-primary">
@@ -303,7 +304,7 @@ export default function ModelTopology(props: { caption?: string; class?: string 
             <path d="M100 200 V232" />
             <path d="M230 140 H284" />
             <path d="M170 200 V220 H270 V232" />
-            <path d="M200 110 V80 H360 V42 H346" />
+            <path d="M370 110 V36 H346" />
           </g>
           <g class="fill-dim" opacity="0.55">
             <polygon points="114,102 126,102 120,110" />
@@ -317,7 +318,7 @@ export default function ModelTopology(props: { caption?: string; class?: string 
             <text x="108" y="222">question</text>
             <text x="260" y="134" text-anchor="middle">review</text>
             <text x="220" y="214" text-anchor="middle">escalate</text>
-            <text x="280" y="72" text-anchor="middle">accepted chunk</text>
+            <text x="378" y="76" text-anchor="start">accepted chunk</text>
           </g>
 
           {/* Coordinator host. */}
@@ -386,7 +387,7 @@ export default function ModelTopology(props: { caption?: string; class?: string 
             <polygon points="264,232 276,232 270,240" class="fill-accent" />
           </g>
           <g data-topo-glow opacity="0">
-            <path d="M200 110 V80 H360 V42 H346" class="stroke-secondary fill-none" stroke-width="2.5" />
+            <path d="M370 110 V36 H346" class="stroke-secondary fill-none" stroke-width="2.5" />
             <polygon points="346,30 346,42 340,36" class="fill-secondary" />
           </g>
 
