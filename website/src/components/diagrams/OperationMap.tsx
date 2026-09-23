@@ -106,7 +106,7 @@ function Panel(props: { x: number; y: number; step: number; tone: Tone; title: s
 }
 
 /** Rail stop: a stage of the run. */
-function Stop(props: { x: number; y: number; w: number; h: number; step: number; tone: Tone; label: string }) {
+function Stop(props: { x: number; y: number; w: number; h: number; step: number; tone: Tone; label: string; ls?: number }) {
   return (
     <g>
       <rect
@@ -129,7 +129,7 @@ function Stop(props: { x: number; y: number; w: number; h: number; step: number;
         data-pulse={props.step}
         opacity={props.step === 0 ? '0.9' : '0'}
       />
-      <T x={props.x + props.w / 2} y={props.y + props.h / 2 + 5} s={11} f="fill-base-content" b mid>
+      <T x={props.x + props.w / 2} y={props.y + props.h / 2 + 5} s={props.ls ?? 11} f="fill-base-content" b mid>
         {props.label}
       </T>
     </g>
@@ -231,12 +231,12 @@ export default function OperationMap() {
           class="size-full sm:hidden"
           preserveAspectRatio="xMidYMid meet"
         >
-          <Stop x={3} y={6} w={42} h={16} step={0} tone="primary" label="plan" />
-          <Stop x={51} y={6} w={42} h={16} step={1} tone="primary" label="delegate" />
-          <Stop x={99} y={6} w={42} h={16} step={2} tone="primary" label="execute" />
-          <Stop x={147} y={6} w={42} h={16} step={3} tone="secondary" label="review" />
-          <Stop x={195} y={6} w={42} h={16} step={4} tone="accent" label="decide" />
-          <Stop x={243} y={6} w={42} h={16} step={5} tone="info" label="operate" />
+          <Stop x={3} y={6} w={42} h={16} step={0} tone="primary" label="plan" ls={10} />
+          <Stop x={51} y={6} w={42} h={16} step={1} tone="primary" label="delegate" ls={10} />
+          <Stop x={99} y={6} w={42} h={16} step={2} tone="primary" label="execute" ls={10} />
+          <Stop x={147} y={6} w={42} h={16} step={3} tone="secondary" label="review" ls={10} />
+          <Stop x={195} y={6} w={42} h={16} step={4} tone="accent" label="decide" ls={10} />
+          <Stop x={243} y={6} w={42} h={16} step={5} tone="info" label="operate" ls={10} />
           <Flow d="M 46 14 H 50" />
           <Flow d="M 94 14 H 98" />
           <Flow d="M 142 14 H 146" />

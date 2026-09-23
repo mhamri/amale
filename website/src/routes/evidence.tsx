@@ -44,34 +44,11 @@ const exercised = [
   },
 ];
 
-const untested = [
-  {
-    title: 'macOS and Linux',
-    body: 'Windows was exercised; macOS and Linux paths use portable APIs but have not been run here, because verification ran on a Windows host only.',
-  },
-  {
-    title: 'Remote CI and deployment',
-    body: 'Remote GitHub Actions and public deployment have not been executed in this checkout. Pages must be enabled with GitHub Actions as its source before the first deployment; no live-deployment success is claimed.',
-  },
-  {
-    title: 'Model quality, speed and cost',
-    body: 'A live fixture demonstrates a working path; it does not establish general model quality, speed or cost. The live smoke test is a historical development observation, not an offline-suite requirement or a benchmark.',
-  },
-  {
-    title: 'Distributed raw artifacts',
-    body: 'Raw development artifacts and review reports are not distributed. Acceptance descriptions and host integration receipts are trusted agent attestations; code verifies registered checks and freshness while the host and Jev inspect semantic claim support.',
-  },
-];
-
-const siteDeps = [
-  ['SolidStart', '2.0.5'],
-  ['Nitro', '3.0.260903-beta'],
-  ['Solid', '1.9.15'],
-  ['daisyUI', '5.7.42'],
-  ['Tailwind CSS', '4.3.3'],
-  ['Vite', '8.3.0'],
-  ['TypeScript', '7.0.2'],
-  ['Node.js', '26.9.0'],
+const skillRuntime = [
+  ['Bun', '1.4.2'],
+  ['Node.js latest stable', '26.9.0'],
+  ['pi coding agent', '0.85.1'],
+  ['Jev OpenRouter model', 'typesafe/jev-1.13'],
 ];
 
 const sources = [
@@ -117,12 +94,78 @@ const sources = [
   },
 ];
 
+const siteDeps = [
+  ['SolidStart', '2.0.5'],
+  ['Nitro', '3.0.260903-beta'],
+  ['Solid', '1.9.15'],
+  ['daisyUI', '5.7.42'],
+  ['Tailwind CSS', '4.3.3'],
+  ['Vite', '8.3.0'],
+  ['TypeScript', '7.0.2'],
+  ['Node.js', '26.9.0'],
+];
+
+const open = [
+  {
+    title: 'macOS and Linux',
+    chip: 'Not yet exercised',
+    body: 'Verification ran on a Windows host only. The macOS and Linux paths use portable APIs, but neither platform has been run here.',
+    help: 'running the offline suite on a Mac or a Linux machine and reporting the outcome moves this from portable-in-principle to exercised.',
+  },
+  {
+    title: 'Remote CI and deployment',
+    chip: 'Not yet exercised',
+    body: 'Remote GitHub Actions and public deployment have not been executed in this checkout, so no live-deployment success is claimed. Pages must be enabled with GitHub Actions as its source before the first deployment.',
+    help: 'enabling Pages with GitHub Actions as its source and merging to the default branch produces the first remote run this record could cite.',
+  },
+  {
+    title: 'Model quality, speed and cost',
+    chip: 'Not yet exercised',
+    body: 'A live fixture demonstrates a working path; it does not establish general model quality, speed or cost. The live smoke test is a historical development observation, not an offline-suite requirement or a benchmark.',
+    help: 'running more fixtures across models and families and contributing their outcomes widens the evidence beyond a single path.',
+  },
+  {
+    title: 'Distributed raw artifacts',
+    chip: 'Not yet exercised',
+    body: 'Raw development artifacts and review reports are not distributed. Acceptance descriptions and host integration receipts are trusted agent attestations; code verifies registered checks and freshness while the host and Jev inspect semantic claim support.',
+    help: 'a diagnostic-export from a completed run \u2014 its allowlist already excludes free text, prompts, code, model names and paths \u2014 would put inspectable evidence behind those attestations.',
+  },
+];
+
+/** Inline mark for the open-to-contribution chips: an open dashed circle
+ *  with a plus, so the invitation is carried by shape and words, not colour. */
+function OpenMark() {
+  return (
+    <svg
+      class="size-3.5 shrink-0"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="8"
+        cy="8"
+        r="6.25"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-dasharray="2.5 2"
+      />
+      <path
+        d="M8 5.5v5M5.5 8h5"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function EvidencePage() {
   return (
     <>
       <PageMeta
         title="Evidence — Amale"
-        description="What has actually been exercised, what has not and why, the dependency and verification position, and the primary sources shipped with Amale."
+        description="What the skill is and what has actually been exercised about it, this project's own build-and-verify standard for this website, what has not been exercised and what would move it, and the primary sources shipped with Amale."
       />
       <main id="main">
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
@@ -130,16 +173,16 @@ export default function EvidencePage() {
             <div class="min-w-0">
               <h1 class="font-display text-hero font-semibold tracking-tight">Evidence</h1>
               <p class="mt-5 text-lg leading-relaxed text-dim max-w-prose">
-                Amale is built from documents that travel with the skill. This page is the record
-                behind them: what the verification work actually exercised, what it deliberately
-                does not claim, and where every claim on this site can be checked in a source you
-                can read in full.
+                This page keeps three things apart: what the skill is and what has actually been
+                exercised about it, how this website itself is built and verified, and what has not
+                been exercised — with what would move each of those items.
               </p>
               <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
                 The project's name is <span lang="fa" dir="rtl">عمله</span>, transliterated as{' '}
-                <em>ʿamalah</em> <span class="font-mono text-sm text-dim">/ AH-mah-lah /</span>. It
-                is a Persian word meaning <strong>workers / laborers</strong> — people contributing
-                effort to a shared result. <em>Amale</em> is the project's Latin-script name.
+                <em>ʿamalah</em> and pronounced <strong class="text-base-content">Ah-mah-leh</strong>
+                . It is a Persian word meaning <strong>workers / laborers</strong> — people
+                contributing effort to a shared result. <em>Amale</em> is the project's Latin-script
+                name.
               </p>
             </div>
             <aside class="min-w-0 card rounded-box border border-line bg-base-200 shadow-rest">
@@ -162,23 +205,37 @@ export default function EvidencePage() {
           </div>
 
           <h2 class="font-display text-display font-semibold tracking-tight mt-12">
-            What has been exercised
+            What the skill is
           </h2>
+          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
+            Amale is a delivery workflow for coding agents: a coordinator plans, segments work into
+            chunks and delegates each chunk to an isolated worker workspace; an independent reviewer
+            from another model family reads the result without seeing the author's proposed verdict;
+            registered checks and repair escalation run before a chunk is accepted and integrated.
+            The invoking agent drives the next-action loop and performs the native host
+            interactions — this is not an unattended daemon or an automatic merge service.
+          </p>
+
+          <h3 class="font-display text-title font-semibold tracking-tight mt-12">
+            What has been exercised about the skill itself
+          </h3>
           <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
             The verification record pairs two kinds of evidence: live probes through the real
             OpenRouter credential, and an offline behavioral suite that runs without any model.
             Together they cover the routing, lifecycle, review, parallelism and recovery machinery.
           </p>
-          <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div class="mt-6 grid gap-6 md:grid-cols-2">
             <For each={exercised}>
               {(item) => (
                 <article class="card rounded-box border border-line bg-base-200 shadow-rest">
                   <div class="card-body gap-3 p-6">
-                    <div class="flex items-center justify-between gap-2">
-                      <h3 class="font-display text-title font-semibold tracking-tight">
+                    <div class="flex items-start justify-between gap-3">
+                      <h4 class="font-display text-title font-semibold tracking-tight min-w-0">
                         {item.title}
-                      </h3>
-                      <span class="badge badge-soft badge-secondary text-xs">{item.chip}</span>
+                      </h4>
+                      <span class="badge badge-soft badge-secondary text-xs shrink-0">
+                        {item.chip}
+                      </span>
                     </div>
                     <p class="text-sm leading-relaxed text-dim">{item.body}</p>
                   </div>
@@ -187,69 +244,42 @@ export default function EvidencePage() {
             </For>
           </div>
 
-          <h2 class="font-display text-display font-semibold tracking-tight mt-12">
-            What has not been exercised
-          </h2>
-          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
-            The record is explicit about its limits, and each limit has a reason rather than a
-            silent omission.
-          </p>
-          <div class="mt-6 grid gap-6 md:grid-cols-2">
-            <For each={untested}>
-              {(item) => (
-                <div class="alert alert-soft alert-warning rounded-box border border-line text-sm items-start">
-                  <span class="badge badge-soft badge-warning text-xs shrink-0">Not exercised</span>
-                  <span class="min-w-0">
-                    <strong>{item.title}.</strong> {item.body}
-                  </span>
-                </div>
-              )}
-            </For>
-          </div>
-
-          <h2 class="font-display text-display font-semibold tracking-tight mt-12">
-            Dependency and version position
-          </h2>
+          <h3 class="font-display text-title font-semibold tracking-tight mt-12">
+            What the skill needs to run on another machine
+          </h3>
           <div class="mt-4 grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
             <div class="min-w-0 text-base leading-relaxed text-dim max-w-prose space-y-4">
               <p>
-                Versions were checked against authoritative release sources on{' '}
-                <span class="text-base-content">2026-09-20</span> and are pinned in{' '}
-                <code class="font-mono text-sm">package.json</code>, with the resolved installation
-                recorded in the lockfile; CI installs from the lockfile with{' '}
-                <code class="font-mono text-sm">npm ci</code>. The site build was verified locally
-                on 2026-09-21 running Node 24.19.0 — an additional compatibility check, not a
-                latest-release claim.
+                <span class="text-base-content">
+                  The skill has no npm runtime dependency.
+                </span>{' '}
+                There are no external skill dependencies either: the runtime source executes without
+                installing its development dependencies, the invoking agent drives the next-action
+                loop, and the installer links the canonical skill directory into Claude and Codex.
               </p>
               <p>
-                One prerelease is deliberate: installing stable Nitro 3.0.0 reproducibly failed with
-                npm ERESOLVE, because Nitro requires an optional peer Vite ^7 while stable
-                SolidStart 2.0.5 requires Vite ^8 or ^9. The registry's current beta adapter is
-                selected to keep both on stable releases, and the exception is revisited when a
-                compatible stable adapter ships.
-              </p>
-              <p>
-                The skill runtime itself runs without installing its development dependencies. Its
-                verified sources, dated 2026-09-19, are Bun 1.4.2, Node latest stable 26.9.0, the
-                pi coding agent 0.85.1, TypeScript 7.0.2 (development only) and the Jev decision
-                model <span class="font-mono text-sm">typesafe/jev-1.13</span>, verified by a live
-                typed response.
+                What running it on someone else's machine does need is the runtime below, verified
+                against authoritative release sources on 2026-09-19. TypeScript is a development-only
+                check, so it is not part of the runtime below; the Jev decision model is reached
+                through the invoking agent's OpenRouter
+                credential, verified by a live typed response, and no separate TypeSafe key is
+                required.
               </p>
             </div>
             <div class="min-w-0 overflow-x-auto rounded-box border border-line bg-base-200 shadow-rest">
               <table class="table table-sm">
                 <thead class="font-mono text-xs text-dim">
                   <tr>
-                    <th>Site dependency</th>
-                    <th>Selected stable version</th>
+                    <th>Skill runtime source</th>
+                    <th>Verified version</th>
                   </tr>
                 </thead>
                 <tbody class="text-sm">
-                  <For each={siteDeps}>
+                  <For each={skillRuntime}>
                     {([name, version]) => (
                       <tr>
-                        <td class="font-mono">{name}</td>
-                        <td>{version}</td>
+                        <td>{name}</td>
+                        <td class="font-mono">{version}</td>
                       </tr>
                     )}
                   </For>
@@ -258,9 +288,49 @@ export default function EvidencePage() {
             </div>
           </div>
 
-          <h2 class="font-display text-display font-semibold tracking-tight mt-12">
-            Verification gates
+          <h3 class="font-display text-title font-semibold tracking-tight mt-12">
+            The skill's own documents
+          </h3>
+          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
+            Amale is built from documents that travel with the skill. These eight are copied
+            unchanged into every build under <span class="font-mono text-sm">sources/</span> — the
+            build ships exactly this list and nothing else. Each is described by what you will find
+            inside it, not by a summary of this page.
+          </p>
+          <div class="mt-6 grid gap-6 md:grid-cols-2">
+            <For each={sources}>
+              {(source) => (
+                <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+                  <div class="card-body gap-3 p-6">
+                    <h4 class="font-display text-title font-semibold tracking-tight min-w-0">
+                      {source.title}
+                    </h4>
+                    <p class="mt-3 flex flex-wrap gap-2">
+                      <span class="badge badge-soft badge-info font-mono font-normal text-xs">
+                        {source.file}.md
+                      </span>
+                    </p>
+                    <p class="text-sm leading-relaxed text-dim">{source.body}</p>
+                    <a
+                      class="link link-hover text-primary text-sm"
+                      href={asset(`sources/${source.file}.md`)}
+                    >
+                      Read the source
+                    </a>
+                  </div>
+                </article>
+              )}
+            </For>
+          </div>
+
+          <h2 class="font-display text-display font-semibold tracking-tight mt-12 border-t border-line pt-12">
+            How this website is built and verified
           </h2>
+          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
+            What follows is <span class="text-base-content">this project's own quality bar</span>{' '}
+            for shipping the site you are reading: the gates we hold ourselves to before a page goes
+            out. It is our standard, not a chore the visitor is expected to follow.
+          </p>
           <div class="mt-4 grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
             <div class="min-w-0 text-base leading-relaxed text-dim max-w-prose space-y-4">
               <p>
@@ -300,35 +370,87 @@ node --test tests/*.test.ts`}</code></pre>
             </div>
           </div>
 
-          <h2 class="font-display text-display font-semibold tracking-tight mt-12">
-            Primary sources
+          <h3 class="font-display text-title font-semibold tracking-tight mt-12">
+            What this website is built with
+          </h3>
+          <div class="mt-4 grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
+            <div class="min-w-0 text-base leading-relaxed text-dim max-w-prose space-y-4">
+              <p>
+                The site you are reading is a SolidStart application on Solid, styled with daisyUI
+                and Tailwind CSS, prerendered by Vite and Nitro, and type-checked with TypeScript in
+                strict mode; the display and code typefaces are self-hosted. These are{' '}
+                <span class="text-base-content">this website's build dependencies</span> — they have
+                nothing to do with running the skill on someone else's machine, which needs none of
+                them (see the skill runtime above).
+              </p>
+              <p>
+                Versions were checked against authoritative release sources on{' '}
+                <span class="text-base-content">2026-09-20</span> and are pinned in{' '}
+                <code class="font-mono text-sm">package.json</code>, with the resolved installation
+                recorded in the lockfile; CI installs from the lockfile with{' '}
+                <code class="font-mono text-sm">npm ci</code>. The site build was verified locally
+                on 2026-09-22 running Node 24.19.0 — an additional compatibility check, not a
+                latest-release claim.
+              </p>
+              <p>
+                One prerelease is deliberate: installing stable Nitro 3.0.0 reproducibly failed with
+                npm ERESOLVE, because Nitro requires an optional peer Vite ^7 while stable
+                SolidStart 2.0.5 requires Vite ^8 or ^9. The registry's current beta adapter is
+                selected to keep both on stable releases, and the exception is revisited when a
+                compatible stable adapter ships.
+              </p>
+            </div>
+            <div class="min-w-0 overflow-x-auto rounded-box border border-line bg-base-200 shadow-rest">
+              <table class="table table-sm">
+                <thead class="font-mono text-xs text-dim">
+                  <tr>
+                    <th>Website dependency</th>
+                    <th>Selected stable version</th>
+                  </tr>
+                </thead>
+                <tbody class="text-sm">
+                  <For each={siteDeps}>
+                    {([name, version]) => (
+                      <tr>
+                        <td class="font-mono">{name}</td>
+                        <td>{version}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <h2 class="font-display text-display font-semibold tracking-tight mt-12 border-t border-line pt-12">
+            Open to contribution
           </h2>
           <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
-            These eight documents are copied unchanged into every build under{' '}
-            <span class="font-mono text-sm">sources/</span> — the build ships exactly this list and
-            nothing else. Each is described by what you will find inside it, not by a summary of
-            this page.
+            The record is explicit about its limits, and each limit has a reason rather than a
+            silent omission. Each one also names the help that would move it — that is an
+            invitation, and the open mark on every card means exactly that.
           </p>
-          <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <For each={sources}>
-              {(source) => (
+          <div class="mt-6 grid gap-6 md:grid-cols-2">
+            <For each={open}>
+              {(item) => (
                 <article class="card rounded-box border border-line bg-base-200 shadow-rest">
                   <div class="card-body gap-3 p-6">
-                    <div class="flex items-center justify-between gap-2">
-                      <h3 class="font-display text-title font-semibold tracking-tight">
-                        {source.title}
+                    <div class="flex items-start justify-between gap-3">
+                      <h3 class="font-display text-title font-semibold tracking-tight min-w-0">
+                        {item.title}
                       </h3>
-                      <span class="badge badge-soft badge-info font-mono font-normal text-xs">
-                        {source.file}.md
+                      <span class="badge badge-soft badge-warning text-xs shrink-0">
+                        <span class="flex items-center gap-1.5">
+                          <OpenMark />
+                          <span>{item.chip}</span>
+                        </span>
                       </span>
                     </div>
-                    <p class="text-sm leading-relaxed text-dim">{source.body}</p>
-                    <a
-                      class="link link-hover text-primary text-sm"
-                      href={asset(`sources/${source.file}.md`)}
-                    >
-                      Read the source
-                    </a>
+                    <p class="text-sm leading-relaxed text-dim">{item.body}</p>
+                    <p class="text-sm leading-relaxed">
+                      <span class="font-medium text-base-content">What would move it:</span>{' '}
+                      <span class="text-dim">{item.help}</span>
+                    </p>
                   </div>
                 </article>
               )}
