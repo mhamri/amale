@@ -45,7 +45,7 @@ export default function DocsGettingStarted() {
       >
         <InstallSequence />
 
-        <section>
+        <section data-reveal>
           <h2 id="prerequisites" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Prerequisites
           </h2>
@@ -65,7 +65,7 @@ export default function DocsGettingStarted() {
           </ul>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="install" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Install the skill
           </h2>
@@ -83,7 +83,7 @@ export default function DocsGettingStarted() {
           </p>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="credentials" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Credentials and network
           </h2>
@@ -117,7 +117,7 @@ export default function DocsGettingStarted() {
           </div>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="first-run" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Your first run
           </h2>

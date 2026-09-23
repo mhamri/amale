@@ -57,7 +57,7 @@ export default function DocsOverview() {
         lead="Amale is a self-contained workflow skill for Codex and Claude: discovery, planning, delegated parallel implementation, independent review and verified delivery. This page explains why it exists and who does what."
         sections={sections}
       >
-        <section>
+        <section data-reveal>
           <h2 id="problem" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             The problem Amale solves
           </h2>
@@ -82,7 +82,7 @@ export default function DocsOverview() {
           </div>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="division" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             How the work is divided
           </h2>
@@ -110,7 +110,7 @@ export default function DocsOverview() {
           </p>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="routing" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Routing and escalation
           </h2>
@@ -144,7 +144,7 @@ export default function DocsOverview() {
           </div>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="host" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             What stays with the host
           </h2>

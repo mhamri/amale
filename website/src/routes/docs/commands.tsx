@@ -35,7 +35,7 @@ export default function DocsCommands() {
       >
         <OperationMap />
 
-        <section>
+        <section data-reveal>
           <h2 id="invocation" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Invocation shape
           </h2>
@@ -60,7 +60,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="run-lifecycle" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Run lifecycle
           </h2>
@@ -203,7 +203,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="planning" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Planning and task contracts
           </h2>
@@ -308,7 +308,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="delegation" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Delegation
           </h2>
@@ -372,7 +372,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="execution" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Execution
           </h2>
@@ -468,7 +468,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="review-repair" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Review and repair
           </h2>
@@ -597,7 +597,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="decisions" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Decisions and routing
           </h2>
@@ -687,7 +687,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="configuration" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Configuration
           </h2>
@@ -758,7 +758,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="artifacts" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Artifacts and fingerprints
           </h2>
@@ -803,7 +803,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="effort" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Effort path
           </h2>
@@ -850,7 +850,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="host" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Host actions and diagnostics
           </h2>
@@ -918,7 +918,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="network" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Network and preflight
           </h2>
@@ -942,7 +942,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="environment" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Environment variables
           </h2>
@@ -988,7 +988,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
         </section>
 
         
-        <section>
+        <section data-reveal>
           <h2 id="jev-helper" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
             Worker-side Jev helper
           </h2>
