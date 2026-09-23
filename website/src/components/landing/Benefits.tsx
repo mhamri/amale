@@ -9,11 +9,6 @@ interface Benefit {
   figureNote?: string;
 }
 
-/**
- * Every figure on this card grid comes from CASE-STUDY.md: the two runs
- * (website-visuals and website-polish) that rebuilt this site, measured on
- * 2026-09-23. The full rebuild, not the single-run 1.04 figure.
- */
 const items: Benefit[] = [
   {
     key: 'outcomes',
@@ -50,11 +45,11 @@ export default function Benefits() {
       class="relative isolate mx-auto w-full max-w-7xl px-4 pt-4 pb-16 sm:px-6 md:pt-8 md:pb-24"
     >
       <div class="decor-field" aria-hidden="true">
-        <Drifter direction="vertical" distance={18}>
-          <Glow hue="secondary" size={640} cx={0.14} cy={0.06} opacity={0.3} />
+        <Drifter direction="vertical" distancePx={18}>
+          <Glow hue="secondary" diameterPx={640} centreXFraction={0.14} centreYFraction={0.06} opacity={0.3} />
         </Drifter>
-        <Rings hue="primary" size={520} cx={0.88} cy={0.72} opacity={0.24} />
-        <GridDots hue="secondary" spacing={28} cx={0.78} cy={0.04} opacity={0.22} />
+        <Rings hue="primary" diameterPx={520} centreXFraction={0.88} centreYFraction={0.72} opacity={0.24} />
+        <GridDots hue="secondary" spacingPx={28} centreXFraction={0.78} centreYFraction={0.04} opacity={0.22} />
       </div>
       <h2 data-reveal class="font-display text-display font-semibold tracking-tight">
         Delegated work, verified delivery.

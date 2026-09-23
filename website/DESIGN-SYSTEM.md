@@ -276,6 +276,39 @@ labels under a tile are supporting label copy: below body scale, and in the
 sans stack, because a model name is a topic rather than a string a reader could
 type or search.
 
+**Benefit figures.** Every figure on the landing page comes from
+`CASE-STUDY.md` — the two runs (`website-visuals` and `website-polish`) that
+rebuilt this site, measured on 2026-09-23 — so the page quotes the full
+rebuild, not the single-run 1.04 figure, and labels the cost as pi's local
+estimate wherever it appears. The benefits grid pairs each figure with the
+outcome it buys, and its status-report figure is one of the two terminal
+captures the case study shows.
+
+## Case-study page
+
+`/case-study/`, titled around "How Amale built this site", is one continuous
+document: a single `max-w-7xl` wrapper with the rhythm set between blocks
+inside it, as the spacing rules above require. Every claim on it is about the
+skill and each one is paired with a figure from `CASE-STUDY.md`; the page's own
+build stack never appears, and neither does any claim that the site's own
+quality is a bar for the skill.
+
+Its hero band is the page's own light: a `relative isolate min-h-[30rem]
+overflow-hidden` section whose decor field carries a vertical `mask-image`
+gradient and an inner wrapper carrying a horizontal one, so the wash fades
+into the page background on all four sides and no edge of the band is ever
+visible. Two nested masks keep the fade to plain `mask-image`, which every
+browser supports without `mask-composite`. Inside the wash sit `LightRays` as
+a broad lamp cone, a `Glow` behind the title, two `Blobs` — brass toward the
+right edge, violet at the lower-left corner — and `GridDots`.
+
+The two terminal captures, `case-study/status-report.png` and
+`case-study/health-report.png`, are real screenshots of the skill's own output
+for the `website-polish` run. Each sits in a `figure` with a title bar, a chip
+naming it as terminal output, descriptive `alt` text and a caption, in
+`grid gap-8 md:grid-cols-2`. The status capture also appears once on the
+landing page, in the benefits section.
+
 ## Shape, borders, elevation
 
 - Radius: `rounded-box` (0.875rem) for cards/panels/code blocks,
@@ -320,19 +353,33 @@ contrast of anything written on top of it.
 
 | Component | `data-decor` | What it draws |
 | --- | --- | --- |
-| `Glow` | `radial-glow` | a soft blooming disc, at a point (`cx`/`cy`, `size`) |
-| `GridDots` | `grid-dots` | the ledger's dot field, densest at `cx`/`cy` and fading with distance |
-| `Rings` | `ring` | one thin circle, a gauge bezel, never filled |
-| `LightRays` | `light-rays` | a warm core plus a wider halo, a cone falling from an apex (`cx`/`cy`, `angle` in degrees clockwise from straight down, `spread` in degrees) |
-| `Blobs` | `blob` | a blurred colour mass with no edge (`size`, `blur`) |
-| `Drifter` | `drift` | a wrapper (`direction`, `distance`) whose contents breathe slowly |
+| `Glow` | `radial-glow` | a soft blooming disc — the light a screen throws on the desk — at a point (`centreXFraction`/`centreYFraction`, `diameterPx`) |
+| `GridDots` | `grid-dots` | the ledger's dot field, densest at `centreXFraction`/`centreYFraction` (`spacingPx`) and fading with distance, so it never competes with the copy |
+| `Rings` | `ring` | one thin circle, a gauge bezel, never filled, so it frames a region without masking anything behind it (`centreXFraction`/`centreYFraction`, `diameterPx`) |
+| `LightRays` | `light-rays` | a warm core plus a wider halo, a cone falling from an apex (`apexXFraction`/`apexYFraction`, `angleDegrees` clockwise from straight down, `spreadDegrees`) |
+| `Blobs` | `blob` | a blurred colour mass with no edge (`centreXFraction`/`centreYFraction`, `diameterPx`, `blurPx`) |
+| `Drifter` | `drift` | a wrapper (`direction`, `distancePx`) whose contents breathe slowly |
 
-Every component takes `hue` (a brand hue), `opacity` and `class`; `Glow`,
-`GridDots`, `Rings` and `Blobs` also take `cx`/`cy` as fractions of the host
-box. Colour, geometry and intensity travel as custom properties
+Every component takes `hue` (a brand hue), `opacity` (peak opacity, 0–1) and
+`class`. **A prop carries its own unit or bounds in its name:**
+`centreXFraction` and `centreYFraction` are fractions of the host box,
+`diameterPx`, `spacingPx`, `blurPx` and `distancePx` are pixels, and
+`angleDegrees` and `spreadDegrees` are degrees, so no caller needs a comment to
+read one.
+
+Colour, geometry and intensity travel as custom properties
 (`--decor-hue`, `--decor-opacity`, `--decor-size`, `--decor-x`/`--decor-y`,
 `--dots-spacing`, `--rays-*`, `--blob-blur`, `--drift-distance`), so placement
 is CSS's job and a component only names what it is.
+
+The layers that are a shape at a point — `radial-glow`, `ring`, `blob` — are
+centred with `translate` rather than `transform`, so a reveal or a drift can
+animate the same element without fighting the centring. Light rays are drawn
+from two conic gradients, and both the beam's angle and its spread are degrees
+for a reason: percentages are legal in a conic gradient only as stop positions,
+and mixing one into the start angle invalidates the whole gradient. The
+component's angle runs clockwise from straight down, so the gradient, which
+starts straight up, is offset by half a turn.
 
 **The field must not fight the copy.** Layers are allowed to stack, so each
 one carries a low peak. Measured on the built site with every shell layer at
@@ -347,8 +394,8 @@ paints above the host's background and below its content:
 ```html
 <section class="relative isolate">
   <div class="decor-field" aria-hidden="true">
-    <Glow hue="secondary" size={720} cx={0.2} cy={0.1} />
-    <GridDots hue="secondary" spacing={28} cx={0.8} cy={0} opacity={0.3} />
+    <Glow hue="secondary" diameterPx={720} centreXFraction={0.2} centreYFraction={0.1} />
+    <GridDots hue="secondary" spacingPx={28} centreXFraction={0.8} centreYFraction={0} opacity={0.3} />
   </div>
   …content…
 </section>
@@ -379,6 +426,11 @@ rises in once, over 0.6s, and is finished well inside 700ms:
   held state for a reader who asked for stillness.
 - `Reveal` never touches an element that is already on screen: re-hiding one
   would be a visible flicker.
+- Route content arrives through the router rather than through `Reveal`, so it
+  watches the document for newly marked elements with a `MutationObserver`
+  instead of binding to one route's markup, and it drops every hold when the
+  preference turns to `reduce` mid-visit, so the attribute can never outlive
+  the preference.
 - A page may set its own ladder with an inline `--reveal-delay`, but the total
   must stay inside 700ms.
 - Never put `data-reveal` on an element that already sets its own opacity (a
@@ -581,6 +633,19 @@ blocks rather than to the `<article>`: a diagram panel, table or code block
 uses the full article column. The "On this page" list lives in the right rail
 from `xl` and inside the article below it, rendered once at any given width.
 
+**The docs header band.** Above that shell, `DocsLayout` puts the page title in
+its own full-bleed band — `relative isolate border-b border-line`, with no
+background of its own. A wide, dim teal `Glow` sets the mean hue of the whole
+band without lifting the copy, because its peak stays under the documented
+lit-background level. A brass `Blobs` lamp sits above the title on a phone and
+moves right of the prose measure from `xl` up, where a second teal pool sits at
+the band's lower-right corner, and `LightRays`, a `Rings` bezel and `GridDots`
+frame it at every width. Every layer fades radially or through a mask, so the
+band is light on the page and never a tinted rectangle. Measured on the built
+site at 390, 768, 1024 and 1440 CSS pixels, the only `dim` element in the band
+is the lead, and it stays above 4.7:1 while the `base-content` title stays above
+7.9:1.
+
 ## Visualization layer
 
 The site shows delegation instead of only describing it. Two component kinds
@@ -603,6 +668,24 @@ enough contrast that the type stays at its documented ratios, and carries no
 `figcaption` — a caption under a background is a panel again. Whatever the
 scene needs explaining goes in body copy further down the page, next to the
 thing it explains.
+
+**Depth is built into the scene, not applied to the whole canvas.** Both the
+canvas and every model tile render at full opacity; the layering inside the
+scene supplies the depth. Far edges — the coordinator distribution and the Jev
+consultation — are thinner, dimmer and softer, a whisper of the workflow, while
+near edges — review, escalation and the accepted-chunk returns — are brighter,
+thicker and sharper. Node glows are additive and soft and breathe slowly, so a
+node is a small light in the dark rather than a flat disc, and the packet
+travelling each active edge is a bright pulse in that edge's own hue with a
+tight hot core and a wider soft halo. The additive palette stays below the
+luminance that would cost the copy its contrast ratios: a packet, its rail and
+a node ring together stay under half the AA threshold for `dim` body copy.
+
+A straight line between two node centres would run through the model-name label
+under Claude Code, GLM and MiMo. The four links involved carry explicit exit and
+entry points on the tile edges instead, and edge glow is clamped below the
+higher of the two tiles, so no glowing line and no glow reaches a label box —
+the same "no label is crossed" rule the diagrams obey.
 
 Each model node wears a **logo tile**: a rounded square carrying the vendor's
 real mark when `website/public/models/` holds one, and otherwise a monogram
@@ -710,6 +793,13 @@ when decorative.
   `font-display`, `font-mono`) plus the depth vocabulary in
   `src/components/decor/` (`Glow`, `GridDots`, `Rings`, `LightRays`, `Blobs`,
   `Drifter`) and the `data-reveal` contract.
+- Tailwind builds its candidate list from raw text, this document and every
+  `.md` beside it included, so a class name spelled out in ordinary prose
+  emits a rule no page uses. Measured on this build: removing the depth
+  chunk's source comments made the stylesheet drop two unused rules and the
+  variable declarations they had pulled in. Spell a class name out only where
+  a page is meant to use it, keep comments out of `src/`, and let this
+  document carry the reasoning.
 - Prefer a daisyUI component over hand-rolled markup for every standard UI
   element (button, menu, alert, badge, table, collapse, steps, stat, kbd).
 - Interactive disclosures use daisyUI `collapse` or native `details` — both

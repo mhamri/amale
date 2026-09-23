@@ -35,39 +35,18 @@ export default function DocsLayout(props: {
   const sections = () => props.sections ?? [];
   return (
     <main id="main">
-      {/* Header band: a full-bleed band behind the page title, lit so the
-          header reads as depth rather than as an article with a heading. A
-          wide, dim teal bloom sets the mean hue of the whole band; a brass
-          lamp sits above the title on a phone and right of the prose measure
-          from xl up; rays, a gauge ring and the ledger's dot field frame it.
-          The band is clipped (`decor-field`), has no background of its own,
-          and every layer fades radially or through a mask, so it is light on
-          the page and never a tinted rectangle. Measured on the built site at
-          390, 768, 1024 and 1440 CSS pixels, the only `dim` element in the
-          band is the lead, and it stays above 4.7:1; the title is
-          `base-content` and stays above 7.9:1. */}
       <div class="relative isolate border-b border-line">
         <div class="decor-field" aria-hidden="true">
-          {/* Broad wash: a wide, dim teal bloom centred on the band. It lifts
-              the mean chroma of the whole header without lifting the copy,
-              because its peak stays under the documented lit-background
-              level. */}
-          <Glow hue="secondary" size={2200} cx={0.5} cy={0.5} opacity={0.45} />
+          <Glow hue="secondary" diameterPx={2200} centreXFraction={0.5} centreYFraction={0.5} opacity={0.45} />
 
-          {/* Phone: a small brass lamp above the title. Its bright core sits
-              clear of the copy, so the strong hue lands on the header's top
-              edge and the title never rides on it. */}
-          <Blobs hue="primary" size={500} cx={0.692} cy={-0.016} blur={30} opacity={0.85} class="lg:hidden" />
+          <Blobs hue="primary" diameterPx={500} centreXFraction={0.692} centreYFraction={-0.016} blurPx={30} opacity={0.85} class="lg:hidden" />
 
-          {/* Desktop: the lamp moves right of the prose measure, and a second
-              teal pool sits at the band's lower-right corner. */}
-          <Blobs hue="primary" size={1000} cx={0.903} cy={1.115} blur={50} opacity={0.8} class="hidden xl:block" />
-          <Blobs hue="secondary" size={900} cx={1.017} cy={1.537} blur={60} opacity={0.75} class="hidden xl:block" />
+          <Blobs hue="primary" diameterPx={1000} centreXFraction={0.903} centreYFraction={1.115} blurPx={50} opacity={0.8} class="hidden xl:block" />
+          <Blobs hue="secondary" diameterPx={900} centreXFraction={1.017} centreYFraction={1.537} blurPx={60} opacity={0.75} class="hidden xl:block" />
 
-          {/* Shape and rays frame the band at every width. */}
-          <LightRays hue="primary" cx={0.5} cy={0} spread={130} opacity={0.4} />
-          <Rings hue="secondary" size={420} cx={0.9} cy={0.3} opacity={0.35} class="hidden sm:block" />
-          <GridDots hue="secondary" spacing={26} cx={0.7} cy={0} opacity={0.3} />
+          <LightRays hue="primary" apexXFraction={0.5} apexYFraction={0} spreadDegrees={130} opacity={0.4} />
+          <Rings hue="secondary" diameterPx={420} centreXFraction={0.9} centreYFraction={0.3} opacity={0.35} class="hidden sm:block" />
+          <GridDots hue="secondary" spacingPx={26} centreXFraction={0.7} centreYFraction={0} opacity={0.3} />
         </div>
         <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
           <header class="pb-12 pt-32 md:pb-14">

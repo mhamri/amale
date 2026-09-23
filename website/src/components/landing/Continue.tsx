@@ -24,8 +24,8 @@ export default function Continue() {
   return (
     <section class="relative isolate border-y border-line bg-base-200/50">
       <div class="decor-field" aria-hidden="true">
-        <Glow hue="accent" size={640} cx={0.16} cy={0.1} opacity={0.2} />
-        <GridDots hue="accent" spacing={28} cx={0.85} cy={0.9} opacity={0.2} />
+        <Glow hue="accent" diameterPx={640} centreXFraction={0.16} centreYFraction={0.1} opacity={0.2} />
+        <GridDots hue="accent" spacingPx={28} centreXFraction={0.85} centreYFraction={0.9} opacity={0.2} />
       </div>
       <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
         <h2 data-reveal class="font-display text-display font-semibold tracking-tight">

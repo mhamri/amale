@@ -47,10 +47,10 @@ export default function Division() {
   return (
     <section class="relative isolate mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <div class="decor-field" aria-hidden="true">
-        <Drifter direction="horizontal" distance={20}>
-          <LightRays hue="primary" cx={0.92} cy={-0.04} angle={18} spread={116} opacity={0.2} />
+        <Drifter direction="horizontal" distancePx={20}>
+          <LightRays hue="primary" apexXFraction={0.92} apexYFraction={-0.04} angleDegrees={18} spreadDegrees={116} opacity={0.2} />
         </Drifter>
-        <Glow hue="accent" size={620} cx={0.08} cy={0.86} opacity={0.2} />
+        <Glow hue="accent" diameterPx={620} centreXFraction={0.08} centreYFraction={0.86} opacity={0.2} />
       </div>
       <h2 data-reveal class="font-display text-display font-semibold tracking-tight">
         Who does what.
