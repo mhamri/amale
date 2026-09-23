@@ -3,9 +3,12 @@
  * the routed hue, the monogram and the vendor mark live in one place. The
  * hero's logo tiles read from here — a model whose vendor publishes a mark
  * renders that mark, and a model without one renders its monogram in the
- * model's routed hue, in the same tile size and shape either way. Dropping a
- * correctly named file into website/public/models upgrades a monogram to a
- * logo with no code change.
+ * model's routed hue, in the same tile size and shape either way.
+ *
+ * A mark reaches the hero only when both halves are in place: the file sits in
+ * website/public/models AND the model's `logo` field points at it. Dropping a
+ * correctly named file into that folder on its own changes nothing — the
+ * shipped mechanism reads the `logo` field, not the directory listing.
  *
  * Vendor marks are third-party marks used only to name the models Amale
  * routes to. They are served from this site, never hotlinked, and never
@@ -35,10 +38,11 @@ export type ModelIdentity = {
   vendor: string | null;
   /**
    * Tile surface behind a mark that carries no background of its own.
-   * Marks published as filled squares (Anthropic, DeepSeek, MoonshotAI)
-   * cover the tile themselves; OpenAI's blossom is black on transparency,
-   * so its tile carries a light surface from the theme to stay legible on
-   * the night-ledger background.
+   * Marks published as filled squares (Anthropic, DeepSeek, MoonshotAI,
+   * TypeSafe) cover the tile themselves; OpenAI's blossom is black on transparency and
+   * MiMo's mark is drawn in currentColor, which resolves to black once the
+   * file is loaded into an <image>, so both tiles carry a light surface from
+   * the theme to stay legible on the night-ledger background.
    */
   tileFill?: string;
 };
@@ -55,22 +59,23 @@ export const MODELS: Record<ModelId, ModelIdentity> = {
     name: 'GLM',
     monogram: 'G',
     hue: 'var(--color-info)',
-    logo: null,
-    vendor: null,
+    logo: 'models/GLM.svg',
+    vendor: 'Zhipu (Z.ai)',
   },
   mimo: {
     name: 'MiMo',
     monogram: 'M',
     hue: 'var(--color-success)',
-    logo: null,
-    vendor: null,
+    logo: 'models/MiMo.svg',
+    vendor: 'Xiaomi',
+    tileFill: 'var(--color-base-content)',
   },
   solar: {
     name: 'Solar',
     monogram: 'S',
     hue: 'var(--color-primary)',
-    logo: null,
-    vendor: null,
+    logo: 'models/Solar.svg',
+    vendor: 'Upstage',
   },
   kimi: {
     name: 'Kimi',
@@ -83,8 +88,8 @@ export const MODELS: Record<ModelId, ModelIdentity> = {
     name: 'Jev',
     monogram: 'J',
     hue: 'var(--color-accent)',
-    logo: null,
-    vendor: null,
+    logo: 'models/TypeSafe.png',
+    vendor: 'TypeSafe',
   },
   anthropic: {
     name: 'Anthropic',
