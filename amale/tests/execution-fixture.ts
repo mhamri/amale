@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {realpath} from 'node:fs/promises';
 import * as c from '../scripts/core.ts';
 import {scopeKey} from '../scripts/routing.ts';
+export const clearCut:c.ShapeInput={understanding:'Synthetic fixture request',clearCut:'A synthetic test fixture has exactly one reading'};
 export async function fixtureClaim(store:c.Store,id:string,input:Parameters<typeof c.claim>[2]){
  const initial=await store.load(),t=c.taskOf(initial,id);
  if(t.depth==='host'&&input.model===initial.host.model){const grant=await c.hostException(store,{id,reason:'repair-escalation',evidence:'Synthetic exhausted-repair fixture'});return c.claim(store,id,{...input,hostAuthorization:grant.authorization});}

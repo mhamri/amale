@@ -63,6 +63,8 @@ async function executeMain(args=process.argv.slice(2),attached=false){
  case 'next':return core.next(store);
  case 'resume':return core.resume(store,input.host);
  case 'unlock':await store.unlock();return {unlocked:true};
+ case 'feedback':return core.feedback(store,input);
+ case 'shape':return core.shape(store,input);
  case 'plan':await core.plan(store,input);break;
  case 'amend':await core.amend(store,input);break;
  case 'decide':return adapters.decide(store,input);

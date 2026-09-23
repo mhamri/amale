@@ -77,7 +77,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             start
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Creates a new run with a host, model, intent, acceptance criteria and constraints. Refuses if an existing run substantially repeats the same intent unless <span class="font-mono text-xs text-base-content">continues</span> or <span class="font-mono text-xs text-base-content">unrelated</span> is supplied.
+            Creates a new run with a host, model, intent, acceptance criteria and constraints. Refuses if an existing run substantially repeats the same intent unless <span class="font-mono text-xs text-base-content">continues</span> or <span class="font-mono text-xs text-base-content">unrelated</span> is supplied. Pass the intent's <span class="font-mono text-xs text-base-content">shape</span>; without it, planning waits until the intent is shaped.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -89,7 +89,47 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
   "criteria": ["observable success"],
   "constraints": ["accepted restriction"],
   "continues": "<optional prior run id>",
-  "unrelated": "<optional reason when word overlap is coincidental>"
+  "unrelated": "<optional reason when word overlap is coincidental>",
+  "shape": { "understanding": "what is asked and what it is for", "clearCut": "why there is only one sensible reading" }
+}`}</code></pre>
+          </figure>
+
+          <h3 id="feedback" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
+            feedback
+          </h3>
+          <p class="mt-3 text-sm leading-relaxed text-dim">
+            Records the user's feedback as a new request. Planning, amending, reopening and delegating wait until it is shaped. Chunks that are already running finish; nothing new starts on the old understanding.
+          </p>
+          <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
+            <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
+              <span>input.json</span>
+            </div>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{ "text": "the user's actual words" }`}</code></pre>
+          </figure>
+
+          <h3 id="shape" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
+            shape
+          </h3>
+          <p class="mt-3 text-sm leading-relaxed text-dim">
+            Shapes the latest request before any plan: the understanding, what is missing, pushback, additions, a reusable principle when one is warranted, and two to four real options with a recommendation. Pass <span class="font-mono text-xs text-base-content">clearCut</span> instead of options when the request has only one sensible reading. Options without <span class="font-mono text-xs text-base-content">chosen</span>, or open questions, make <span class="font-mono text-xs text-base-content">next</span> return <span class="font-mono text-xs text-base-content">ask-user</span>. The chosen option becomes a requirement decision.
+          </p>
+          <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
+            <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
+              <span>input.json</span>
+            </div>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{
+  "understanding": "the hero must sell the product in one glance",
+  "gaps": ["no headline copy was supplied"],
+  "pushback": ["three paragraphs bury the animation"],
+  "additions": ["show every model's logo"],
+  "mentor": ["a hero earns attention with one promise, not a feature list"],
+  "options": [
+    { "id": "headline", "summary": "one headline and one line", "gains": "scene stays visible", "costs": "less detail" },
+    { "id": "split", "summary": "copy left, scene right", "gains": "both readable", "costs": "scene shrinks on phones" }
+  ],
+  "recommendation": "headline",
+  "affects": ["hero"],
+  "chosen": { "option": "headline", "quote": "the user's words" }
 }`}</code></pre>
           </figure>
 
@@ -214,7 +254,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             amend
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Changes an existing task contract while retaining identity and escalation ancestry. Invalidates affected descendants. Do not create a replacement ID merely to reset repair history.
+            Changes an existing task contract while retaining identity and escalation ancestry. Invalidates affected descendants. Do not create a replacement ID merely to reset repair history. Add <span class="font-mono text-xs text-base-content">"feedback": true</span> when the change delivers shaped user feedback naming this task; that reopen spends no repair cycle.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -231,7 +271,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             invalidate
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Invalidates a task and its dependents when an accepted assumption or piece of evidence changes. Repair ancestry remains, and the reopen spends a repair cycle. Reopening a delivered task needs the probe that found the defect as <span class="font-mono text-xs text-base-content">check</span>; it joins the task's checks and runs on every later repair. Pass <span class="font-mono text-xs text-base-content">noProbe</span> with a reason when no executable can show the defect.
+            Invalidates a task and its dependents when an accepted assumption or piece of evidence changes. Repair ancestry remains, and the reopen spends a repair cycle. Reopening a delivered task needs the probe that found the defect as <span class="font-mono text-xs text-base-content">check</span>; it joins the task's checks and runs on every later repair. Pass <span class="font-mono text-xs text-base-content">noProbe</span> with a reason when no executable can show the defect; it is accepted once per task. <span class="font-mono text-xs text-base-content">"feedback": true</span> reopens a task named by settled user feedback, with no probe and no repair cycle.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">

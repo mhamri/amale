@@ -1,4 +1,4 @@
-import {fixtureClaim} from './execution-fixture.ts';
+import {fixtureClaim,clearCut} from './execution-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
@@ -19,7 +19,7 @@ async function fixture(t:any){
  const dir=await mkdtemp(join(tmpdir(),'amale-delegate-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await writeFile(join(dir,'app.txt'),'original');
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-delegate-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
- const store=await c.start(dir,{id:'deleg',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});
+ const store=await c.start(dir,{shape:clearCut,id:'deleg',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});
  await c.plan(store,{tasks:[task('a')],integrationChecks:[]});
  return {dir,store};
 }
@@ -85,7 +85,7 @@ test('process health flags coordinator micromanagement and missing delegation',a
 async function batchFixture(t:any,ids:string[],maxWorkers:number,withChecks=true){
  const dir=await mkdtemp(join(tmpdir(),'amale-batch-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-delegate-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
- const store=await c.start(dir,{id:'batch',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});
+ const store=await c.start(dir,{shape:clearCut,id:'batch',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});
  await c.plan(store,{tasks:ids.map(id=>withChecks?task(id):({...task(id),checks:[]} as c.Task)),integrationChecks:[]});
  const spaces:Record<string,string>={};
  for(const id of ids){const workspace=join(dir,'w-'+id);await mkdir(workspace,{recursive:true});await writeFile(join(workspace,'app.txt'),'original '+id);spaces[id]=await realpath(workspace);}

@@ -119,20 +119,31 @@ function renderHealth(value: unknown): string {
     ['Retries', text(metrics.retries)],
     ['Worker families', families.join(', ')],
   ]);
-  const sections = [body, speedTable(metrics.modelSpeed)];
+  const spend = record(metrics.spend);
+  const sections = [body, speedTable(metrics.modelSpeed), spendTable('Estimated spend by model', spend.byModel), spendTable('Estimated spend by role', spend.byRole), spendTable('Estimated spend by task', spend.byTask)];
   if (warnings.length) sections.push(`Warnings\n${warnings.map((warning) => `- ${warning}`).join('\n')}`);
   sections.push(slowSection(v.slowModels));
   return sections.filter(Boolean).join('\n\n');
 }
 
-function speedTable(value: unknown): string {
-  const speeds = Array.isArray(value) ? value.map(record) : [];
-  if (!speeds.length) return '';
-  const header = ['Model', 'Role', 'Calls', 'Avg min', 'Longest', 'Tokens/s', 'Tokens/call'];
-  const body = speeds.map((s) => [text(s.model), text(s.role), text(s.calls), text(s.averageMinutes), text(s.longestMinutes), text(s.outputTokensPerSecond), text(s.outputTokensPerCall)]);
+function table(title: string, header: string[], body: string[][]): string {
+  if (!body.length) return '';
   const widths = header.map((_, column) => Math.max(header[column].length, ...body.map((row) => row[column].length)));
   const line = (cells: string[]) => cells.map((cell, column) => cell.padEnd(widths[column])).join('  ').trimEnd();
-  return `Model speed\n${[header, ...body].map(line).join('\n')}`;
+  return `${title}\n${[header, ...body].map(line).join('\n')}`;
+}
+
+function speedTable(value: unknown): string {
+  const speeds = Array.isArray(value) ? value.map(record) : [];
+  return table('Model speed', ['Model', 'Role', 'Calls', 'Avg min', 'Longest', 'Tokens/s', 'Tokens/call'],
+    speeds.map((s) => [text(s.model), text(s.role), text(s.calls), text(s.averageMinutes), text(s.longestMinutes), text(s.outputTokensPerSecond), text(s.outputTokensPerCall)]));
+}
+
+const spendRowLimit = 10;
+function spendTable(title: string, value: unknown): string {
+  const rows = Array.isArray(value) ? value.map(record).slice(0, spendRowLimit) : [];
+  return table(title, ['Name', 'Est. $', 'Calls', 'Turns', 'New input', 'Cached', 'Output'],
+    rows.map((r) => [text(r.key), text(r.estimatedCost), text(r.calls), text(r.turns), text(r.inputTokens), text(r.cacheReadTokens), text(r.outputTokens)]));
 }
 
 function slowSection(value: unknown): string {

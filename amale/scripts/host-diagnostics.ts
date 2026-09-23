@@ -2,9 +2,10 @@ import {mkdir,writeFile,readdir,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {Store,invariant} from './core.ts';
-import {sanitize,diagnostics,modelSpeed,slowModels,recentSpeeds,readSpeedSamples} from './telemetry.ts';
+import {sanitize,diagnostics,modelSpeed,slowModels,recentSpeeds,readSpeedSamples,spend} from './telemetry.ts';
 import {loadModelConfig} from './config.ts';
 
+export const deepSpendShareLimit=0.3;
 const kinds=['decision','worker','review','edit','check','integration','permission','other'] as const;
 const phases=['planned','permission-granted','permission-denied','started','completed','failed','skipped'] as const;
 type HostAction={actionId:string;sessionId:string;kind:typeof kinds[number];phase:typeof phases[number];summary:string;next?:string;taskId?:string};
@@ -47,7 +48,9 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  const loopSteps=['cli:worker','cli:reviewer','cli:repair','cli:accept'];
  const manualSteps=runtime.operations.filter(o=>loopSteps.includes(o.operation)).length;
  const reopened=s.events.filter(e=>e.type==='invalidated').length;
- const windowMs=await loadModelConfig().then(c=>c.slowModelWindowMs).catch(()=>0);
+ const config=await loadModelConfig().catch(()=>undefined),windowMs=config?.slowModelWindowMs??0;
+ const costs=spend(runtime.operations),estimatedTotal=costs.byModel.reduce((total,r)=>total+r.estimatedCost,0);
+ const deepSpend=costs.byModel.filter(r=>config?.deep.includes(r.key)),deepCost=deepSpend.reduce((total,r)=>total+r.estimatedCost,0),deepShare=estimatedTotal?deepCost/estimatedTotal:0;
  const speeds=windowMs?await recentSpeeds(store.amaleDir,windowMs):modelSpeed(await readSpeedSamples(store.amaleDir)),slow=slowModels(speeds);
  const skipNote=(role:string)=>windowMs?` Routing skips it as ${role} while this holds over the last ${Math.round(windowMs/86400000*10)/10} day(s), unless no other model is eligible.`:' slowModelWindowMs is 0, so routing still uses it.';
  const warnings:string[]=[];
@@ -60,8 +63,9 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  if(tasks&&delegations.length&&manualSteps>tasks)warnings.push(`${manualSteps} worker, reviewer, repair and accept call(s) made by hand across ${tasks} task(s): the coordinator is stepping the chunk loop itself between delegations. Re-delegate the chunk instead.`);
  if(tasks&&reopened>=Math.max(2,Math.ceil(tasks/2)))warnings.push(`${reopened} invalidation(s) reopened chunks across ${tasks} task(s): the coordinator is finding defects the chunks' own checks cannot see, and each reopening costs a repair cycle and a full chunk round. Register the probe you judge by as a task check before delegating.`);
  if(tasks===1&&s.criteria.length>=3&&!s.events.some(e=>e.type==='single-chunk'))warnings.push(`One task carries ${s.criteria.length} run outcomes: nothing can run in parallel. Split the work into independent chunks, or record a single-chunk reason.`);
+ if(deepShare>deepSpendShareLimit&&estimatedTotal>=1)warnings.push(`${deepSpend.map(r=>r.key).join(', ')} took ${Math.round(deepShare*100)}% of the $${estimatedTotal.toFixed(2)} estimated spend across ${deepSpend.reduce((n,r)=>n+r.calls,0)} call(s). Deep repairs come from repeated reopens and failed repairs: find the check each chunk is missing instead of paying the deep model to guess.`);
  const slowNotes=slow.map(m=>`${m.model} as ${m.role} averages ${m.averageMinutes} min per call over ${m.calls} calls, ${m.times}× the ${m.medianMinutes} min median for that role: ${m.outputTokensPerSecond} output tokens per second and ${m.outputTokensPerCall} output tokens per call.${skipNote(m.role)}`);
- return {available:true,slowModels:slowNotes,metrics:{modelSpeed:speeds,tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,manualLoopSteps:manualSteps,reopenedChunks:reopened,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals},warnings};
+ return {available:true,slowModels:slowNotes,metrics:{modelSpeed:speeds,tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,manualLoopSteps:manualSteps,reopenedChunks:reopened,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals,spend:costs},warnings};
 }
 // Shareable by explicit user choice: omit all free text, paths, models, raw
 // identifiers, prompts, artifact bodies and original exception messages.

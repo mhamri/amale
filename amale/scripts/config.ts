@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { invariant } from './core.ts';
 
-export type ModelConfig = { flash:string[]; deep:string[]; jev:string; providerCooldownMs:number; providerFailovers:number; launchAttempts:number; idleTimeoutMs:number; slowModelWindowMs:number };
+export type ModelConfig = { flash:string[]; deep:string[]; jev:string; providerCooldownMs:number; providerFailovers:number; launchAttempts:number; idleTimeoutMs:number; slowModelWindowMs:number; reviewerMaxTurns:number };
 
 export const configPath=()=>resolve(process.env.AMALE_MODELS??join(dirname(fileURLToPath(import.meta.url)),'..','models.json'));
 export const isAlias=(model:string)=>/^~|[/:_-]latest(?:$|[/:_-])/i.test(model);
@@ -30,7 +30,8 @@ export async function loadModelConfig(path=configPath()):Promise<ModelConfig>{
   providerFailovers:whole(parsed.providerFailovers,'providerFailovers',path,1,10),
   launchAttempts:whole(parsed.launchAttempts,'launchAttempts',path,1,5),
   idleTimeoutMs:whole(parsed.idleTimeoutMs,'idleTimeoutMs',path,0,7200000),
-  slowModelWindowMs:whole(parsed.slowModelWindowMs,'slowModelWindowMs',path,0,2592000000)};
+  slowModelWindowMs:whole(parsed.slowModelWindowMs,'slowModelWindowMs',path,0,2592000000),
+  reviewerMaxTurns:whole(parsed.reviewerMaxTurns,'reviewerMaxTurns',path,5,500)};
 }
 
 export async function jevModel(){return process.env.AMALE_JEV_MODEL??(await loadModelConfig()).jev;}

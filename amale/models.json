@@ -13,5 +13,6 @@
   "providerFailovers": 3,
   "launchAttempts": 3,
   "idleTimeoutMs": 900000,
-  "slowModelWindowMs": 604800000
+  "slowModelWindowMs": 604800000,
+  "reviewerMaxTurns": 60
 }

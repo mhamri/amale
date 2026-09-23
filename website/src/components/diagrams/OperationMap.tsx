@@ -244,7 +244,8 @@ export default function OperationMap() {
           <Flow d="M 238 16 H 242" />
 
           <T x={6} y={36} s={8.5} f="fill-primary" b>plan</T>
-          <T x={44} y={36} s={7} mono>plan · amend · invalidate · record-decision</T>
+          <T x={44} y={36} s={7} mono>feedback · shape · plan · amend</T>
+          <T x={44} y={45} s={7} mono>invalidate · record-decision</T>
           <T x={6} y={55} s={8.5} f="fill-primary" b>build</T>
           <T x={44} y={55} s={7} mono>delegate · delegate-batch · wait · claim</T>
           <T x={44} y={66} s={7} mono>route · worker · check · result</T>
@@ -266,7 +267,7 @@ export default function OperationMap() {
         <svg
           viewBox="0 0 800 450"
           role="img"
-          aria-label="Operation map: CLI operations grouped by stage — plan the graph, delegate chunks, run a chunk, independent review, repair and accept, start and inspect, decide and route, configure and guard, evidence, bootstrap"
+          aria-label="Operation map: CLI operations grouped by stage — shape and plan, delegate chunks, run a chunk, independent review, repair and accept, start and inspect, decide and route, configure and guard, evidence, bootstrap"
           class="hidden size-full sm:block"
           preserveAspectRatio="xMidYMid meet"
         >
@@ -288,8 +289,8 @@ export default function OperationMap() {
           <Flow d="M 655 58 H 663" />
           <Head points="669,58 661,54 661,62" />
 
-          <Panel x={15} y={112} step={0} tone="primary" title="plan the graph"
-            ops={['plan', 'amend', 'invalidate', 'record-decision']} />
+          <Panel x={15} y={112} step={0} tone="primary" title="shape & plan"
+            ops={['feedback', 'shape', 'plan', 'amend', 'invalidate', 'record-decision']} />
           <Panel x={171} y={112} step={1} tone="primary" title="delegate chunks"
             ops={['delegate', 'delegate-batch', 'wait']} />
           <Panel x={327} y={112} step={2} tone="primary" title="run a chunk"

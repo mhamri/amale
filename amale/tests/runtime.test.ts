@@ -1,4 +1,4 @@
-import {fixtureClaim} from './execution-fixture.ts';
+import {fixtureClaim,clearCut} from './execution-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, mkdir, readFile, rm } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import * as c from '../scripts/core.ts';
 import { choiceAnswer, hostDecision } from '../scripts/adapters.ts';
 import { install, statusHtml } from '../scripts/cli.ts';
 
-async function fixture(t:any){const dir=await mkdtemp(join(tmpdir(),'amale-test-'));t.after(()=>rm(dir,{recursive:true,force:true}));await writeFile(join(dir,'app.txt'),'original');const store=await c.start(dir,{id:'run',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});return {dir,store};}
+async function fixture(t:any){const dir=await mkdtemp(join(tmpdir(),'amale-test-'));t.after(()=>rm(dir,{recursive:true,force:true}));await writeFile(join(dir,'app.txt'),'original');const store=await c.start(dir,{shape:clearCut,id:'run',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});return {dir,store};}
 const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]} as c.Task);
 async function syntheticCoverage(store:c.Store,id:string){const state=await store.load();return c.reviewObligations(state,c.taskOf(state,id)).map(o=>({id:o.id,status:'covered' as const,evidence:'Synthetic protocol fixture only; not a real model review'}));}
 async function deliver(store:c.Store,dir:string,id='a') {await fixtureClaim(store,id,{workspace:dir,model:'deepseek/flash'});await c.result(store,id,{changed:'app.txt'});await c.check(store,id,'test');await c.review(store,id,{coverage:await syntheticCoverage(store,id),model:'z-ai/glm-flash',findings:[],fingerprint:await c.fingerprint(dir),report:'Spec and Standards inspected actual implementation'});await c.accept(store,id);await c.integrated(store,id,'Inspected integrated behavior and actual diff');}
@@ -70,7 +70,7 @@ test('missing accepted workspace blocks stale descendants but preserves live own
 
 const host={kind:'codex',model:'gpt-6-astra'};
 async function workspace(t:any){const dir=await mkdtemp(join(tmpdir(),'amale-lineage-'));t.after(()=>rm(dir,{recursive:true,force:true}));return dir;}
-async function wideFixture(t:any){const dir=await workspace(t);const store=await c.start(dir,{id:'wide',host,intent:'Build a ten page marketing website',criteria:['Ten pages exist','Navigation reaches every page','Copy is final','Styling is consistent']});return {dir,store};}
+async function wideFixture(t:any){const dir=await workspace(t);const store=await c.start(dir,{shape:clearCut,id:'wide',host,intent:'Build a ten page marketing website',criteria:['Ten pages exist','Navigation reaches every page','Copy is final','Styling is consistent']});return {dir,store};}
 const wholeSite={id:'whole',title:'whole',goal:'Build the entire website',phase:'one',deps:[],resources:['*'],criteria:['pages render'],kind:'code' as const,checks:[]};
 
 test('a single task for many outcomes is rejected with the counts it saw',async t=>{
@@ -92,12 +92,12 @@ test('a blank single chunk reason is not an escape hatch',async t=>{const {store
 
 test('continues inherits answered requirement decisions and no routing history',async t=>{
  const dir=await workspace(t);
- const first=await c.start(dir,{id:'first',host,intent:'Build the marketing website',criteria:['Pages render','Navigation reaches every page']});
+ const first=await c.start(dir,{shape:clearCut,id:'first',host,intent:'Build the marketing website',criteria:['Pages render','Navigation reaches every page']});
  await first.transaction(s=>{s.decisions.push(
   {purpose:'requirement',id:'palette',question:'Which palette?',criteria:{warm:'Warm neutrals'},choice:'warm',reason:'Owner chose warm neutrals',state:{},revision:s.revision},
   {purpose:'requirement',id:'typeface',question:'Which typeface?',criteria:{serif:'Serif'},state:{},revision:s.revision},
   {id:'route',question:'Which worker?',criteria:{flash:'deepseek/flash'},choice:'flash',state:{routing:{scope:{taskId:'a'}}},revision:s.revision});});
- const second=await c.start(dir,{id:'second',continues:'first',host,intent:'Improve the marketing website',criteria:['Pages read better']});
+ const second=await c.start(dir,{shape:clearCut,id:'second',continues:'first',host,intent:'Improve the marketing website',criteria:['Pages read better']});
  const s=await second.load();
  assert.deepEqual(s.decisions.map(d=>d.id),['palette']);
  assert.equal(s.decisions[0].source,'inherited:first');assert.equal(s.decisions[0].choice,'warm');assert.equal(s.decisions[0].reason,'Owner chose warm neutrals');
@@ -105,27 +105,27 @@ test('continues inherits answered requirement decisions and no routing history',
  assert.deepEqual(s.events.find(e=>e.type==='continues')!.detail,{continues:'first',inheritedCriteria:2,inheritedDecisions:1});
  assert.equal((await c.summarize(dir,'second')).continues,'first');
 });
-test('continues names the prior run it could not load',async t=>{const dir=await workspace(t);await assert.rejects(()=>c.start(dir,{id:'second',continues:'absent-run',host,intent:'Improve the marketing website',criteria:['Pages read better']}),/absent-run/);});
+test('continues names the prior run it could not load',async t=>{const dir=await workspace(t);await assert.rejects(()=>c.start(dir,{shape:clearCut,id:'second',continues:'absent-run',host,intent:'Improve the marketing website',criteria:['Pages read better']}),/absent-run/);});
 
 test('a near duplicate intent is refused and names the run to continue',async t=>{
  const dir=await workspace(t);
- await c.start(dir,{id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
- await assert.rejects(()=>c.start(dir,{id:'second',host,intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']}),/first.*continues/s);
+ await c.start(dir,{shape:clearCut,id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
+ await assert.rejects(()=>c.start(dir,{shape:clearCut,id:'second',host,intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']}),/first.*continues/s);
 });
 test('an explicit unrelated reason admits a similar intent and records the match',async t=>{
  const dir=await workspace(t);
- await c.start(dir,{id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
- const second=await c.start(dir,{id:'second',host,unrelated:'Different client brand sharing the same vocabulary',intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']});
+ await c.start(dir,{shape:clearCut,id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
+ const second=await c.start(dir,{shape:clearCut,id:'second',host,unrelated:'Different client brand sharing the same vocabulary',intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']});
  const recorded=(await second.load()).events.find(e=>e.type==='unrelated-run')!.detail as any;
  assert.equal(recorded.matched,'first');assert.match(recorded.reason,/Different client brand/);assert.ok(recorded.score>=0.3);
 });
-test('a first run in an empty workspace is never treated as a duplicate',async t=>{const dir=await workspace(t);const store=await c.start(dir,{id:'only',host,intent:'Build a brand new website from nothing',criteria:['The website exists']});assert.equal((await store.load()).id,'only');});
+test('a first run in an empty workspace is never treated as a duplicate',async t=>{const dir=await workspace(t);const store=await c.start(dir,{shape:clearCut,id:'only',host,intent:'Build a brand new website from nothing',criteria:['The website exists']});assert.equal((await store.load()).id,'only');});
 test('an unreadable prior run does not block a new run',async t=>{
  const dir=await workspace(t);
- await c.start(dir,{id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
+ await c.start(dir,{shape:clearCut,id:'first',host,intent:'Redesign the marketing website navigation and typography',criteria:['Navigation is clear']});
  await writeFile(join(dir,'.amale','runs','first','revision-000000000.json'),'{ truncated');
  await mkdir(join(dir,'.amale','runs','empty'),{recursive:true});
- const store=await c.start(dir,{id:'second',host,intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']});
+ const store=await c.start(dir,{shape:clearCut,id:'second',host,intent:'Redesign marketing website typography and navigation again',criteria:['Navigation is clearer']});
  assert.equal((await store.load()).id,'second');
 });
 test('summarize reports the current run shape for a coordinator',async t=>{

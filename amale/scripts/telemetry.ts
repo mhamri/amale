@@ -66,12 +66,34 @@ export function slowModels(speeds:ModelSpeed[],minimumCalls=3,factor=2):SlowMode
   return measured.filter(s=>s.averageMinutes>=factor*typical).map(s=>({...s,medianMinutes:round1(typical),times:round1(s.averageMinutes/typical)}));
  });
 }
+export type SpendRow={key:string;calls:number;turns:number;estimatedCost:number;inputTokens:number;cacheReadTokens:number;outputTokens:number};
+const reviewSession=/-review-\d+$/;
+export function spend(operations:Operation[]){
+ const tables={byModel:new Map<string,SpendRow>(),byRole:new Map<string,SpendRow>(),byTask:new Map<string,SpendRow>()};
+ for(const o of operations.filter(o=>o.operation==='pi')){
+  const usage=o.events.filter(e=>e.stage==='usage'),session=String(o.metadata?.sessionDir??'').split(/[\\/]/).pop()||'unknown';
+  const keys={byModel:String(o.metadata?.model??'unknown'),byRole:o.metadata?.readOnly?'reviewer':'worker',byTask:session.replace(reviewSession,'')};
+  for(const [table,key] of Object.entries(keys) as [keyof typeof tables,string][]){
+   const row=tables[table].get(key)??{key,calls:0,turns:0,estimatedCost:0,inputTokens:0,cacheReadTokens:0,outputTokens:0};
+   row.calls++;row.turns+=usage.length;
+   for(const u of usage){row.estimatedCost+=Number(u.data?.cost)||0;row.inputTokens+=Number(u.data?.inputTokens)||0;row.cacheReadTokens+=Number(u.data?.cacheRead)||0;row.outputTokens+=Number(u.data?.outputTokens)||0;}
+   tables[table].set(key,row);
+  }
+ }
+ const sorted=(m:Map<string,SpendRow>)=>[...m.values()].map(r=>({...r,estimatedCost:Math.round(r.estimatedCost*1000)/1000})).sort((a,b)=>b.estimatedCost-a.estimatedCost);
+ return {byModel:sorted(tables.byModel),byRole:sorted(tables.byRole),byTask:sorted(tables.byTask)};
+}
+const emptyTotals={operations:0,unfinished:0,failures:0,reportedCost:0,estimatedCost:0,inputTokens:0,cacheReadTokens:0,cacheWriteTokens:0,outputTokens:0};
+const sum=(rows:any[],field:string)=>rows.reduce((total,r)=>total+(Number(r.data[field])||0),0);
 export async function diagnostics(root:string){
- let names:string[];try{names=await readdir(join(root,'diagnostics'));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return {operations:[],totals:{operations:0,unfinished:0,failures:0,reportedCost:0,estimatedCost:0,inputTokens:0,outputTokens:0},unreadable:[]};throw e;}
+ let names:string[];try{names=await readdir(join(root,'diagnostics'));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return {operations:[],totals:{...emptyTotals},unreadable:[]};throw e;}
  const rows:any[]=[],unreadable:string[]=[];
  for(const name of names.filter(n=>/^[a-f0-9-]+-\d{6}\.json$/.test(n))){try{rows.push(JSON.parse(await readFile(join(root,'diagnostics',name),'utf8')));}catch{unreadable.push(name);}}
  const groups=new Map<string,any[]>();for(const row of rows){const items=groups.get(row.id)??[];items.push(row);groups.set(row.id,items);}
  const operations=[...groups.entries()].map(([id,items])=>{items.sort((a,b)=>a.sequence-b.sequence);const first=items[0],last=items.at(-1),completed=last.stage==='finished';return {id,operation:first.operation,started:first.at,elapsedMs:last.elapsedMs,outcome:completed?last.data.outcome:'unfinished (active or interrupted)',metadata:first.metadata,events:items.map(r=>({stage:r.stage,data:r.data,elapsedMs:r.elapsedMs}))};}).sort((a,b)=>a.started.localeCompare(b.started));
  const usage=rows.filter(r=>r.stage==='usage');
- return {operations,totals:{operations:operations.length,unfinished:operations.filter(o=>o.outcome.startsWith('unfinished')).length,failures:operations.filter(o=>o.outcome==='failed').length,reportedCost:usage.filter(r=>(r.data.costSource==='openrouter-response'||(!r.data.costSource&&r.operation==='openrouter'))).reduce((sum,r)=>sum+(Number(r.data.cost)||0),0),estimatedCost:usage.filter(r=>(r.data.costSource==='pi-estimate'||(!r.data.costSource&&r.operation==='pi'))).reduce((sum,r)=>sum+(Number(r.data.cost)||0),0),inputTokens:usage.reduce((sum,r)=>sum+(Number(r.data.inputTokens)||0),0),outputTokens:usage.reduce((sum,r)=>sum+(Number(r.data.outputTokens)||0),0)},unreadable};
+ const reported=usage.filter(r=>r.data.costSource==='openrouter-response'||(!r.data.costSource&&r.operation==='openrouter'));
+ const estimated=usage.filter(r=>r.data.costSource==='pi-estimate'||(!r.data.costSource&&r.operation==='pi'));
+ return {operations,totals:{operations:operations.length,unfinished:operations.filter(o=>o.outcome.startsWith('unfinished')).length,failures:operations.filter(o=>o.outcome==='failed').length,
+  reportedCost:sum(reported,'cost'),estimatedCost:sum(estimated,'cost'),inputTokens:sum(usage,'inputTokens'),cacheReadTokens:sum(usage,'cacheRead'),cacheWriteTokens:sum(usage,'cacheWrite'),outputTokens:sum(usage,'outputTokens')},unreadable};
 }

@@ -16,6 +16,10 @@ export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'
 export type ModelPool = { role:string; models:string[]; requiredInputs:string[]; requiresTools:boolean; notes:string };
 export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:Check[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
 export type RunSummary = { id:string; status:Run['status']; intent:string; criteria:string[]; tasks:number; revision:number; continues?:string; acceptance?:Run['acceptance'] };
+export type ShapeOption = { id:string; summary:string; gains:string; costs:string };
+export type ShapeInput = { understanding:string; gaps?:string[]; pushback?:string[]; additions?:string[]; mentor?:string[]; options?:ShapeOption[]; recommendation?:string; clearCut?:string; questions?:string[]; affects?:string[]; chosen?:{option:string;quote:string} };
+export type ShapeRequest = { request:number; kind:'intent'|'feedback'; text:string };
+export type Shaped = { request:number; open:boolean; artifact:string; affects:string[]; questions:string[]; options:{id:string;summary:string}[]; recommendation?:string; chosen?:string };
 export function invariant(value:unknown,message:string):asserts value { if(!value) throw new Error(message); }
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 export const idCheck=(id:string)=>invariant(typeof id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id),'Invalid identifier');
@@ -58,6 +62,62 @@ export function reopenReasons(s:Run,id:string):string[]{
  for(const e of s.events){const d=e.detail as {id?:string;reason?:string};if(d?.id!==id)continue;if(e.type==='accepted')reasons=[];else if(e.type==='invalidated'&&d.reason)reasons.push(d.reason);}
  return reasons;
 }
+// See references/planning.md#shape-every-request
+export function shaping(s:Run){
+ const requests=s.events.filter(e=>e.type==='request');
+ if(!requests.length)return undefined;
+ const request=requests.at(-1)!.detail as ShapeRequest;
+ const shape=s.events.filter(e=>e.type==='shaped'&&(e.detail as Shaped).request===request.request).map(e=>e.detail as Shaped).at(-1);
+ return {request,shape,due:!shape,open:!!shape?.open};
+}
+export function requireShaped(s:Run,operation:string){
+ const state=shaping(s);
+ if(!state)return;
+ invariant(!state.due,`${operation} waits for the ${state.request.kind} "${state.request.text.slice(0,160)}" to be shaped: run shape first, with your understanding, what is missing, pushback, additions and the options you see`);
+ invariant(!state.open,`${operation} waits for the user: the shape of request ${state.request.request} still has open questions or an unchosen option. Put them to the user, then run shape again with the answers or chosen`);
+}
+const strings=(value:unknown,field:string)=>{invariant(value===undefined||Array.isArray(value)&&value.every(v=>typeof v==='string'&&!!v.trim()),`shape ${field} must be an array of non-empty strings`);return (value as string[]|undefined)??[];};
+export function validateShape(s:Run,input:ShapeInput){
+ invariant(input&&typeof input.understanding==='string'&&!!input.understanding.trim(),'shape needs understanding: the request restated in your own words, including what it is for');
+ const options=input.options??[];
+ invariant(Array.isArray(options)&&options.every(o=>o&&[o.id,o.summary,o.gains,o.costs].every(v=>typeof v==='string'&&!!v.trim())),'Each shape option needs id, summary, gains and costs');
+ invariant(new Set(options.map(o=>o.id)).size===options.length,'Shape option ids must be unique');
+ const clearCut=typeof input.clearCut==='string'?input.clearCut.trim():'';
+ invariant(!(clearCut&&options.length),'Pass clearCut or options, not both');
+ invariant(clearCut||options.length>=2&&options.length<=4,'shape needs two to four options that genuinely differ, or clearCut naming why the request has only one sensible reading');
+ invariant(!options.length||options.some(o=>o.id===input.recommendation),'recommendation must name one of the option ids');
+ const affects=strings(input.affects,'affects');for(const id of affects)taskOf(s,id);
+ const chosen=input.chosen;
+ invariant(chosen===undefined||options.some(o=>o.id===chosen?.option)&&typeof chosen.quote==='string'&&!!chosen.quote.trim(),'chosen needs an option id from options and quote with the user\'s actual words');
+ return {understanding:input.understanding.trim(),gaps:strings(input.gaps,'gaps'),pushback:strings(input.pushback,'pushback'),additions:strings(input.additions,'additions'),mentor:strings(input.mentor,'mentor'),options,recommendation:input.recommendation,clearCut:clearCut||undefined,questions:strings(input.questions,'questions'),affects,chosen};
+}
+export function recordShape(s:Run,shape:ReturnType<typeof validateShape>,artifact:string){
+ const state=shaping(s);invariant(state,'Nothing to shape: this run predates shaping and has no recorded request; record new user feedback with feedback');
+ const open=shape.questions.length>0||shape.options.length>0&&!shape.chosen;
+ const detail:Shaped={request:state.request.request,open,artifact,affects:shape.affects,questions:shape.questions,options:shape.options.map(o=>({id:o.id,summary:o.summary})),recommendation:shape.recommendation,chosen:shape.chosen?.option};
+ event(s,'shaped',detail);
+ if(shape.chosen){
+  const option=shape.options.find(o=>o.id===shape.chosen!.option)!;
+  s.decisions.push({purpose:'requirement',id:`shape-${state.request.request}-${randomUUID().slice(0,8)}`,question:`How should this ${state.request.kind} be delivered: ${state.request.text.slice(0,200)}`,criteria:{[option.id]:option.summary},choice:option.id,source:'user',reason:shape.chosen.quote,state:{understanding:shape.understanding,additions:shape.additions},revision:s.revision});
+ }
+ return detail;
+}
+export async function shape(store:Store,input:ShapeInput){
+ const s=await store.load(),validated=validateShape(s,input),artifact=await store.artifact(validated);
+ return store.transaction(current=>recordShape(current,validateShape(current,input),artifact));
+}
+export async function feedback(store:Store,input:{text:string}){
+ invariant(input&&typeof input.text==='string'&&!!input.text.trim(),'feedback needs text quoting what the user actually said');
+ return store.transaction(s=>{const request:ShapeRequest={request:s.events.filter(e=>e.type==='request').length+1,kind:'feedback',text:input.text.trim()};event(s,'request',request);return request;});
+}
+// See references/planning.md#shape-every-request
+function feedbackReopen(s:Run,id:string){
+ const state=shaping(s);
+ invariant(state?.request.kind==='feedback'&&state.shape&&!state.open,'feedback reopen needs the latest request to be user feedback whose shape is settled');
+ invariant(state.shape.affects.includes(id),`Shaped feedback ${state.request.request} does not name ${id} in affects; reshape it to include this task`);
+ invariant(!s.events.some(e=>e.type==='invalidated'&&(e.detail as {id?:string;feedback?:number}).id===id&&(e.detail as {feedback?:number}).feedback===state.request.request),`${id} was already reopened for feedback ${state.request.request}`);
+ return state.request.request;
+}
 const intentStopwords=new Set(['with','that','this','from','into','when','then','they','them','have','will','make','must','also','only','does','each','over','than','such','been','were','what','which','their','there','using','still']);
 const intentWords=(text:string)=>new Set(text.toLowerCase().split(/[^a-z]+/).filter(w=>w.length>=4&&!intentStopwords.has(w)));
 function intentOverlap(a:Set<string>,b:Set<string>){const smaller=Math.min(a.size,b.size);if(!smaller)return 0;let shared=0;for(const word of a)if(b.has(word))shared++;return shared/smaller;}
@@ -79,7 +139,7 @@ async function overlappingRun(workspace:string,id:string,intent:string){
 async function continuedRun(workspace:string,continues:string):Promise<Run>{
  return new Store(workspace,continues).load().catch((error:Error)=>{throw new Error(`Cannot continue run ${continues}: ${error.message}; name a prior run of this workspace or drop continues`);});
 }
-export async function start(workspace:string,input:{id:string;host:Run['host'];intent:string;criteria:string[];constraints?:string[];continues?:string;unrelated?:string}):Promise<Store>{
+export async function start(workspace:string,input:{id:string;host:Run['host'];intent:string;criteria:string[];constraints?:string[];continues?:string;unrelated?:string;shape?:ShapeInput}):Promise<Store>{
  invariant(input.intent&&input.criteria?.length&&input.host?.kind&&input.host?.model,'Intent, acceptance criteria and actual host identity required');
  const root=await realpath(workspace),unrelated=input.unrelated?.trim();
  const prior=input.continues?await continuedRun(root,input.continues):undefined;
@@ -92,8 +152,10 @@ export async function start(workspace:string,input:{id:string;host:Run['host'];i
  event(s,'started',{host:input.host});
  if(prior&&input.continues){s.lineage={continues:input.continues,inheritedCriteria:prior.criteria,inheritedDecisions:inherited.map(d=>d.id)};event(s,'continues',{continues:input.continues,inheritedCriteria:prior.criteria.length,inheritedDecisions:inherited.length});}
  if(unrelated&&!input.continues)event(s,'unrelated-run',{reason:unrelated,matched:overlapping?.id,score:overlapping?.score});
+ event(s,'request',{request:1,kind:'intent',text:input.intent} satisfies ShapeRequest);
+ if(input.shape!==undefined){const shaped=validateShape(s,input.shape);recordShape(s,shaped,await store.artifact(shaped));}
  await store.save(s);return store;}finally{await release();}}
-export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:Check[];singleChunk?:string}){await store.transaction(s=>{invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
+export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:Check[];singleChunk?:string}){await store.transaction(s=>{requireShaped(s,'plan');invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
 // Coverage is an explicit reviewer attestation, not proof that all defects were found.
 export function reviewObligations(s:Run,t:Task):{id:string;question:string}[]{return [
  ...t.criteria.map((criterion,i)=>({id:`criterion:${i+1}`,question:`Spec: inspect the actual behavior satisfying task criterion: ${criterion}`})),
@@ -118,7 +180,7 @@ export function reviewCoverageDebt(s:Run,t:Task){return reviewObligations(s,t).f
  return matches.length!==1||!matches[0].evidence?.trim()||!(matches[0].status==='covered'||matches[0].status==='not-applicable'&&!ownObligation.test(required.id));
 });}
 async function reviewAction(s:Run,t:Task){if(t.activity)return {action:'await-verification',task:t.id,activity:t.activity}; const unmet=t.deps.filter(id=>taskOf(s,id).status!=='accepted'||!taskOf(s,id).integrated);if(unmet.length)return {action:'reconcile-dependencies',task:t.id,dependencies:unmet}; let fp:string; try{fp=await fingerprint(t.workspace!);}catch(error){if(!workspaceUnavailable(error))throw error;return {action:'reconcile-workspace',task:t.id,workspace:t.workspace,reason:(error as Error).message,recovery:'Restore workspace access, or resume to block affected work while independent tasks continue'};} const missing=t.checks.filter(c=>!t.receipts.some(r=>r.id===c.id&&r.fingerprint===fp&&r.code===0)); if(t.receipts.some(r=>r.code!==0))return {action:'repair-needed',task:t.id}; if(missing.length)return {action:'check',task:t.id,checks:missing}; if(!t.review||t.review.fingerprint!==fp)return {action:'review',tasks:[{id:t.id,author:t.family,workspace:t.workspace}]}; if(t.review.findings.some(f=>f.blocking&&f.disposition==='open'))return {action:'triage-repair',task:t.id,findings:t.review.findings}; const coverage=reviewCoverageDebt(s,t); if(coverage.length)return {action:'review-evidence-needed',task:t.id,obligations:coverage.map(o=>({...o,evidence:t.review?.coverage?.find(c=>c.id===o.id)?.evidence})),reviewArtifact:t.review.artifact}; return {action:'accept',task:t.id};}
-async function nextAction(s:Run,reviewActions:Map<string,Awaited<ReturnType<typeof reviewAction>>>){if(s.status==='complete')return {action:'done',run:s.id,acceptance:s.acceptance};if(s.status==='blocked')return {action:'intervention',reason:s.blocked};const untracked=s.tasks.filter(t=>t.status==='running'&&!t.execution);if(untracked.length)return {action:'reconcile-execution',tasks:untracked.map(t=>t.id),reason:'Legacy running claims lack execution authorization; reconcile live ownership and preserve artifacts before requeueing through worker routing'};const orphaned=activeTasks(s).filter(t=>{const owner=t.activity?.owner??t.owner;return !!owner&&!ownerAlive(owner);});if(orphaned.length)return {action:'resume',tasks:orphaned.map(t=>t.id),reason:'The recorded owner of this work is no longer running; resume to reconcile it before trusting its status'};if(s.effort?.request)return {action:s.effort.request.status==='running'?'await-host-effort':'execute-host-effort',model:s.effort.model,base:s.effort.base,modes:s.effort.modes,...s.effort.request};const pending=s.decisions.find(d=>!d.choice);if(pending)return {action:'host-decision',decision:pending};if(!s.tasks.length)return {action:'discover-specify-plan',intent:s.intent,criteria:s.criteria};const review=s.tasks.filter(t=>t.status==='review');if(review.length)return reviewActions.get(review[0].id)!;const repair=s.tasks.filter(t=>t.status==='repair');if(repair.length)return {action:'repair',tasks:repair.map(t=>({id:t.id,depth:t.depth,cycles:t.cycles,findings:t.review?.findings.filter(f=>f.blocking&&f.disposition!=='resolved'&&f.disposition!=='refuted')}))};const running=s.tasks.filter(t=>t.status==='running');const ready=s.tasks.filter(t=>t.status==='ready'&&t.deps.every(id=>taskOf(s,id).status==='accepted'&&!!taskOf(s,id).integrated));if(ready.length&&running.length<s.config.maxWorkers)return {action:'route-dispatch',tasks:ready.map(t=>({id:t.id,goal:t.goal,criteria:t.criteria})),available:Math.max(0,s.config.maxWorkers-running.length)};const integrate=s.tasks.filter(t=>t.status==='accepted'&&!t.integrated);if(integrate.length)return {action:'integrate',tasks:integrate.map(t=>t.id)};if(running.length)return {action:'await-workers',tasks:running.map(t=>({id:t.id,owner:t.owner}))};const blocked=s.tasks.filter(t=>t.status==='blocked');if(blocked.length)return {action:'resolve-blockers',tasks:blocked.map(t=>({id:t.id,reason:t.blocked}))};return {action:'verify-feature',criteria:s.criteria,checks:s.integrationChecks};}
+async function nextAction(s:Run,reviewActions:Map<string,Awaited<ReturnType<typeof reviewAction>>>){if(s.status==='complete')return {action:'done',run:s.id,acceptance:s.acceptance};if(s.status==='blocked')return {action:'intervention',reason:s.blocked};const untracked=s.tasks.filter(t=>t.status==='running'&&!t.execution);if(untracked.length)return {action:'reconcile-execution',tasks:untracked.map(t=>t.id),reason:'Legacy running claims lack execution authorization; reconcile live ownership and preserve artifacts before requeueing through worker routing'};const orphaned=activeTasks(s).filter(t=>{const owner=t.activity?.owner??t.owner;return !!owner&&!ownerAlive(owner);});if(orphaned.length)return {action:'resume',tasks:orphaned.map(t=>t.id),reason:'The recorded owner of this work is no longer running; resume to reconcile it before trusting its status'};if(s.effort?.request)return {action:s.effort.request.status==='running'?'await-host-effort':'execute-host-effort',model:s.effort.model,base:s.effort.base,modes:s.effort.modes,...s.effort.request};const shapingNow=shaping(s);if(shapingNow?.due)return {action:'shape',request:shapingNow.request,guide:'references/planning.md#shape-every-request'};if(shapingNow?.open)return {action:'ask-user',request:shapingNow.request,questions:shapingNow.shape!.questions,options:shapingNow.shape!.options,recommendation:shapingNow.shape!.recommendation,shapeArtifact:shapingNow.shape!.artifact};const pending=s.decisions.find(d=>!d.choice);if(pending)return {action:'host-decision',decision:pending};if(!s.tasks.length)return {action:'discover-specify-plan',intent:s.intent,criteria:s.criteria};const review=s.tasks.filter(t=>t.status==='review');if(review.length)return reviewActions.get(review[0].id)!;const repair=s.tasks.filter(t=>t.status==='repair');if(repair.length)return {action:'repair',tasks:repair.map(t=>({id:t.id,depth:t.depth,cycles:t.cycles,findings:t.review?.findings.filter(f=>f.blocking&&f.disposition!=='resolved'&&f.disposition!=='refuted')}))};const running=s.tasks.filter(t=>t.status==='running');const ready=s.tasks.filter(t=>t.status==='ready'&&t.deps.every(id=>taskOf(s,id).status==='accepted'&&!!taskOf(s,id).integrated));if(ready.length&&running.length<s.config.maxWorkers)return {action:'route-dispatch',tasks:ready.map(t=>({id:t.id,goal:t.goal,criteria:t.criteria})),available:Math.max(0,s.config.maxWorkers-running.length)};const integrate=s.tasks.filter(t=>t.status==='accepted'&&!t.integrated);if(integrate.length)return {action:'integrate',tasks:integrate.map(t=>t.id)};if(running.length)return {action:'await-workers',tasks:running.map(t=>({id:t.id,owner:t.owner}))};const blocked=s.tasks.filter(t=>t.status==='blocked');if(blocked.length)return {action:'resolve-blockers',tasks:blocked.map(t=>({id:t.id,reason:t.blocked}))};return {action:'verify-feature',criteria:s.criteria,checks:s.integrationChecks};}
 export const activeTasks=(s:Run)=>s.tasks.filter(t=>t.status==='running'||!!t.activity);
 export async function acquireActivity(store:Store,id:string,kind:'check'|'review',checkId?:string,beforeStart?:(s:Run)=>void|Promise<void>){return store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='review'&&t.workspace,'Task not awaiting verification');invariant(!t.activity,'Task verification already active');const live=activeTasks(s);invariant(live.length<s.config.maxWorkers,'Worker capacity reached');invariant(!live.some(other=>conflict(t,other)),'Conflicting live task');await beforeStart?.(s);const operation=randomUUID();t.activity={kind,checkId,owner:{pid:process.pid,coordinatorPid:process.pid,host:hostname(),operation}};event(s,'activity-started',{id,...t.activity});return operation;});}
 export async function activitySpawned(store:Store,id:string,operation:string,pid:number){await store.transaction(s=>{const activity=taskOf(s,id).activity;invariant(activity?.owner.operation===operation,'Verification ownership changed');activity.owner.pid=pid;});}
@@ -232,31 +294,35 @@ export async function packet(store:Store,id?:string){
 }
 export async function summarize(workspace:string,id:string):Promise<RunSummary>{const s=await new Store(workspace,id).load();return {id:s.id,status:s.status,intent:s.intent,criteria:s.criteria,tasks:s.tasks.length,revision:s.revision,continues:s.lineage?.continues,acceptance:s.acceptance};}
 
-export function invalidateTree(s:Run,id:string,reason:string){
- invariant(reason,'Invalidation reason required');const root=taskOf(s,id),affected=new Set([id]);let changed=true;while(changed){changed=false;for(const t of s.tasks)if(!affected.has(t.id)&&t.deps.some(dep=>affected.has(dep))){affected.add(t.id);changed=true;}}
+export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
+ invariant(reason,'Invalidation reason required');taskOf(s,id);const affected=new Set([id]);let changed=true;while(changed){changed=false;for(const t of s.tasks)if(!affected.has(t.id)&&t.deps.some(dep=>affected.has(dep))){affected.add(t.id);changed=true;}}
  invariant(!s.tasks.some(t=>affected.has(t.id)&&(t.status==='running'||!!t.activity)),'Affected task is still running; reconcile ownership before invalidation');
  for(const t of s.tasks)if(affected.has(t.id)){
   // Every repeated implementation attempt consumes the same ancestry counter.
-  if(t.output||t.review){t.cycles++;t.depth=t.cycles>s.config.flashRepairCycles+s.config.deepRepairCycles?'host':t.cycles>s.config.flashRepairCycles?'deep':'flash';}
+  if((t.output||t.review)&&feedback===undefined){t.cycles++;t.depth=t.cycles>s.config.flashRepairCycles+s.config.deepRepairCycles?'host':t.cycles>s.config.flashRepairCycles?'deep':'flash';}
   t.status='ready';t.integrated=undefined;t.receipts=[];t.review=undefined;
  }
- s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected]});
+ s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback});
 }
 
-export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string}){await store.transaction(s=>{
+export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean}){await store.transaction(s=>{
  const t=taskOf(s,input.id),noProbe=typeof input.noProbe==='string'?input.noProbe.trim():'';
  invariant(!(input.check&&noProbe),'Pass check or noProbe, not both');
- if(t.output||t.review)invariant(input.check||noProbe,`Reopening ${t.id} needs the probe that found the defect: pass check with the executable that shows it, so every later repair of this task runs it too, or noProbe naming why no executable can show it`);
+ const fromFeedback=input.feedback===true?feedbackReopen(s,t.id):undefined;
+ if(fromFeedback===undefined)requireShaped(s,'invalidate');
+ if((t.output||t.review)&&fromFeedback===undefined)invariant(input.check||noProbe,`Reopening ${t.id} needs the probe that found the defect: pass check with the executable that shows it, so every later repair of this task runs it too, or noProbe naming why no executable can show it`);
+ const earlierNoProbe=s.events.find(e=>e.type==='reopen-probe'&&(e.detail as {id?:string;noProbe?:string}).id===t.id&&(e.detail as {noProbe?:string}).noProbe);
+ invariant(!noProbe||!earlierNoProbe,`${t.id} was already reopened once without a probe ("${(earlierNoProbe?.detail as {noProbe?:string})?.noProbe}"). A second defect the checks cannot see means the checks are missing something: register the probe that shows it as check`);
  if(input.check){
   idCheck(input.check.id);validCommand(input.check);
   const same=t.checks.find(c=>c.id===input.check!.id);
   invariant(!same||JSON.stringify([same.command,same.args])===JSON.stringify([input.check.command,input.check.args]),`Task ${t.id} already has a different check named ${input.check.id}`);
   if(!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args});
  }
- invalidateTree(s,input.id,input.reason);
+ invalidateTree(s,input.id,input.reason,fromFeedback);
  if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
 });}
-export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');invalidateTree(s,input.id,input.reason);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
+export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
 
 export type ParallelAction={task:string;action:string;workspace?:string;resources:string[];checks?:Check[];[key:string]:unknown};
 export async function next(store:Store){
