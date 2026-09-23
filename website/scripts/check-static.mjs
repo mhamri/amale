@@ -116,7 +116,7 @@ async function checkPage({ file, page, label }) {
   const expectsName = page === "index.html" || page === "docs/index.html" || page === "evidence/index.html";
   if (expectsName) {
     assert.match(html, /عمله/, "" + label + ": " + file + " must render عمله");
-    assert.match(html, /AH-mah-lah/, "" + label + ": " + file + " must render the pronunciation");
+    assert.match(html, /Ah-mah-leh/, "" + label + ": " + file + " must render the pronunciation");
     assert.match(html, /workers [/] laborers/, "" + label + ": " + file + " must render the meaning");
   }
 
