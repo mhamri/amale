@@ -8,12 +8,10 @@ export default function Problem() {
       <div class="relative mx-auto w-full max-w-7xl px-4 pt-16 sm:px-6 md:pt-24 lg:pb-8">
         <div class="animate-rise max-w-xl">
           <h1 class="font-display text-hero font-semibold tracking-tight">
-            Big-model delivery on a cheap-model budget, every chunk verified.
+            Direct with your model. Flash workers review every chunk.
           </h1>
           <p class="mt-5 max-w-prose text-lg leading-relaxed text-dim">
-            Amale plans the work, hands each chunk to a cheap Flash model, reviews the result and
-            verifies it before the next step. You get the same verified delivery at a fraction of
-            the token cost.
+            A coordinator delegates to cheap Flash models, each chunk independently reviewed by another family. 45 blocking defects caught, $7.82 estimated cost.
           </p>
           <div class="mt-8 flex flex-wrap gap-3">
             <a
