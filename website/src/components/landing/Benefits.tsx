@@ -25,9 +25,8 @@ export default function Benefits() {
   return (
     <section
       id="benefits"
-      class="px-4 pt-4 sm:px-6 md:pt-8"
+      class="mx-auto w-full max-w-7xl px-4 pt-4 pb-16 sm:px-6 md:pt-8 md:pb-24"
     >
-      <div class="mx-auto w-full max-w-7xl">
       <h2 class="font-display text-display font-semibold tracking-tight">
         Why it matters
       </h2>
@@ -45,7 +44,6 @@ export default function Benefits() {
             </div>
           </article>
         ))}
-      </div>
       </div>
     </section>
   );
