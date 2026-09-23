@@ -104,7 +104,7 @@ Local runs, credentials, screenshots, development reports and intermediate bundl
 
 ## Website development and GitHub Pages
 
-The marketing site uses SolidStart, Solid, Tailwind CSS, and daisyUI. All seven routes — `/`, `/docs/`, `/evidence/`, `/docs/getting-started/`, `/docs/workflow/`, `/docs/review-and-recovery/` and `/docs/commands/` — are prerendered to complete HTML; Solid hydrates the interactive controls. Primary-source notes are copied from this repository during the build, and the interactive workflow graph ships alongside them as `workflow.html`. No agent credentials are required to build or host the website.
+The marketing site uses SolidStart, Solid, Tailwind CSS, and daisyUI. All seven routes — `/`, `/docs/`, `/case-study/`, `/docs/getting-started/`, `/docs/workflow/`, `/docs/review-and-recovery/` and `/docs/commands/` — are prerendered to complete HTML; Solid hydrates the interactive controls. Primary-source notes are copied from this repository during the build, and the interactive workflow graph ships alongside them as `workflow.html`. No agent credentials are required to build or host the website.
 
 ```sh
 cd website
