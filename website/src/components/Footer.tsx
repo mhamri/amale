@@ -1,4 +1,5 @@
 import { asset } from '../lib/paths';
+import { Glow, GridDots } from './decor';
 
 const siteLinks = [
   { label: 'Overview', href: asset('') },
@@ -13,7 +14,17 @@ const projectLinks = [
 
 export default function Footer() {
   return (
-    <footer class="border-t border-line bg-base-200/50">
+    <footer class="relative isolate overflow-hidden border-t border-line bg-base-200/50">
+      {/*
+        The page closes on the same warm light it opened in: a low brass
+        bloom rising from the bottom edge over the ledger's dot field. It is
+        a clipped, pointer-transparent, aria-hidden layer, painted behind the
+        footer's own content.
+      */}
+      <div class="decor-field" aria-hidden="true" data-reveal>
+        <GridDots hue="primary" spacing={32} cx={0.5} cy={1} opacity={0.35} />
+        <Glow hue="primary" size={760} cx={0.5} cy={1.2} opacity={0.4} />
+      </div>
       <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
         <div class="footer gap-10 sm:footer-horizontal">
           <aside class="max-w-sm">

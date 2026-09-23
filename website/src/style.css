@@ -76,9 +76,43 @@
   --color-line: #2b333c;  /* hairline borders and dividers */
   --color-raised: #161c22; /* alias of base-200 for card surfaces */
 
-  /* Depth: two quiet elevation steps, used with border-line. */
+  /* Depth: three tiers, always paired with border-line. Surface steps
+     lighter as it rises, so the shadow is a cue for how far a panel stands
+     above the desk, never decoration on its own.
+
+       shadow-rest      resting card      a card sitting on the page
+       shadow-raised    raised card       a panel lifted over the page
+       shadow-floating  floating panel    a menu or dialog over everything
+     */
   --shadow-rest: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.25);
   --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.35);
+  --shadow-floating: 0 4px 8px rgb(0 0 0 / 0.45), 0 24px 64px rgb(0 0 0 / 0.4), 0 48px 96px rgb(0 0 0 / 0.2);
+
+  /* Hue-tinted glow, one per brand hue: the same brass, teal and violet the
+     palette already uses for action, verification and orchestration. A glow
+     is a hairline of the hue at the panel's own edge plus a wide halo behind
+     it; it never replaces the neutral tier, it layers on top of it. */
+  --glow-primary: 0 0 0 1px color-mix(in oklab, var(--color-primary) 24%, transparent),
+    0 0 40px -10px color-mix(in oklab, var(--color-primary) 50%, transparent),
+    0 0 96px -24px color-mix(in oklab, var(--color-primary) 30%, transparent);
+  --glow-secondary: 0 0 0 1px color-mix(in oklab, var(--color-secondary) 24%, transparent),
+    0 0 40px -10px color-mix(in oklab, var(--color-secondary) 50%, transparent),
+    0 0 96px -24px color-mix(in oklab, var(--color-secondary) 30%, transparent);
+  --glow-accent: 0 0 0 1px color-mix(in oklab, var(--color-accent) 24%, transparent),
+    0 0 40px -10px color-mix(in oklab, var(--color-accent) 50%, transparent),
+    0 0 96px -24px color-mix(in oklab, var(--color-accent) 30%, transparent);
+
+  /* Tier + glow, one utility per pair: shadow-raised-glow-secondary is a
+     raised teal panel that still casts the raised card's own shadow. */
+  --shadow-rest-glow-primary: var(--shadow-rest), var(--glow-primary);
+  --shadow-rest-glow-secondary: var(--shadow-rest), var(--glow-secondary);
+  --shadow-rest-glow-accent: var(--shadow-rest), var(--glow-accent);
+  --shadow-raised-glow-primary: var(--shadow-raised), var(--glow-primary);
+  --shadow-raised-glow-secondary: var(--shadow-raised), var(--glow-secondary);
+  --shadow-raised-glow-accent: var(--shadow-raised), var(--glow-accent);
+  --shadow-floating-glow-primary: var(--shadow-floating), var(--glow-primary);
+  --shadow-floating-glow-secondary: var(--shadow-floating), var(--glow-secondary);
+  --shadow-floating-glow-accent: var(--shadow-floating), var(--glow-accent);
 
   /* Motion: short, purposeful, ease-out. See DESIGN-SYSTEM.md rules. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -100,10 +134,17 @@
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 5.5rem;
+    /*
+     * The page background lives on the root element, not on body. A body
+     * background is painted as an ordinary in-flow background, above every
+     * negative-z-index layer, which would hide the whole ambient decor
+     * field; painted from the root it becomes the canvas, and the decor
+     * layers sit on top of it and under every in-flow element.
+     */
+    background-color: var(--color-base-100);
   }
 
   body {
-    background-color: var(--color-base-100);
     color: var(--color-base-content);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -134,6 +175,213 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+
+  /*
+   * Shared depth system — decor layers (DESIGN-SYSTEM.md, "Depth vocabulary").
+   *
+   * A decor layer is decorative by construction: it carries data-decor and
+   * aria-hidden="true", it is positioned absolutely against its host, it
+   * never takes a pointer event, and it paints at z-index -1 so it can never
+   * lift or lower the contrast of anything written on top of it. Put the
+   * layers in a `.decor-field` inside an `isolate` host: the field clips what
+   * hangs off the edge, so a shape at 130% of the box can never make the page
+   * scroll sideways.
+   *
+   * Colour, geometry and intensity travel as custom properties set by the
+   * components in src/components/decor/:
+   *
+   *   --decor-hue       the brand hue the layer is drawn in
+   *   --decor-opacity   peak opacity of the layer
+   *   --decor-size      diameter of a sized shape, in pixels
+   *   --decor-x/-y      where the shape sits in its host box, as a percentage
+   */
+  [data-decor] {
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .decor-field {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  /* Layers that cover their host box rather than sitting at a point. */
+  [data-decor="drift"],
+  [data-decor="light-rays"],
+  [data-decor="grid-dots"] {
+    inset: 0;
+  }
+
+  /* Layers that are a shape at a point. `translate` is used rather than
+     `transform` so a reveal or a drift can animate the same element without
+     fighting the centring. */
+  [data-decor="radial-glow"],
+  [data-decor="ring"],
+  [data-decor="blob"] {
+    width: var(--decor-size, 24rem);
+    height: var(--decor-size, 24rem);
+    left: var(--decor-x, 50%);
+    top: var(--decor-y, 50%);
+    translate: -50% -50%;
+  }
+
+  /* Light rays: a warm core with a wider halo around it, both in the same
+     hue, falling from an apex the component places. Both the angle and the
+     spread are measured in degrees: percentages are legal in a conic gradient
+     only as stop positions, and mixing one into the start angle invalidates
+     the whole gradient. The component's angle runs clockwise from straight
+     down, so the gradient — which starts straight up — is offset by half a
+     turn. */
+  [data-decor="light-rays"] {
+    background:
+      conic-gradient(
+        from calc(180deg + var(--rays-angle, 0deg) - (var(--rays-spread, 108deg) / 2)) at var(--rays-x, 50%) var(--rays-y, 0%),
+        transparent 0deg,
+        color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 9%, transparent) calc(var(--rays-spread, 108deg) / 2),
+        transparent var(--rays-spread, 108deg),
+        transparent 360deg
+      ),
+      conic-gradient(
+        from calc(180deg + var(--rays-angle, 0deg) - (var(--rays-spread, 108deg) * 0.8)) at var(--rays-x, 50%) var(--rays-y, 0%),
+        transparent 0deg,
+        color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 5%, transparent) calc(var(--rays-spread, 108deg) * 0.8),
+        transparent calc(var(--rays-spread, 108deg) * 1.6),
+        transparent 360deg
+      );
+    opacity: var(--decor-opacity, 0.55);
+  }
+
+  /* Radial hue glow: a soft blooming disc, brightest at its centre. The peak
+     is deliberately low: the ambient layers are allowed to stack, and a
+     stacked peak must still leave `dim` text at its 4.5:1 floor. */
+  [data-decor="radial-glow"] {
+    background: radial-gradient(
+      circle at center,
+      color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 22%, transparent) 0%,
+      color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 9%, transparent) 36%,
+      transparent 70%
+    );
+    opacity: var(--decor-opacity, 0.6);
+  }
+
+  /* Geometric ring: a thin circle stroke, never a fill. */
+  [data-decor="ring"] {
+    border-radius: 50%;
+    border: 1px solid color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 28%, transparent);
+    opacity: var(--decor-opacity, 0.45);
+  }
+
+  /* Grid dots: the ledger's ruled field, densest where it is anchored and
+     fading out with distance so it never competes with the copy. */
+  [data-decor="grid-dots"] {
+    background-image: radial-gradient(
+      circle at center,
+      color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 38%, transparent) 1px,
+      transparent 1.5px
+    );
+    background-size: var(--dots-spacing, 1.75rem) var(--dots-spacing, 1.75rem);
+    opacity: var(--decor-opacity, 0.3);
+    mask-image: radial-gradient(
+      90% 70% at var(--dots-x, 50%) var(--dots-y, 0%),
+      black 0%,
+      transparent 75%
+    );
+  }
+
+  /* Blurred blob: a coloured mass with no edge a reader could trace. */
+  [data-decor="blob"] {
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 35% 35%,
+      color-mix(in oklab, var(--decor-hue, var(--color-secondary)) 60%, transparent) 0%,
+      transparent 65%
+    );
+    filter: blur(var(--blob-blur, 40px));
+    opacity: var(--decor-opacity, 0.35);
+  }
+
+  /*
+   * Ambient drift: one slow breath for a decor layer, so a page is alive
+   * rather than looping. It stops dead under prefers-reduced-motion (see the
+   * block below), which is the only place drift may be silenced.
+   */
+  [data-drift="vertical"] {
+    animation: drift-vertical 13s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  [data-drift="horizontal"] {
+    animation: drift-horizontal 17s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /*
+   * Entrance motion — the data-reveal contract.
+   *
+   * Any element carrying data-reveal fades and rises in once, over 0.6s, and
+   * is finished well inside 700ms even at the widest stagger. The reveal is
+   * driven from here rather than from script, so it starts at first paint and
+   * never waits on hydration, and the whole block is scoped so that it cannot
+   * leave anything stranded:
+   *
+   * - it requires `scripting: enabled`, so with JavaScript disabled the
+   *   prerendered HTML shows every marked element at full strength;
+   * - it requires `prefers-reduced-motion: no-preference`, so a reader who
+   *   asked for stillness gets no animation and full opacity;
+   * - elements in the first viewport animate in on load, straight from the
+   *   stylesheet, with no help from script;
+   * - elements below the fold are held by `data-reveal-pending`, which only
+   *   script ever sets, and released when they scroll into view.
+   *
+   * Do not put data-reveal on an element that already sets its own opacity
+   * (a decor layer, a tinted band): the animation ends at opacity 1 and would
+   * override it. Wrap it in a plain element instead.
+   */
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    [data-reveal]:not([data-reveal-pending]) {
+      animation: reveal 0.6s var(--reveal-delay, 0ms) var(--ease-out-soft) both;
+    }
+
+    [data-reveal-pending] {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-drift] {
+      animation: none !important;
+      will-change: auto;
+    }
+
+    [data-reveal-pending] {
+      opacity: 1;
+    }
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes drift-vertical {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(calc(-1 * var(--drift-distance, 1.25rem))); }
+  }
+
+  @keyframes drift-horizontal {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(var(--drift-distance, 1.25rem)); }
   }
 }
 
