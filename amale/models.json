@@ -12,5 +12,6 @@
   "providerCooldownMs": 300000,
   "providerFailovers": 3,
   "launchAttempts": 3,
-  "idleTimeoutMs": 900000
+  "idleTimeoutMs": 900000,
+  "slowModelWindowMs": 604800000
 }

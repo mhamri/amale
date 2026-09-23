@@ -246,8 +246,8 @@ export default function OperationMap() {
           <T x={6} y={36} s={8.5} f="fill-primary" b>plan</T>
           <T x={44} y={36} s={7} mono>plan · amend · invalidate · record-decision</T>
           <T x={6} y={55} s={8.5} f="fill-primary" b>build</T>
-          <T x={44} y={55} s={7} mono>delegate · delegate-batch · claim · route</T>
-          <T x={44} y={66} s={7} mono>worker · check · result</T>
+          <T x={44} y={55} s={7} mono>delegate · delegate-batch · wait · claim</T>
+          <T x={44} y={66} s={7} mono>route · worker · check · result</T>
           <T x={6} y={85} s={8.5} f="fill-secondary" b>review</T>
           <T x={44} y={85} s={7} mono>reviewer · review-packet · review-check</T>
           <T x={44} y={96} s={7} mono>review · repair · accept · integrated</T>
@@ -291,7 +291,7 @@ export default function OperationMap() {
           <Panel x={15} y={112} step={0} tone="primary" title="plan the graph"
             ops={['plan', 'amend', 'invalidate', 'record-decision']} />
           <Panel x={171} y={112} step={1} tone="primary" title="delegate chunks"
-            ops={['delegate', 'delegate-batch']} />
+            ops={['delegate', 'delegate-batch', 'wait']} />
           <Panel x={327} y={112} step={2} tone="primary" title="run a chunk"
             ops={['claim', 'route', 'worker', 'check', 'result']} />
           <Panel x={483} y={112} step={3} tone="secondary" title="independent review"

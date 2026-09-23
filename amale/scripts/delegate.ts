@@ -3,7 +3,8 @@
 // until the task is accepted or a genuine escalation boundary is reached.
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt } from './core.ts';
+import { hostname } from 'node:os';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next } from './core.ts';
 import { worker, reviewer, requestJson, choiceAnswer, transientProvider } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
@@ -53,7 +54,7 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
 export async function delegate(store:Store,id:string,input:{workspace?:string;brief?:string;routing?:RoutingRequest;lenses?:string[];skills?:string[];references?:string[]}={},deps:Partial<DelegateDeps>={}):Promise<DelegateOutcome>{
  const d:DelegateDeps={...real,...deps};
  const trail:Trail=[];
- await store.transaction(s=>{const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id});});
+ await store.transaction(s=>{const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
  try{
   let out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));
@@ -108,11 +109,19 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
 }
 
 export type BatchOutcome = DelegateOutcome|{task:string;outcome:'failed';reason:string};
-export async function delegateBatch(store:Store,input:{ids:string[];workspace?:string;lenses?:string[];skills?:string[];references?:string[]},deps:Partial<DelegateDeps>={}){
+export type BatchInput={ids:string[];workspace?:string;briefs?:Record<string,string>;lenses?:string[];skills?:string[];references?:string[]};
+export function validateBatch(input:BatchInput){
  const ids=input.ids;
  invariant(Array.isArray(ids)&&ids.length>0&&ids.every(id=>typeof id==='string'&&!!id.trim()),'delegate-batch needs an ids array of one or more task id strings; received '+JSON.stringify(input.ids));
  const repeated=[...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];
  invariant(!repeated.length,'delegate-batch received duplicate task ids ('+repeated.join(', ')+'); delegate each task exactly once per batch');
+ invariant(input.briefs===undefined||input.briefs!==null&&typeof input.briefs==='object'&&!Array.isArray(input.briefs)&&Object.values(input.briefs).every(b=>typeof b==='string'&&!!b.trim()),'delegate-batch briefs must map task ids to non-empty brief strings');
+ const strays=Object.keys(input.briefs??{}).filter(id=>!ids.includes(id));
+ invariant(!strays.length,`delegate-batch has briefs for ${strays.join(', ')}, which ${strays.length===1?'is':'are'} not in ids`);
+}
+export async function delegateBatch(store:Store,input:BatchInput,deps:Partial<DelegateDeps>={}){
+ validateBatch(input);
+ const ids=input.ids;
  const s=await store.load();
  const shared=new Map<string,string[]>();
  for(const id of ids){const workspace=input.workspace??taskOf(s,id).workspace;invariant(workspace,`Task ${id} has no workspace; prepare an isolated checkout per task before delegating a batch`);shared.set(workspace,[...shared.get(workspace)??[],id]);}
@@ -121,7 +130,24 @@ export async function delegateBatch(store:Store,input:{ids:string[];workspace?:s
  const concurrency=Math.max(1,s.config.maxWorkers);
  const outcomes=new Array<BatchOutcome>(ids.length);
  let cursor=0;
- const pump=async()=>{for(let index=cursor++;index<ids.length;index=cursor++){try{outcomes[index]=await delegate(store,ids[index],{workspace:input.workspace,lenses:input.lenses,skills:input.skills,references:input.references},deps);}catch(error){outcomes[index]={task:ids[index],outcome:'failed',reason:(error as Error).message};}}};
+ const refused=async(id:string,reason:string)=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:'failed',reason})).catch(()=>{});return {task:id,outcome:'failed' as const,reason};};
+ const pump=async()=>{for(let index=cursor++;index<ids.length;index=cursor++){const id=ids[index];try{outcomes[index]=await delegate(store,id,{workspace:input.workspace,brief:input.briefs?.[id],lenses:input.lenses,skills:input.skills,references:input.references},deps);}catch(error){outcomes[index]=await refused(id,(error as Error).message);}}};
  await Promise.all(Array.from({length:Math.min(concurrency,ids.length)},pump));
  return {delegated:ids.length,concurrency,outcomes};
+}
+
+export const waitLimitMs=540000;
+export async function waitForDelegations(store:Store,input:{after?:number;timeoutMs?:number}={},pollMs=2000){
+ const timeoutMs=input.timeoutMs??100000;
+ invariant(Number.isInteger(timeoutMs)&&timeoutMs>=0&&timeoutMs<=waitLimitMs,`wait timeoutMs must be a whole number of milliseconds from 0 to ${waitLimitMs}`);
+ invariant(input.after===undefined||Number.isInteger(input.after)&&input.after>=0,'wait after must be the cursor an earlier wait or delegate-batch returned');
+ const deadline=Date.now()+timeoutMs;let after=input.after;
+ for(;;){
+  const s=await store.load();after??=s.events.length;
+  const finished=s.events.slice(after).filter(e=>e.type==='delegate-finished').map(e=>{const d=e.detail as {id:string;outcome:string;reason?:string};return {id:d.id,outcome:d.outcome,reason:d.reason,at:e.at};});
+  const open=openDelegations(s),live=open.filter(d=>d.alive).map(d=>d.id),interrupted=open.filter(d=>!d.alive).map(d=>d.id);
+  if(finished.length||interrupted.length||!live.length||Date.now()>=deadline)
+   return {outcome:finished.length?'finished':interrupted.length?'interrupted':live.length?'still-running':'idle',cursor:s.events.length,finished,live,interrupted,next:await next(store)};
+  await new Promise(r=>setTimeout(r,Math.min(pollMs,Math.max(0,deadline-Date.now()))));
+ }
 }

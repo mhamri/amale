@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { piRun, requestJson, guidanceBlock, handoffFile, reviewReport, promptLimit, transientProvider } from '../scripts/adapters.ts';
 import { Store } from '../scripts/core.ts';
 import { jsRuntime, onPath } from '../scripts/runtime.ts';
-import { diagnostics, trace } from '../scripts/telemetry.ts';
+import { diagnostics, trace, readSpeedSamples } from '../scripts/telemetry.ts';
 import { main } from '../scripts/cli.ts';
 
 async function fixture(t:any){const dir=await mkdtemp(join(tmpdir(),'amale-adapter-'));t.after(()=>rm(dir,{recursive:true,force:true}));const old={key:process.env.OPENROUTER_API_KEY,pi:process.env.AMALE_PI_ENTRY,node:process.env.AMALE_NODE};process.env.OPENROUTER_API_KEY='sk-or-fake-diagnostic-secret-12345';t.after(()=>{for(const [name,value] of [['OPENROUTER_API_KEY',old.key],['AMALE_PI_ENTRY',old.pi],['AMALE_NODE',old.node]])if(value===undefined)delete process.env[name!];else process.env[name!]=value;});return dir;}
@@ -99,6 +99,18 @@ test('a worker that keeps producing output is never cut off by the idle timeout'
  const {input}=await piFixture(t,`let n=0;const t=setInterval(()=>{process.stdout.write(JSON.stringify({type:'tool_execution_start',toolName:'bash'})+'\\n');if(++n===6){clearInterval(t);${output([assistant,{type:'agent_end'}])}}},120);`);
  const result=await piRun({...input,idleTimeoutMs:600});
  assert.equal(result.text,'Completed fixture','steady progress must keep the worker alive past the idle window');
+});
+test('a finished call adds one speed sample, and a first read seeds the ledger from earlier run traces',async t=>{
+ const {dir,input}=await piFixture(t,output([assistant,{type:'agent_end'}]));
+ const amaleDir=join(dir,'.amale'),earlier=join(amaleDir,'runs','earlier');
+ const old=await trace(earlier,'pi',{model:'old/model',readOnly:true});await old.write('usage',{outputTokens:500});await old.end('success');
+ await piRun({...input,speedDir:amaleDir,readOnly:false});
+ await piRun({...input,speedDir:amaleDir,readOnly:true});
+ const samples=await readSpeedSamples(amaleDir);
+ assert.deepEqual(samples.map(s=>[s.model,s.role,s.outputTokens]),[['old/model','reviewer',500],['test/model','worker',3],['test/model','reviewer',3]]);
+ assert.ok(samples.every(s=>s.ms>=0&&!Number.isNaN(Date.parse(s.at))));
+ await writeFile(join(amaleDir,'model-speed.jsonl'),(await readFile(join(amaleDir,'model-speed.jsonl'),'utf8'))+'not json\n{"model":"x"}\n');
+ assert.equal((await readSpeedSamples(amaleDir)).length,3,'a torn or foreign line is skipped, not fatal');
 });
 test('an oversized prompt is refused with a message naming the limit',async t=>{
  const {input}=await piFixture(t,output([assistant,{type:'agent_end'}]));

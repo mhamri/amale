@@ -1,12 +1,13 @@
-import { readFile, writeFile, mkdir, readdir, realpath, lstat, symlink } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, realpath, lstat, symlink, open } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
+import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as core from './core.ts';
 import * as adapters from './adapters.ts';
 import { preflight } from './preflight.ts';
 import {recordHostAction,hostActions,exportDiagnostics,processHealth} from './host-diagnostics.ts';
-import {delegate,delegateBatch} from './delegate.ts';
+import {delegate,delegateBatch,validateBatch,waitForDelegations,type BatchInput} from './delegate.ts';
 import {bench,renderScorecard} from './bench.ts';
 import { selectModel } from './routing.ts';
 import * as effort from './effort.ts';
@@ -25,7 +26,25 @@ async function finishGate(store:core.Store,input:{claims:string[];acknowledgeWar
  }
  await core.finish(store,input.claims);
 }
-async function executeMain(args=process.argv.slice(2)){
+// See references/runtime.md (delegate-batch, wait)
+async function launchBatch(store:core.Store,args:{workspace:string;runId:string;inputPath?:string},input:BatchInput,startupMs=30000){
+ validateBatch(input);core.invariant(args.inputPath,'delegate-batch needs an input file');
+ const cursor=(await store.load()).events.length,logs=join(store.root,'delegations');
+ await mkdir(logs,{recursive:true});
+ const log=join(logs,new Date().toISOString().replace(/[:.]/g,'-')+'-'+process.pid+'.log'),out=await open(log,'a');
+ let exit:number|null|undefined;
+ const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'delegate-batch',args.workspace,args.runId,resolve(args.inputPath),attachedFlag],{detached:true,stdio:['ignore',out.fd,out.fd],windowsHide:true,shell:false});
+ child.on('exit',code=>{exit=code;});child.unref();await out.close();
+ for(const deadline=Date.now()+startupMs;;){
+  const begun=(await store.load()).events.slice(cursor).some(e=>(e.type==='delegate-started'||e.type==='delegate-finished')&&input.ids.includes((e.detail as {id:string}).id));
+  if(begun)return {launched:true,pid:child.pid,ids:input.ids,cursor,log,follow:'Run wait with after set to this cursor until it reports idle; act on each finished chunk as it arrives.'};
+  if(exit!==undefined)throw new Error(`delegate-batch exited with code ${exit} before starting any chunk: ${(await readFile(log,'utf8')).trim().slice(-2000)}`);
+  core.invariant(Date.now()<deadline,`delegate-batch process ${child.pid} started no chunk within ${startupMs} ms; inspect ${log}`);
+  await new Promise(r=>setTimeout(r,200));
+ }
+}
+const attachedFlag='--attached';
+async function executeMain(args=process.argv.slice(2),attached=false){
  const [operation,workspace=process.cwd(),runId,inputPath]=args;
  if(operation==='install')return install(args[1]);
  if(operation==='doctor'){const pi=await adapters.piCommand();let auth=false;try{auth=!!await adapters.credential();}catch{}return {runtime:{engine:process.versions.bun?'bun':'node',version:process.versions.bun??process.versions.node,nodeCompatibility:process.versions.node,executable:process.execPath},platform:process.platform,pi,openrouterConfigured:auth,dependencies:'No npm runtime dependencies',jevEndpoint:'https://openrouter.ai/api/alpha/decisions'};}
@@ -49,7 +68,8 @@ async function executeMain(args=process.argv.slice(2)){
  case 'decide':return adapters.decide(store,input);
  case 'decide-batch':return adapters.decideBatch(store,input);
  case 'delegate':return delegate(store,input.id,input);
- case 'delegate-batch':return delegateBatch(store,input);
+ case 'delegate-batch':return attached||input.foreground===true?delegateBatch(store,input):launchBatch(store,{workspace,runId,inputPath},input);
+ case 'wait':return waitForDelegations(store,input);
  case 'health':return processHealth(store);
  case 'host-decision':await adapters.hostDecision(store,input.id,input.choice,input.reason);break;
  case 'effort-configure':await effort.configureEffort(store,input);break;
@@ -80,18 +100,18 @@ case 'host-exception':return core.hostException(store,input);
  case 'block':await store.transaction(s=>{core.invariant(input.reason,'Block reason required');if(input.id){const t=core.taskOf(s,input.id);core.invariant(t.status!=='running'&&!t.activity,'Reconcile live execution before blocking its task');t.status='blocked';t.blocked=input.reason;}else{s.status='blocked';s.blocked=input.reason;}core.event(s,'blocked',{id:input.id,reason:input.reason});});break;
  case 'record-decision':await store.transaction(s=>{core.invariant(input.id&&input.question&&input.answer&&input.reason&&['user','host'].includes(input.source),'ID, question, answer, source and evidence/reason required');core.invariant(!s.decisions.some(d=>d.id===input.id),'Decision ID exists');s.decisions.push({purpose:'requirement',id:input.id,question:input.question,criteria:{accepted:input.answer},choice:'accepted',source:input.source,reason:input.reason,state:{},revision:s.revision});core.event(s,'recorded-decision',{id:input.id,purpose:'requirement',source:input.source});});break;
  case 'requeue':await store.transaction(s=>{const t=core.taskOf(s,input.id);core.invariant(t.status==='blocked'&&input.evidence,'Blocked task and reconciliation evidence required');t.status='ready';t.blocked=undefined;core.event(s,'reconciled',{id:t.id,evidence:input.evidence});});break;
- case 'invalidate':await store.transaction(s=>{core.invalidateTree(s,input.id,input.reason);});break;
- case 'configure':await store.transaction(s=>{for(const key of ['maxWorkers','flashRepairCycles','deepRepairCycles'] as const)if(input[key]!==undefined){core.invariant(Number.isInteger(input[key])&&input[key]>0,`Invalid ${key}`);s.config[key]=input[key];}core.event(s,'configured',s.config);});break;
+ case 'invalidate':await core.invalidate(store,input);break;
+ case 'configure':await core.configure(store,input);break;
  case 'pools':await store.transaction(s=>{core.invariant(Array.isArray(input.pools),'pools array required');for(const pool of input.pools)core.invariant(typeof pool.role==='string'&&Array.isArray(pool.models)&&pool.models.length&&pool.models.every((m:unknown)=>typeof m==='string')&&Array.isArray(pool.requiredInputs)&&typeof pool.requiresTools==='boolean'&&typeof pool.notes==='string','Invalid model pool');s.modelPools=input.pools;core.event(s,'pools-configured',{roles:input.pools.map((p:core.ModelPool)=>p.role)});});break;
  default:throw new Error('Unknown operation: '+operation);
  }
  return core.next(store);
 }
 export async function main(args=process.argv.slice(2)){
- const argv=stripFlags(args);
+ const attached=args.includes(attachedFlag),argv=stripFlags(args).filter(a=>a!==attachedFlag);
  const [operation,workspace,runId]=argv;
- if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export'].includes(operation))return executeMain(argv);
+ if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export','wait'].includes(operation))return executeMain(argv);
  const store=new core.Store(workspace,runId),operationTrace=await trace(store.root,'cli:'+operation,{runId});
- try{const value=await executeMain(argv);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
+ try{const value=await executeMain(argv,attached);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().then(value=>console.log(renderResult(stripFlags(process.argv.slice(2))[0]??'',value,humanRequested(process.argv.slice(2),process.stdout.isTTY)))).catch(e=>{console.error(JSON.stringify({error:e.message}));process.exitCode=1;});

@@ -4,6 +4,7 @@ import { Store, taskOf, invariant, hash, family, fingerprint, event, conflict, a
 import type { Run } from './core.ts';
 import { catalog } from './adapters.ts';
 import { loadModelConfig, configPath } from './config.ts';
+import { recentSpeeds, slowModels } from './telemetry.ts';
 
 export type RoutingRequest = { role?:string; requiredInputs?:string[]; contextTokens?:number; evidence?:string };
 type Purpose = 'worker'|'reviewer';
@@ -77,6 +78,10 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
  if(purpose==='reviewer')eligible=eligible.filter((m:any)=>family(m.id)!==t.family);
  const responsive=eligible.filter((m:any)=>!cooling(s,m.id,config.providerCooldownMs));
  if(responsive.length)eligible=responsive;
+ const slow=config.slowModelWindowMs?slowModels(await recentSpeeds(store.amaleDir,config.slowModelWindowMs)).filter(m=>m.role===purpose):[];
+ const brisk=eligible.filter((m:any)=>!slow.some(x=>x.model===m.id));
+ const skippedSlow=brisk.length&&brisk.length<eligible.length?slow.filter(x=>eligible.some((m:any)=>m.id===x.model)).map(x=>({model:x.model,averageMinutes:x.averageMinutes,medianMinutes:x.medianMinutes})):[];
+ if(skippedSlow.length)eligible=brisk;
  if(!eligible.length)return {action:'route-blocked',reason:`No configured model is routable for this ${purpose}. Configured in ${configPath()}: ${listed.join(', ')}.`
   +(absent.length?` Absent from the OpenRouter catalog: ${absent.join(', ')}.`:'')
   +(unfit.length?` Lacking tool support, the required input modalities (${inputs.join(', ')}) or ${request.contextTokens??0} context tokens: ${unfit.join(', ')}.`:'')
@@ -96,10 +101,10 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
   const prior=current.decisions.filter(d=>(d.state as any)?.routing?.models).length;
   const index=(parseInt(hash(current.id).slice(0,8),16)+prior)%eligible.length;
   const choice=`model_${index}`;
-  const state={routing:{key,models,scope},rotation:{seed:'run-session-hash',priorRoutes:prior,index,eligible:eligible.length},task:{goal:t.goal,criteria:t.criteria,kind:t.kind,depth:t.depth},purpose,
+  const state={routing:{key,models,scope},skippedSlow,rotation:{seed:'run-session-hash',priorRoutes:prior,index,eligible:eligible.length},task:{goal:t.goal,criteria:t.criteria,kind:t.kind,depth:t.depth},purpose,
    poolNotes:pool?.notes,evidence:request.evidence,catalog:{verifiedAt:cards.verifiedAt,source:cards.source,models:eligible}};
   const made={id:decisionId,question:'Deterministic round-robin rotation across eligible models, seeded by the run session hash',criteria,state,revision:current.revision,choice,source:'runtime:round-robin',confidence:1};
-  current.decisions.push(made);event(current,'model-routed',{id:decisionId,taskId:id,purpose,eligible:eligible.map((m:any)=>m.id),choice,model:models[choice],source:'runtime:round-robin'});
+  current.decisions.push(made);event(current,'model-routed',{id:decisionId,taskId:id,purpose,eligible:eligible.map((m:any)=>m.id),skippedSlow:skippedSlow.map(x=>x.model),choice,model:models[choice],source:'runtime:round-robin'});
   return made;
  });
  return resolve(decision);

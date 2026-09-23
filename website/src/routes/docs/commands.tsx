@@ -231,13 +231,17 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             invalidate
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Invalidates a task and its dependents when an accepted assumption or piece of evidence changes. Repair ancestry remains.
+            Invalidates a task and its dependents when an accepted assumption or piece of evidence changes. Repair ancestry remains, and the reopen spends a repair cycle. Reopening a delivered task needs the probe that found the defect as <span class="font-mono text-xs text-base-content">check</span>; it joins the task's checks and runs on every later repair. Pass <span class="font-mono text-xs text-base-content">noProbe</span> with a reason when no executable can show the defect.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>input.json</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{ "id": "charge", "reason": "which accepted assumption/evidence changed" }`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{
+  "id": "charge",
+  "reason": "which accepted assumption/evidence changed",
+  "check": { "id": "totals", "command": "bun", "args": ["test", "test/charge.test.js"] }
+}`}</code></pre>
           </figure>
 
           <h3 id="record-decision" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
@@ -298,7 +302,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             delegate-batch
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Delegates every ready chunk in one invocation, bounded by <span class="font-mono text-xs text-base-content">maxWorkers</span>. Each task needs its own isolated checkout. Returns <span class="font-mono text-xs text-base-content">{'{ delegated, concurrency, outcomes }'}</span> with outcomes in input order; one chunk failing never stops the others.
+            Delegates every ready chunk in one invocation, bounded by <span class="font-mono text-xs text-base-content">maxWorkers</span>. Each task needs its own isolated checkout, and <span class="font-mono text-xs text-base-content">briefs</span> carries extra guidance for single chunks. The batch runs in a detached process, so the call returns within seconds with <span class="font-mono text-xs text-base-content">{'{ launched, pid, ids, cursor, log }'}</span>. Follow it with <span class="font-mono text-xs text-base-content">wait</span>. The final outcomes land in <span class="font-mono text-xs text-base-content">log</span>; one chunk failing never stops the others.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -306,10 +310,24 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             </div>
             <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{
   "ids": ["hero", "docs", "pricing"],
+  "briefs": { "hero": "optional guidance for this chunk only" },
   "lenses": ["optional review lenses"],
   "skills": ["optional shared skill"],
   "references": ["optional shared contract"]
 }`}</code></pre>
+          </figure>
+
+          <h3 id="wait" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
+            wait
+          </h3>
+          <p class="mt-3 text-sm leading-relaxed text-dim">
+            Follows a running batch. Returns as soon as a chunk finishes, a batch process is gone, nothing is running, or the timeout passes. The outcome is <span class="font-mono text-xs text-base-content">finished</span>, <span class="font-mono text-xs text-base-content">interrupted</span>, <span class="font-mono text-xs text-base-content">idle</span> or <span class="font-mono text-xs text-base-content">still-running</span>, with the finished chunks, a new cursor and the next action. Pass the cursor back on the next call and keep going until it reports idle.
+          </p>
+          <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
+            <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
+              <span>input.json</span>
+            </div>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{ "after": 812, "timeoutMs": 100000 }`}</code></pre>
           </figure>
         </section>
 
@@ -376,7 +394,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             route
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Selects a worker or reviewer model. Selection is deterministic round-robin across eligible models, seeded by the run's session hash. A model that exhausted retries is skipped for five minutes. Finding no eligible candidates returns <span class="font-mono text-xs text-base-content">route-blocked</span>.
+            Selects a worker or reviewer model. Selection is deterministic round-robin across eligible models, seeded by the run's session hash. A model that exhausted retries is skipped for five minutes, and a model measured at least twice as slow as its role's median is skipped for that role until its slow calls age out of <span class="font-mono text-xs text-base-content">slowModelWindowMs</span>. Finding no eligible candidates returns <span class="font-mono text-xs text-base-content">route-blocked</span>.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -643,13 +661,13 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             configure
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Sets positive integer values for operational limits.
+            Sets positive integer values for operational limits. <span class="font-mono text-xs text-base-content">maxWorkers</span> changes freely. The repair budget is the user's policy, so changing <span class="font-mono text-xs text-base-content">flashRepairCycles</span> or <span class="font-mono text-xs text-base-content">deepRepairCycles</span> needs <span class="font-mono text-xs text-base-content">userInstruction</span> quoting the user's request.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>input.json</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{ "maxWorkers": 4, "flashRepairCycles": 2, "deepRepairCycles": 1 }`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`{ "maxWorkers": 4, "flashRepairCycles": 3, "userInstruction": "Give Flash three tries before Kimi" }`}</code></pre>
           </figure>
 
           <h3 id="block" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
@@ -855,7 +873,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             health
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Standalone health check. Measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host-action ceremony and model-family distribution — and emits warnings. <span class="font-mono text-xs text-base-content">finish</span> reads the same warnings and refuses on them. No input required.
+            Standalone health check. Measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host-action ceremony and model-family distribution — and emits warnings. <span class="font-mono text-xs text-base-content">finish</span> reads the same warnings and refuses on them. It also reports each model's speed per role and names any model at least twice as slow as the median for its role; a slow model never blocks <span class="font-mono text-xs text-base-content">finish</span>. No input required.
           </p>
         </section>
 

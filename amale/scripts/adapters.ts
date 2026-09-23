@@ -3,11 +3,11 @@ import { join, delimiter, dirname, basename, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
-import { invariant, execute, Store, event, claim, result, review, packet, fingerprint, taskOf, family, acquireActivity, releaseActivity, activitySpawned, reviewObligations } from './core.ts';
+import { invariant, execute, Store, event, claim, result, review, packet, fingerprint, taskOf, family, acquireActivity, releaseActivity, activitySpawned, reviewObligations, reopenReasons } from './core.ts';
 import type { Decision, Command, Guidance } from './core.ts';
 import { selectModel, consumeRoute } from './routing.ts';
 import type { RoutingRequest } from './routing.ts';
-import { trace, registerSecret, sanitize } from './telemetry.ts';
+import { trace, registerSecret, sanitize, recordSpeed } from './telemetry.ts';
 import { jsRuntime } from './runtime.ts';
 import { jevModel, isAlias, loadModelConfig } from './config.ts';
 
@@ -74,8 +74,9 @@ const codedFailure=/\b(408|409|429|500|502|503|504|529)\b/;
 const transientWording=/rate.?limit|temporarily|overload|unavailable|timed? ?out|Provider returned error|Internal Server Error/i;
 const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits/i;
 export const transientProvider=(message:string)=>!settledProvider.test(message)&&((codedFailure.test(message)&&transientWording.test(message))||transientWithoutCode.test(message));
-export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;onSpawn?:(pid:number)=>Promise<void>;attempts?:number;idleTimeoutMs?:number}){
+export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;speedDir?:string;onSpawn?:(pid:number)=>Promise<void>;attempts?:number;idleTimeoutMs?:number}){
  const telemetry=await trace(input.diagnosticRoot,'pi',{model:input.model,workspace:input.workspace,readOnly:!!input.readOnly,sessionDir:input.sessionDir});
+ const started=Date.now();let outputTokens=0;
  try{
   const config=await loadModelConfig();
   const attempts=input.attempts??config.launchAttempts;
@@ -101,7 +102,7 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
      if(!Array.isArray(item.message.content)||item.message.content.some((c:any)=>!c||typeof c.type!=='string'||(c.type==='text'&&typeof c.text!=='string'))||typeof item.message.model!=='string'){protocolError='pi assistant event has invalid model/content shape';record('protocol-error',{reason:protocolError});return;}
      actual=item.message.model??actual;text=(item.message.content??[]).filter((c:any)=>c.type==='text').map((c:any)=>c.text).join('\n');
      if(['error','aborted','length'].includes(item.message.stopReason)||item.message.errorMessage)providerError=String(item.message.errorMessage??`Assistant stopped: ${item.message.stopReason}`);
-     const usage=item.message.usage;if(usage)record('usage',{inputTokens:usage.input,outputTokens:usage.output,cacheRead:usage.cacheRead,cacheWrite:usage.cacheWrite,cost:usage.cost?.total,costSource:'pi-estimate',model:actual});
+     const usage=item.message.usage;if(usage)outputTokens+=Number(usage.output)||0;if(usage)record('usage',{inputTokens:usage.input,outputTokens:usage.output,cacheRead:usage.cacheRead,cacheWrite:usage.cacheWrite,cost:usage.cost?.total,costSource:'pi-estimate',model:actual});
     }
    };
    child.stdout.on('data',data=>{buffer+=data;let newline;while((newline=buffer.indexOf('\n'))>=0){parse(buffer.slice(0,newline).replace(/\r$/,''));buffer=buffer.slice(newline+1);}});
@@ -146,7 +147,9 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     await new Promise(r=>setTimeout(r,1000*attempt));
    }
   }
-  await telemetry.end('success',{model:output.model});return output;
+  await telemetry.end('success',{model:output.model});
+  if(input.speedDir)await recordSpeed(input.speedDir,{at:new Date(started).toISOString(),model:input.model,role:input.readOnly?'reviewer':'worker',ms:Date.now()-started,outputTokens}).catch(()=>{});
+  return output;
  }catch(error){await telemetry.end('failed',{message:(error as Error).message});throw error;}
 }
 const guidanceRoots=()=>[join(homedir(),'.claude','skills'),join(process.env.CODEX_HOME??join(homedir(),'.codex'),'skills')];
@@ -182,10 +185,12 @@ export async function worker(store:Store,id:string,input:{workspace:string;model
  const jev=join(dirname(fileURLToPath(import.meta.url)),'jev.ts'),runId=basename(store.root),runtime=await jsRuntime();
  const brief=input.brief??'Own this task end to end: satisfy every criterion and make the registered checks pass, stay within the allowed scope and resources, and do not add hypothetical features.';
  const guidance=await guidanceBlock(t.workspace??input.workspace,{skills:input.skills??t.skills,references:input.references??t.references});
+ const reopened=reopenReasons(s,id);
  const briefPath=await handoffFile(store,id,'brief.md',[`# Task ${id}\n\n## Your brief\n${brief}`,
+  reopened.length?`## Why this task was reopened\nIt was accepted before and then sent back. Fix each defect below and keep the rest of the accepted work as it is; a fresh reviewer verifies each one against the actual artifact.\n${reopened.map(r=>`- ${r}`).join('\n')}`:'',
   `## Task and run context\n\`\`\`json\n${JSON.stringify(context,null,1)}\n\`\`\``,guidance].filter(Boolean).join('\n\n'));
  const prompt=`You are an Amale worker owning this task end to end within the supplied workspace. Do not invoke other skills or delegate. Do not add hypothetical features.\nYour brief, the run context and any binding guidance are in "${briefPath}". Read that file in full before you touch anything, and follow it as part of your instructions. It sits outside your workspace: read it, never edit it, never copy it in.\nWhen you face an uncertain semantic choice inside this task (approach, trade-off, interpretation), consult Jev instead of guessing or stalling: "${runtime}" "${jev}" "${s.workspace}" ${runId} ${id} "<question>" "<optionA>|<optionB>|...". Follow its choice; on low confidence pick the safest option, record why, and continue. Return actual changed artifacts, checks and unresolved issues.`;
- await claim(store,id,{...input,model,pid:process.pid,routeDecisionId:route.decisionId});try{const out=await piRun({...input,model,prompt,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});if(transientProvider(t.blocked))event(s,'provider-unavailable',{model,family:family(model),taskId:id,purpose:'worker'});});throw e;}
+ await claim(store,id,{...input,model,pid:process.pid,routeDecisionId:route.decisionId});try{const out=await piRun({...input,model,prompt,diagnosticRoot:store.root,speedDir:store.amaleDir,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});if(transientProvider(t.blocked))event(s,'provider-unavailable',{model,family:family(model),taskId:id,purpose:'worker'});});throw e;}
 }
 // Factual projection: never forward author output, verdicts or decision rationale.
 export async function reviewPacket(store:Store,id:string,lenses:string[]=[]){
@@ -243,7 +248,7 @@ export async function reviewer(store:Store,id:string,model:string|undefined,lens
  try{
  let correction='',lastFormatError='';
  for(let attempt=1;;attempt++){
-  const out=await piRun({workspace:t.workspace,model,prompt:prompt+correction,diagnosticRoot:store.root,sessionDir:join(store.root,'sessions',id+'-review-'+Date.now()),readOnly:true,onSpawn:pid=>activitySpawned(store,id,operation,pid)});
+  const out=await piRun({workspace:t.workspace,model,prompt:prompt+correction,diagnosticRoot:store.root,speedDir:store.amaleDir,sessionDir:join(store.root,'sessions',id+'-review-'+Date.now()),readOnly:true,onSpawn:pid=>activitySpawned(store,id,operation,pid)});
   try{
    const report=reviewReport(out.text);
    await review(store,id,{model,findings:report.findings,coverage:report.coverage,report:report.report,fingerprint:fp});

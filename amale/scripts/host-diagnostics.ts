@@ -2,7 +2,8 @@ import {mkdir,writeFile,readdir,readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {Store,invariant} from './core.ts';
-import {sanitize,diagnostics} from './telemetry.ts';
+import {sanitize,diagnostics,modelSpeed,slowModels,recentSpeeds,readSpeedSamples} from './telemetry.ts';
+import {loadModelConfig} from './config.ts';
 
 const kinds=['decision','worker','review','edit','check','integration','permission','other'] as const;
 const phases=['planned','permission-granted','permission-denied','started','completed','failed','skipped'] as const;
@@ -25,7 +26,7 @@ export async function hostActions(store:Store){
 }
 // Process health: measurable anti-patterns that reveal the coordinator doing
 // the work itself instead of delegating, or model usage fixating on one family.
-export async function processHealth(store:Store):Promise<{available:false;reason:string}|{available:true;metrics:Record<string,unknown>;warnings:string[]}> {
+export async function processHealth(store:Store):Promise<{available:false;reason:string}|{available:true;slowModels:string[];metrics:Record<string,unknown>;warnings:string[]}> {
  const runtime=await diagnostics(store.root),ledger=await hostActions(store);
  let s:Awaited<ReturnType<Store['load']>>;
  try{s=await store.load();}catch(error){return {available:false,reason:(error as Error).message};}
@@ -43,6 +44,12 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  const revisionBudget=15,retryBudget=5;
  const retries=s.events.filter(e=>e.type==='provider-failover'||e.type==='repair').length;
  const revisionAllowance=revisionBudget*tasks+retryBudget*retries;
+ const loopSteps=['cli:worker','cli:reviewer','cli:repair','cli:accept'];
+ const manualSteps=runtime.operations.filter(o=>loopSteps.includes(o.operation)).length;
+ const reopened=s.events.filter(e=>e.type==='invalidated').length;
+ const windowMs=await loadModelConfig().then(c=>c.slowModelWindowMs).catch(()=>0);
+ const speeds=windowMs?await recentSpeeds(store.amaleDir,windowMs):modelSpeed(await readSpeedSamples(store.amaleDir)),slow=slowModels(speeds);
+ const skipNote=(role:string)=>windowMs?` Routing skips it as ${role} while this holds over the last ${Math.round(windowMs/86400000*10)/10} day(s), unless no other model is eligible.`:' slowModelWindowMs is 0, so routing still uses it.';
  const warnings:string[]=[];
  if(tasks&&coordinatorDecisions.length>2*tasks)warnings.push(`${coordinatorDecisions.length} coordinator-authored Jev decisions across ${tasks} task(s): micro-decision pattern. Delegate chunks and let workers consult Jev through the worker helper.`);
  if(claims.length>0&&delegations.length===0)warnings.push(`${claims.length} worker dispatch(es) without any delegate run: the coordinator is stepping through the worker→check→review→repair loop manually instead of delegating the chunk.`);
@@ -50,8 +57,11 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  if(ledger.records.length>6*Math.max(tasks,1))warnings.push(`${ledger.records.length} host-action records across ${tasks} task(s): recording ceremony is eating coordinator context.`);
  if(claims.length>=3&&dominant&&dominant[1]/claims.length>0.8)warnings.push(`Model usage is fixated on ${dominant[0]} (${dominant[1]}/${claims.length} dispatches): round-robin routing should distribute across eligible families.`);
  if(tasks&&s.revision>revisionAllowance&&(delegations.length<tasks||coordinatorDecisions.length>tasks))warnings.push(`${s.revision} state revisions across ${tasks} task(s) with ${retries} recorded retr${retries===1?'y':'ies'}, above the ${revisionAllowance} a delegated run needs, alongside ${delegations.length} delegation(s) and ${coordinatorDecisions.length} coordinator decision(s). The coordinator is driving the loop turn by turn instead of handing over whole chunks.`);
+ if(tasks&&delegations.length&&manualSteps>tasks)warnings.push(`${manualSteps} worker, reviewer, repair and accept call(s) made by hand across ${tasks} task(s): the coordinator is stepping the chunk loop itself between delegations. Re-delegate the chunk instead.`);
+ if(tasks&&reopened>=Math.max(2,Math.ceil(tasks/2)))warnings.push(`${reopened} invalidation(s) reopened chunks across ${tasks} task(s): the coordinator is finding defects the chunks' own checks cannot see, and each reopening costs a repair cycle and a full chunk round. Register the probe you judge by as a task check before delegating.`);
  if(tasks===1&&s.criteria.length>=3&&!s.events.some(e=>e.type==='single-chunk'))warnings.push(`One task carries ${s.criteria.length} run outcomes: nothing can run in parallel. Split the work into independent chunks, or record a single-chunk reason.`);
- return {available:true,metrics:{tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals},warnings};
+ const slowNotes=slow.map(m=>`${m.model} as ${m.role} averages ${m.averageMinutes} min per call over ${m.calls} calls, ${m.times}× the ${m.medianMinutes} min median for that role: ${m.outputTokensPerSecond} output tokens per second and ${m.outputTokensPerCall} output tokens per call.${skipNote(m.role)}`);
+ return {available:true,slowModels:slowNotes,metrics:{modelSpeed:speeds,tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,manualLoopSteps:manualSteps,reopenedChunks:reopened,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals},warnings};
 }
 // Shareable by explicit user choice: omit all free text, paths, models, raw
 // identifiers, prompts, artifact bodies and original exception messages.

@@ -115,7 +115,7 @@ export default function DocsOverview() {
             Routing and escalation
           </h2>
           <p class="mt-4 text-base leading-relaxed">
-            Worker and reviewer models are chosen by deterministic round-robin across eligible stable Flash families, seeded by the run’s session hash, so work spreads across vendors instead of fixating on one. No Jev call is spent on mechanical selection. A provider that fails its retry budget is skipped for five minutes, which costs capacity rather than the whole run.
+            Worker and reviewer models are chosen by deterministic round-robin across eligible stable Flash families, seeded by the run’s session hash, so work spreads across vendors instead of fixating on one. No Jev call is spent on mechanical selection. A provider that fails its retry budget is skipped for five minutes, which costs capacity rather than the whole run. A model measured at least twice as slow as the median for its role is skipped for that role only, until its slow calls are a week old.
           </p>
           <p class="mt-4 text-base leading-relaxed">
             Only genuine boundaries reach the expensive model: an exhausted repair allowance, missing evidence, or ambiguous intent. Repair escalation is enforced by persistent counters inside the chunk loop, so the coordinator only sees the final escalation.

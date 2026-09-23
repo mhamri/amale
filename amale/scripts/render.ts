@@ -119,7 +119,25 @@ function renderHealth(value: unknown): string {
     ['Retries', text(metrics.retries)],
     ['Worker families', families.join(', ')],
   ]);
-  return warnings.length ? `${body}\n\nWarnings\n${warnings.map((warning) => `- ${warning}`).join('\n')}` : body;
+  const sections = [body, speedTable(metrics.modelSpeed)];
+  if (warnings.length) sections.push(`Warnings\n${warnings.map((warning) => `- ${warning}`).join('\n')}`);
+  sections.push(slowSection(v.slowModels));
+  return sections.filter(Boolean).join('\n\n');
+}
+
+function speedTable(value: unknown): string {
+  const speeds = Array.isArray(value) ? value.map(record) : [];
+  if (!speeds.length) return '';
+  const header = ['Model', 'Role', 'Calls', 'Avg min', 'Longest', 'Tokens/s', 'Tokens/call'];
+  const body = speeds.map((s) => [text(s.model), text(s.role), text(s.calls), text(s.averageMinutes), text(s.longestMinutes), text(s.outputTokensPerSecond), text(s.outputTokensPerCall)]);
+  const widths = header.map((_, column) => Math.max(header[column].length, ...body.map((row) => row[column].length)));
+  const line = (cells: string[]) => cells.map((cell, column) => cell.padEnd(widths[column])).join('  ').trimEnd();
+  return `Model speed\n${[header, ...body].map(line).join('\n')}`;
+}
+
+function slowSection(value: unknown): string {
+  const slow = Array.isArray(value) ? value.map(text) : [];
+  return slow.length ? `Slow models\n${slow.map((note) => `- ${note}`).join('\n')}` : '';
 }
 
 function renderNext(value: unknown): string {
@@ -146,7 +164,7 @@ function renderDiagnose(value: unknown): string {
   const healthSummary = health.available === true
     ? `${Array.isArray(health.warnings) ? health.warnings.length : 0} warning(s)`
     : text(health.reason);
-  return report(`Diagnostics for ${text(state.run)}${v.stateError ? ' — state unreadable' : ''}`, [
+  const body = report(`Diagnostics for ${text(state.run)}${v.stateError ? ' — state unreadable' : ''}`, [
     ['State error', text(v.stateError)],
     ['Intent', text(state.intent)],
     ['Host', `${text(record(state.host).kind)} / ${text(record(state.host).model)}`],
@@ -158,6 +176,7 @@ function renderDiagnose(value: unknown): string {
     ['Host actions', `${records} recorded, ${unreadable} unreadable`],
     ['Health', healthSummary],
   ]);
+  return [body, slowSection(health.slowModels)].filter(Boolean).join('\n\n');
 }
 
 function renderPreflight(value: unknown): string {

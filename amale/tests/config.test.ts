@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadModelConfig, configPath, isAlias, jevModel } from '../scripts/config.ts';
 
-const valid={flash:['a/one','b/two'],deep:['c/deep'],jev:'typesafe/jev-1.13',providerCooldownMs:300000,providerFailovers:3,launchAttempts:3,idleTimeoutMs:900000};
+const valid={flash:['a/one','b/two'],deep:['c/deep'],jev:'typesafe/jev-1.13',providerCooldownMs:300000,providerFailovers:3,launchAttempts:3,idleTimeoutMs:900000,slowModelWindowMs:604800000};
 async function written(t:any,value:unknown){
  const dir=await mkdtemp(join(tmpdir(),'amale-config-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const path=join(dir,'models.json');await writeFile(path,typeof value==='string'?value:JSON.stringify(value));
@@ -39,7 +39,8 @@ test('each field is validated with a message naming the field and the file',asyn
   [{...valid,providerFailovers:0},/providerFailovers in .* must be a whole number between 1 and 10/],
   [{...valid,launchAttempts:9},/launchAttempts in .* must be a whole number between 1 and 5/],
   [{...valid,providerCooldownMs:1.5},/providerCooldownMs in .* must be a whole number/],
-  [{...valid,idleTimeoutMs:-1},/idleTimeoutMs in .* must be a whole number between 0 and 7200000/]];
+  [{...valid,idleTimeoutMs:-1},/idleTimeoutMs in .* must be a whole number between 0 and 7200000/],
+  [{...valid,slowModelWindowMs:undefined},/slowModelWindowMs in .* must be a whole number between 0 and 2592000000/]];
  for(const [value,message] of cases){const path=await written(t,value);await assert.rejects(()=>loadModelConfig(path),message);}
 });
 

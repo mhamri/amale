@@ -10,7 +10,7 @@ export type Check = Command & { id:string };
 export type Finding = { id:string; lens:string; location:string; scenario:string; evidence:string; consequence:string; blocking:boolean; disposition?:'open'|'resolved'|'refuted'; resolution?:string };
 export type ReviewCoverage = { id:string; status:'covered'|'finding'|'unreviewed'|'not-applicable'; evidence:string };
 export type Guidance = { skills?:string[]; references?:string[] };
-export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
+export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;coordinatorPid?:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
 export type Decision = { purpose?:'requirement'|'workflow'; id:string; question:string; criteria:Record<string,string>; state:unknown; revision:number; choice?:string; source?:string; confidence?:number; reason?:string; artifact?:string };
 export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'>;
 export type ModelPool = { role:string; models:string[]; requiredInputs:string[]; requiresTools:boolean; notes:string };
@@ -32,17 +32,32 @@ export async function fingerprint(workspace:string):Promise<string>{
  const entries:string[]=[]; async function walk(dir:string){for(const ent of (await readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){if(ignored.has(ent.name))continue;const path=join(dir,ent.name),name=relative(workspace,path).split(sep).join('/');if(ent.isSymbolicLink()){const {readlink}=await import('node:fs/promises');entries.push(`${name}:link:${await readlink(path)}`);}else if(ent.isDirectory())await walk(path);else if(ent.isFile())entries.push(`${name}:${hash((await readFile(path)).toString('base64'))}`);}}await walk(workspace);return hash(entries.join('\n'));
 }
 export class Store {
- root:string;
- constructor(workspace:string,runId:string){idCheck(runId);this.root=join(resolve(workspace),'.amale','runs',runId);}
+ root:string;amaleDir:string;
+ constructor(workspace:string,runId:string){idCheck(runId);this.amaleDir=join(resolve(workspace),'.amale');this.root=join(this.amaleDir,'runs',runId);}
  async load():Promise<Run>{const names=(await readdir(this.root)).filter(n=>/^revision-\d{9}\.json$/.test(n)).sort();invariant(names.length,'Run not found');const state=JSON.parse(await readFile(join(this.root,names.at(-1)!), 'utf8'));invariant(state.schema===1,'Unsupported run schema');validateTasks(state.tasks);return state;}
  async artifact(data:unknown):Promise<string>{await mkdir(join(this.root,'artifacts'),{recursive:true});const text=typeof data==='string'?data:JSON.stringify(data,null,2),id=hash(text);await writeFile(join(this.root,'artifacts',id+'.json'),text,{flag:'wx'}).catch((e)=>{if(e.code!=='EEXIST')throw e;});return id;}
  async readArtifact(id:string){invariant(/^[a-f0-9]{64}$/.test(id),'Invalid artifact ID');return readFile(join(this.root,'artifacts',id+'.json'),'utf8');}
  async lock(){await mkdir(this.root,{recursive:true});const path=join(this.root,'lock');for(let attempt=0;;attempt++){try{await mkdir(path);break;}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;if(attempt>=100)throw new Error('Run is locked. Inspect owner; unlock only after verifying abandonment.');await new Promise(r=>setTimeout(r,50));}}try{await writeFile(join(path,'owner.json'),JSON.stringify({pid:process.pid,host:hostname()}));}catch(e){await rm(path,{recursive:true});throw e;}return ()=>rm(path,{recursive:true});}
- async unlock(){const path=join(this.root,'lock');const owner=JSON.parse(await readFile(join(path,'owner.json'),'utf8'));invariant(owner.host===hostname(),'Cannot verify remote owner');let alive=true;try{process.kill(owner.pid,0);}catch(e){if((e as NodeJS.ErrnoException).code==='ESRCH')alive=false;}invariant(!alive,'Lock owner is alive');await rm(path,{recursive:true});}
+ async unlock(){const path=join(this.root,'lock');const owner=JSON.parse(await readFile(join(path,'owner.json'),'utf8'));invariant(owner.host===hostname(),'Cannot verify remote owner');invariant(!processAlive(owner.pid),'Lock owner is alive');await rm(path,{recursive:true});}
  async transaction<T>(change:(s:Run)=>Promise<T>|T):Promise<T>{const release=await this.lock();try{const s=await this.load();invariant(s.status!=='complete','Completed run is immutable; start a new run');const result=await change(s);s.revision++;await this.save(s);return result;}finally{await release();}}
  async save(s:Run){const name=`revision-${String(s.revision).padStart(9,'0')}.json`,temp=join(this.root,randomUUID()+'.tmp');await writeFile(temp,JSON.stringify(s,null,2));await rename(temp,join(this.root,name));}
 }
 export function event(s:Run,type:string,detail:unknown){s.events.push({at:new Date().toISOString(),type,detail});}
+export function processAlive(pid:number){try{process.kill(pid,0);return true;}catch(e){return (e as NodeJS.ErrnoException).code!=='ESRCH';}}
+// A remote owner cannot be proven dead from here, so it counts as alive.
+export function ownerAlive(owner:{pid:number;coordinatorPid?:number;host:string}){return owner.host!==hostname()||[owner.pid,owner.coordinatorPid].some(pid=>pid!==undefined&&processAlive(pid));}
+export type OpenDelegation={id:string;pid?:number;host?:string;at:string;alive:boolean};
+export function openDelegations(s:Run):OpenDelegation[]{
+ const open=new Map<string,{pid?:number;host?:string;at:string}>();
+ for(const e of s.events){const d=e.detail as {id:string;pid?:number;host?:string};if(e.type==='delegate-started')open.set(d.id,{pid:d.pid,host:d.host,at:e.at});else if(e.type==='delegate-finished')open.delete(d.id);}
+ const legacyAlive=(id:string)=>{const t=s.tasks.find(t=>t.id===id),owner=t?.activity?.owner??t?.owner;return !!owner&&ownerAlive(owner);};
+ return [...open].map(([id,d])=>({id,...d,alive:d.pid!==undefined&&d.host?ownerAlive({pid:d.pid,host:d.host}):legacyAlive(id)}));
+}
+export function reopenReasons(s:Run,id:string):string[]{
+ let reasons:string[]=[];
+ for(const e of s.events){const d=e.detail as {id?:string;reason?:string};if(d?.id!==id)continue;if(e.type==='accepted')reasons=[];else if(e.type==='invalidated'&&d.reason)reasons.push(d.reason);}
+ return reasons;
+}
 const intentStopwords=new Set(['with','that','this','from','into','when','then','they','them','have','will','make','must','also','only','does','each','over','than','such','been','were','what','which','their','there','using','still']);
 const intentWords=(text:string)=>new Set(text.toLowerCase().split(/[^a-z]+/).filter(w=>w.length>=4&&!intentStopwords.has(w)));
 function intentOverlap(a:Set<string>,b:Set<string>){const smaller=Math.min(a.size,b.size);if(!smaller)return 0;let shared=0;for(const word of a)if(b.has(word))shared++;return shared/smaller;}
@@ -87,25 +102,36 @@ export function reviewObligations(s:Run,t:Task):{id:string;question:string}[]{re
  {id:'boundaries',question:'Trace changed inputs, outputs and affected callers; inspect malformed, empty and rejected inputs, and contract compatibility.'},
  {id:'lifecycle',question:'Trace reachable success, failure, interruption and recovery exits; verify durable evidence, cleanup and terminal ordering.'},
  {id:'parallelism',question:'For actual overlap, retry or shared-state paths, inspect ownership, capacity, conflicts and the complete eligible work frontier.'},
- {id:'integration',question:'Trace affected consumers and integrated outcomes; check deterministic rejection before external effects and verify evidence against the actual artifacts.'}
+ {id:'integration',question:'Trace affected consumers and integrated outcomes; check deterministic rejection before external effects and verify evidence against the actual artifacts.'},
+ ...reopenReasons(s,t.id).map((reason,i)=>({id:`reopened:${i+1}`,question:`Verify against the actual artifact that the defect which reopened this task is gone: ${reason}`}))
 ];}
+const ownObligation=/^(criterion|reopened):/;
 function validateReviewCoverage(s:Run,t:Task,coverage:ReviewCoverage[],findings:Finding[]=[]){
  const required=reviewObligations(s,t);invariant(Array.isArray(coverage),'Review coverage must be an array');
  const claimed=coverage.filter(c=>c?.status==='finding').map(c=>c.id);
  invariant(!claimed.length||findings.length,`Coverage marks ${claimed.join(', ')} as finding while the findings array is empty; use covered when inspection found no defect, or file the defect as a finding`);
  invariant(coverage.length===required.length&&new Set(coverage.map(c=>c?.id)).size===required.length&&coverage.every(c=>c&&required.some(r=>r.id===c.id)),'Review coverage must include every obligation exactly once; missing, duplicate or unknown IDs');
- for(const c of coverage){invariant(['covered','finding','unreviewed','not-applicable'].includes(c.status)&&typeof c.evidence==='string'&&!!c.evidence.trim(),'Review coverage requires a valid status and nonempty evidence');invariant(c.status!=='not-applicable'||!/^criterion:/.test(c.id),'This task\'s own criteria cannot be not-applicable; they are what it was asked to deliver');}
+ for(const c of coverage){invariant(['covered','finding','unreviewed','not-applicable'].includes(c.status)&&typeof c.evidence==='string'&&!!c.evidence.trim(),'Review coverage requires a valid status and nonempty evidence');invariant(c.status!=='not-applicable'||!ownObligation.test(c.id),'This task\'s own criteria and reopen reasons cannot be not-applicable; they are what it was asked to deliver');}
 }
 export function reviewCoverageDebt(s:Run,t:Task){return reviewObligations(s,t).filter(required=>{
  const matches=t.review?.coverage?.filter(c=>c.id===required.id)??[];
- return matches.length!==1||!matches[0].evidence?.trim()||!(matches[0].status==='covered'||matches[0].status==='not-applicable'&&!/^criterion:/.test(required.id));
+ return matches.length!==1||!matches[0].evidence?.trim()||!(matches[0].status==='covered'||matches[0].status==='not-applicable'&&!ownObligation.test(required.id));
 });}
 async function reviewAction(s:Run,t:Task){if(t.activity)return {action:'await-verification',task:t.id,activity:t.activity}; const unmet=t.deps.filter(id=>taskOf(s,id).status!=='accepted'||!taskOf(s,id).integrated);if(unmet.length)return {action:'reconcile-dependencies',task:t.id,dependencies:unmet}; let fp:string; try{fp=await fingerprint(t.workspace!);}catch(error){if(!workspaceUnavailable(error))throw error;return {action:'reconcile-workspace',task:t.id,workspace:t.workspace,reason:(error as Error).message,recovery:'Restore workspace access, or resume to block affected work while independent tasks continue'};} const missing=t.checks.filter(c=>!t.receipts.some(r=>r.id===c.id&&r.fingerprint===fp&&r.code===0)); if(t.receipts.some(r=>r.code!==0))return {action:'repair-needed',task:t.id}; if(missing.length)return {action:'check',task:t.id,checks:missing}; if(!t.review||t.review.fingerprint!==fp)return {action:'review',tasks:[{id:t.id,author:t.family,workspace:t.workspace}]}; if(t.review.findings.some(f=>f.blocking&&f.disposition==='open'))return {action:'triage-repair',task:t.id,findings:t.review.findings}; const coverage=reviewCoverageDebt(s,t); if(coverage.length)return {action:'review-evidence-needed',task:t.id,obligations:coverage.map(o=>({...o,evidence:t.review?.coverage?.find(c=>c.id===o.id)?.evidence})),reviewArtifact:t.review.artifact}; return {action:'accept',task:t.id};}
-async function nextAction(s:Run,reviewActions:Map<string,Awaited<ReturnType<typeof reviewAction>>>){if(s.status==='complete')return {action:'done',run:s.id,acceptance:s.acceptance};if(s.status==='blocked')return {action:'intervention',reason:s.blocked};const untracked=s.tasks.filter(t=>t.status==='running'&&!t.execution);if(untracked.length)return {action:'reconcile-execution',tasks:untracked.map(t=>t.id),reason:'Legacy running claims lack execution authorization; reconcile live ownership and preserve artifacts before requeueing through worker routing'};if(s.effort?.request)return {action:s.effort.request.status==='running'?'await-host-effort':'execute-host-effort',model:s.effort.model,base:s.effort.base,modes:s.effort.modes,...s.effort.request};const pending=s.decisions.find(d=>!d.choice);if(pending)return {action:'host-decision',decision:pending};if(!s.tasks.length)return {action:'discover-specify-plan',intent:s.intent,criteria:s.criteria};const review=s.tasks.filter(t=>t.status==='review');if(review.length)return reviewActions.get(review[0].id)!;const repair=s.tasks.filter(t=>t.status==='repair');if(repair.length)return {action:'repair',tasks:repair.map(t=>({id:t.id,depth:t.depth,cycles:t.cycles,findings:t.review?.findings.filter(f=>f.blocking&&f.disposition!=='resolved'&&f.disposition!=='refuted')}))};const running=s.tasks.filter(t=>t.status==='running');const ready=s.tasks.filter(t=>t.status==='ready'&&t.deps.every(id=>taskOf(s,id).status==='accepted'&&!!taskOf(s,id).integrated));if(ready.length&&running.length<s.config.maxWorkers)return {action:'route-dispatch',tasks:ready.map(t=>({id:t.id,goal:t.goal,criteria:t.criteria})),available:Math.max(0,s.config.maxWorkers-running.length)};const integrate=s.tasks.filter(t=>t.status==='accepted'&&!t.integrated);if(integrate.length)return {action:'integrate',tasks:integrate.map(t=>t.id)};if(running.length)return {action:'await-workers',tasks:running.map(t=>({id:t.id,owner:t.owner}))};const blocked=s.tasks.filter(t=>t.status==='blocked');if(blocked.length)return {action:'resolve-blockers',tasks:blocked.map(t=>({id:t.id,reason:t.blocked}))};return {action:'verify-feature',criteria:s.criteria,checks:s.integrationChecks};}
+async function nextAction(s:Run,reviewActions:Map<string,Awaited<ReturnType<typeof reviewAction>>>){if(s.status==='complete')return {action:'done',run:s.id,acceptance:s.acceptance};if(s.status==='blocked')return {action:'intervention',reason:s.blocked};const untracked=s.tasks.filter(t=>t.status==='running'&&!t.execution);if(untracked.length)return {action:'reconcile-execution',tasks:untracked.map(t=>t.id),reason:'Legacy running claims lack execution authorization; reconcile live ownership and preserve artifacts before requeueing through worker routing'};const orphaned=activeTasks(s).filter(t=>{const owner=t.activity?.owner??t.owner;return !!owner&&!ownerAlive(owner);});if(orphaned.length)return {action:'resume',tasks:orphaned.map(t=>t.id),reason:'The recorded owner of this work is no longer running; resume to reconcile it before trusting its status'};if(s.effort?.request)return {action:s.effort.request.status==='running'?'await-host-effort':'execute-host-effort',model:s.effort.model,base:s.effort.base,modes:s.effort.modes,...s.effort.request};const pending=s.decisions.find(d=>!d.choice);if(pending)return {action:'host-decision',decision:pending};if(!s.tasks.length)return {action:'discover-specify-plan',intent:s.intent,criteria:s.criteria};const review=s.tasks.filter(t=>t.status==='review');if(review.length)return reviewActions.get(review[0].id)!;const repair=s.tasks.filter(t=>t.status==='repair');if(repair.length)return {action:'repair',tasks:repair.map(t=>({id:t.id,depth:t.depth,cycles:t.cycles,findings:t.review?.findings.filter(f=>f.blocking&&f.disposition!=='resolved'&&f.disposition!=='refuted')}))};const running=s.tasks.filter(t=>t.status==='running');const ready=s.tasks.filter(t=>t.status==='ready'&&t.deps.every(id=>taskOf(s,id).status==='accepted'&&!!taskOf(s,id).integrated));if(ready.length&&running.length<s.config.maxWorkers)return {action:'route-dispatch',tasks:ready.map(t=>({id:t.id,goal:t.goal,criteria:t.criteria})),available:Math.max(0,s.config.maxWorkers-running.length)};const integrate=s.tasks.filter(t=>t.status==='accepted'&&!t.integrated);if(integrate.length)return {action:'integrate',tasks:integrate.map(t=>t.id)};if(running.length)return {action:'await-workers',tasks:running.map(t=>({id:t.id,owner:t.owner}))};const blocked=s.tasks.filter(t=>t.status==='blocked');if(blocked.length)return {action:'resolve-blockers',tasks:blocked.map(t=>({id:t.id,reason:t.blocked}))};return {action:'verify-feature',criteria:s.criteria,checks:s.integrationChecks};}
 export const activeTasks=(s:Run)=>s.tasks.filter(t=>t.status==='running'||!!t.activity);
 export async function acquireActivity(store:Store,id:string,kind:'check'|'review',checkId?:string,beforeStart?:(s:Run)=>void|Promise<void>){return store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='review'&&t.workspace,'Task not awaiting verification');invariant(!t.activity,'Task verification already active');const live=activeTasks(s);invariant(live.length<s.config.maxWorkers,'Worker capacity reached');invariant(!live.some(other=>conflict(t,other)),'Conflicting live task');await beforeStart?.(s);const operation=randomUUID();t.activity={kind,checkId,owner:{pid:process.pid,coordinatorPid:process.pid,host:hostname(),operation}};event(s,'activity-started',{id,...t.activity});return operation;});}
 export async function activitySpawned(store:Store,id:string,operation:string,pid:number){await store.transaction(s=>{const activity=taskOf(s,id).activity;invariant(activity?.owner.operation===operation,'Verification ownership changed');activity.owner.pid=pid;});}
 export async function releaseActivity(store:Store,id:string,operation:string){await store.transaction(s=>{const t=taskOf(s,id);if(t.activity?.owner.operation===operation){t.activity=undefined;event(s,'activity-finished',{id,operation});}});}
+export async function configure(store:Store,input:Partial<Run['config']>&{userInstruction?:string}){await store.transaction(s=>{
+ const keys=(['maxWorkers','flashRepairCycles','deepRepairCycles'] as const).filter(key=>input[key]!==undefined);
+ for(const key of keys)invariant(Number.isInteger(input[key])&&input[key]!>0,`Invalid ${key}`);
+ const budget=keys.filter(key=>key!=='maxWorkers'&&input[key]!==s.config[key]);
+ const userInstruction=typeof input.userInstruction==='string'?input.userInstruction.trim():'';
+ invariant(!budget.length||userInstruction,`The repair budget is the user's policy: changing ${budget.join(' and ')} needs userInstruction quoting the user's explicit request. An escalation is a diagnosis to make, not a reason to buy more cycles`);
+ for(const key of keys)s.config[key]=input[key]!;
+ event(s,'configured',budget.length?{...s.config,userInstruction}:s.config);
+});}
 export function hostExceptionKey(s:Run,t:Task){return hash(JSON.stringify({host:s.host,intent:s.intent,constraints:s.constraints,repairPolicy:{flash:s.config.flashRepairCycles,deep:s.config.deepRepairCycles},task:{id:t.id,goal:t.goal,criteria:t.criteria,checks:t.checks,deps:t.deps,resources:t.resources,kind:t.kind,status:t.status,cycles:t.cycles,depth:t.depth,output:t.output}}));}
 export async function hostException(store:Store,input:{id:string;reason:'user-request'|'repair-escalation';evidence:string}){
  const authorization=randomUUID();await store.transaction(s=>{const t=taskOf(s,input.id);
@@ -137,7 +163,7 @@ export async function claim(store:Store,id:string,input:{workspace:string;model:
   const {consumeWorkerRoute}=await import('./routing.ts');consumeWorkerRoute(s,id,input.model,workspace,input.routeDecisionId);
   t.execution={kind:'routed-worker',authorization:input.routeDecisionId};
  }
- t.workspace=workspace;t.author=input.model;t.family=family(input.model);t.status='running';t.owner={pid:input.pid??process.pid,host:hostname(),operation:randomUUID()};t.receipts=[];t.integrated=undefined;s.integrationReceipts=[];
+ t.workspace=workspace;t.author=input.model;t.family=family(input.model);t.status='running';t.owner={pid:input.pid??process.pid,coordinatorPid:process.pid,host:hostname(),operation:randomUUID()};t.receipts=[];t.integrated=undefined;s.integrationReceipts=[];
  event(s,'claimed',{id,workspace,model:input.model,execution:t.execution,operation:t.owner.operation});
  });
 }
@@ -180,8 +206,9 @@ export async function resume(store:Store,host?:Run['host']){
  await store.transaction(async s=>{
   s.status='active';s.blocked=undefined;
   if(host){invariant(host.kind&&host.model,'Actual resumed host identity required');if(host.model!==s.host.model||host.kind!==s.host.kind){invariant(!s.effort?.request,'Reconcile active effort execution before switching hosts');s.effort=undefined;}event(s,'host-resumed',{previous:s.host,current:host});s.host=host;}
-  for(const t of s.tasks)if(t.status==='running'&&t.owner){let alive=true;if(t.owner.host===hostname()){try{process.kill(t.owner.pid,0);}catch(e){if((e as NodeJS.ErrnoException).code==='ESRCH')alive=false;}}if(!alive){t.status='blocked';t.blocked='Interrupted operation: reconcile artifacts and side effects before requeue';t.owner=undefined;}}
-  for(const t of s.tasks)if(t.activity){const owner=t.activity.owner;let alive=true;if(owner.host===hostname()){alive=[owner.pid,owner.coordinatorPid].filter((pid):pid is number=>pid!==undefined).some(pid=>{try{process.kill(pid,0);return true;}catch(e){return (e as NodeJS.ErrnoException).code!=='ESRCH';}});}if(!alive){event(s,'activity-interrupted',{id:t.id,activity:t.activity});t.activity=undefined;t.status='blocked';t.blocked='Interrupted verification: reconcile artifacts and side effects before requeue';}}
+  for(const t of s.tasks)if(t.status==='running'&&t.owner&&!ownerAlive(t.owner)){t.status='blocked';t.blocked='Interrupted operation: reconcile artifacts and side effects before requeue';t.owner=undefined;}
+  for(const t of s.tasks)if(t.activity&&!ownerAlive(t.activity.owner)){event(s,'activity-interrupted',{id:t.id,activity:t.activity});t.activity=undefined;t.status='blocked';t.blocked='Interrupted verification: reconcile artifacts and side effects before requeue';}
+  for(const d of openDelegations(s))if(!d.alive)event(s,'delegate-finished',{id:d.id,outcome:'interrupted'});
   const stale:string[]=[],unavailable:{id:string;reason:string}[]=[];for(const t of s.tasks)if(['review','accepted'].includes(t.status)&&t.workspace){try{const fp=await fingerprint(t.workspace);if(t.status==='accepted'&&t.fingerprint!==fp)stale.push(t.id);}catch(error){if(!workspaceUnavailable(error))throw error;unavailable.push({id:t.id,reason:(error as Error).message});}}
   for(const fault of unavailable)if(['review','accepted'].includes(taskOf(s,fault.id).status))quarantineWorkspace(s,fault.id,fault.reason);
   for(const id of stale)if(taskOf(s,id).status==='accepted')invalidateTree(s,id,'Accepted workspace changed since verification');
@@ -194,7 +221,7 @@ export async function packet(store:Store,id?:string){
  const common={run:s.id,host:s.host,intent:s.intent,criteria:s.criteria,constraints:s.constraints,artifactDirectory:join(store.root,'artifacts')};
  if(t){
   const relevant=new Set([t.id]);const visit=(id:string)=>{for(const dep of taskOf(s,id).deps)if(!relevant.has(dep)){relevant.add(dep);visit(dep);}};visit(t.id);
-  return {...common,task:t,decisions:s.decisions.filter(d=>{
+  return {...common,task:t,reopened:reopenReasons(s,t.id),decisions:s.decisions.filter(d=>{
    const routing=(d.state as any)?.routing;
    // Unscoped intent/technical decisions are retained; never discard them by recency.
    return d.choice&&(!routing?.scope?.taskId||relevant.has(routing.scope.taskId));
@@ -216,6 +243,19 @@ export function invalidateTree(s:Run,id:string,reason:string){
  s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected]});
 }
 
+export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string}){await store.transaction(s=>{
+ const t=taskOf(s,input.id),noProbe=typeof input.noProbe==='string'?input.noProbe.trim():'';
+ invariant(!(input.check&&noProbe),'Pass check or noProbe, not both');
+ if(t.output||t.review)invariant(input.check||noProbe,`Reopening ${t.id} needs the probe that found the defect: pass check with the executable that shows it, so every later repair of this task runs it too, or noProbe naming why no executable can show it`);
+ if(input.check){
+  idCheck(input.check.id);validCommand(input.check);
+  const same=t.checks.find(c=>c.id===input.check!.id);
+  invariant(!same||JSON.stringify([same.command,same.args])===JSON.stringify([input.check.command,input.check.args]),`Task ${t.id} already has a different check named ${input.check.id}`);
+  if(!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args});
+ }
+ invalidateTree(s,input.id,input.reason);
+ if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
+});}
 export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');invalidateTree(s,input.id,input.reason);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
 
 export type ParallelAction={task:string;action:string;workspace?:string;resources:string[];checks?:Check[];[key:string]:unknown};
@@ -239,5 +279,5 @@ export async function next(store:Store){
  for(const item of actions){const t=taskOf(s,item.task);if(!['check','review'].includes(item.action??'')||!t.workspace||used.some(other=>conflict(t,other)))continue;
   if(independent.length>=Math.max(0,s.config.maxWorkers-running.length))break;independent.push(item);used.push(t);
  }
- return {...action,parallel:s.status==='active'?{available:Math.max(0,s.config.maxWorkers-running.length),ready:ready.map(t=>({id:t.id,goal:t.goal,resources:t.resources})),running:running.map(t=>({id:t.id,owner:t.activity?.owner??t.owner,kind:t.activity?.kind??'worker'})),actions,independent}:undefined};
+ return {...action,parallel:s.status==='active'?{available:Math.max(0,s.config.maxWorkers-running.length),ready:ready.map(t=>({id:t.id,goal:t.goal,resources:t.resources})),running:running.map(t=>{const owner=t.activity?.owner??t.owner;return {id:t.id,owner,kind:t.activity?.kind??'worker',alive:!!owner&&ownerAlive(owner)};}),delegations:openDelegations(s),actions,independent}:undefined};
 }

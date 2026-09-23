@@ -10,7 +10,7 @@ import { worker, reviewer } from '../scripts/adapters.ts';
 
 const card=(id:string,created:number,images=false)=>({id,created,context_length:64000,architecture:{input_modalities:images?['text','image']:['text']},supported_parameters:['tools'],pricing:{prompt:'0.000001',completion:'0.000002'},description:'Synthetic test card, not a capability benchmark'});
 const cards=[card('deepseek/old-flash',1),card('deepseek/new-flash',3),card('z-ai/glm-new-flash',4),card('moonshot/kimi-specialist',5,true),card('deepseek/preview-flash',9),card('~deepseek/deepseek-flash-latest',10),card('z-ai/glm-flash-latest',11)];
-const testModels={flash:['z-ai/glm-new-flash','deepseek/new-flash'],deep:['moonshot/kimi-specialist'],jev:'typesafe/jev-1.13',providerCooldownMs:300000,providerFailovers:3,launchAttempts:3,idleTimeoutMs:900000};
+const testModels={flash:['z-ai/glm-new-flash','deepseek/new-flash'],deep:['moonshot/kimi-specialist'],jev:'typesafe/jev-1.13',providerCooldownMs:300000,providerFailovers:3,launchAttempts:3,idleTimeoutMs:900000,slowModelWindowMs:604800000};
 async function useModels(t:any,dir:string,overrides:Partial<typeof testModels>={}){
  const path=join(dir,'models.json');await writeFile(path,JSON.stringify({...testModels,...overrides}));
  const old=process.env.AMALE_MODELS;process.env.AMALE_MODELS=path;
@@ -188,6 +188,45 @@ test('every eligible model cooling down still yields a route rather than blockin
  assert.ok(flashPair.includes(route.model));
 });
 
+const trio=['z-ai/glm-new-flash','deepseek/new-flash','deepseek/old-flash'];
+async function eligibleNow(store:c.Store,dir:string,g:ReturnType<typeof gateway>){
+ await store.transaction(s=>{s.decisions=[];});
+ const route=await selectModel(store,'a','worker',dir,{},g.fetcher);
+ assert.equal(route.action,'launch');
+ const d=(await store.load()).decisions[0];
+ return {offered:Object.values((d.state as any).routing.models) as string[],skipped:(d.state as any).skippedSlow as unknown[]};
+}
+async function speedLedger(store:c.Store,minutes:Record<string,number>,at=new Date().toISOString(),role='worker'){
+ const lines=Object.entries(minutes).flatMap(([model,m])=>Array.from({length:3},()=>JSON.stringify({at,model,role,ms:m*60000,outputTokens:1000})));
+ await writeFile(join(store.amaleDir,'model-speed.jsonl'),lines.join('\n')+'\n');
+}
+test('a model slow for its role is skipped until its slow calls age out of the window',async t=>{
+ const {dir,store}=await fixture(t,{flash:trio}),g=gateway();
+ const minutes={'deepseek/new-flash':20,'z-ai/glm-new-flash':5,'deepseek/old-flash':5};
+ await speedLedger(store,minutes);
+ const slow=await eligibleNow(store,dir,g);
+ assert.deepEqual(slow.offered.sort(),['deepseek/old-flash','z-ai/glm-new-flash'],'a model four times slower than the median must not be offered');
+ assert.deepEqual(slow.skipped,[{model:'deepseek/new-flash',averageMinutes:20,medianMinutes:5}]);
+ await speedLedger(store,minutes,new Date(Date.now()-testModels.slowModelWindowMs-60000).toISOString());
+ const aged=await eligibleNow(store,dir,g);
+ assert.deepEqual(aged.offered.sort(),[...trio].sort(),'aged-out slowness must return the model to the rotation');
+ assert.deepEqual(aged.skipped,[]);
+});
+test('slowness measured as a reviewer does not skip the same model as a worker',async t=>{
+ const {dir,store}=await fixture(t,{flash:trio}),g=gateway();
+ await speedLedger(store,{'deepseek/new-flash':20,'z-ai/glm-new-flash':5,'deepseek/old-flash':5},undefined,'reviewer');
+ assert.deepEqual((await eligibleNow(store,dir,g)).offered.sort(),[...trio].sort());
+});
+test('a slow model is still routed when it is the only eligible one, and a zero window turns skipping off',async t=>{
+ const {dir,store}=await fixture(t,{flash:['deepseek/new-flash']}),g=gateway();
+ await speedLedger(store,{'deepseek/new-flash':20,'z-ai/glm-new-flash':5,'deepseek/old-flash':5});
+ const only=await selectModel(store,'a','worker',dir,{},g.fetcher);
+ assert.equal(only.action,'launch');if(only.action!=='launch')throw Error('Expected launch');
+ assert.equal(only.model,'deepseek/new-flash');
+ assert.deepEqual(((await store.load()).decisions[0].state as any).skippedSlow,[]);
+ await useModels(t,dir,{flash:trio,slowModelWindowMs:0});
+ assert.deepEqual((await eligibleNow(store,dir,g)).offered.sort(),[...trio].sort());
+});
 test('concurrent routes advance the rotation instead of all selecting one model',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'amale-rotation-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await useModels(t,dir);
