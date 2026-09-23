@@ -54,6 +54,11 @@ export default function Division() {
             The coordinator holds the direction. Everything inside a chunk runs without it and comes
             back as one outcome to inspect and integrate.
           </p>
+          <p class="mt-4 leading-relaxed text-dim">
+            Brass marks the coordinator sending chunks out to the routed worker models. Violet marks
+            the bounded questions workers put to Jev. Teal marks a chunk reviewed by another family
+            and accepted back.
+          </p>
           <h3 class="mt-10 font-display text-title font-semibold tracking-tight">How it stays cheap.</h3>
           <ul class="mt-4 list-inside list-disc space-y-2 leading-relaxed text-dim">
             {mechanics.map((item) => (
@@ -65,7 +70,7 @@ export default function Division() {
         </div>
         <ModelTopology />
       </div>
-      <div class="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div class="mt-12 grid gap-6 md:grid-cols-2">
         {roles.map((role) => (
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
