@@ -38,8 +38,8 @@ export type ModelIdentity = {
   vendor: string | null;
   /**
    * Tile surface behind a mark that carries no background of its own.
-   * Marks published as filled squares (Anthropic, DeepSeek, MoonshotAI)
-   * cover the tile themselves; OpenAI's blossom is black on transparency and
+   * Marks published as filled squares (Anthropic, DeepSeek, MoonshotAI,
+   * TypeSafe) cover the tile themselves; OpenAI's blossom is black on transparency and
    * MiMo's mark is drawn in currentColor, which resolves to black once the
    * file is loaded into an <image>, so both tiles carry a light surface from
    * the theme to stay legible on the night-ledger background.
@@ -88,8 +88,8 @@ export const MODELS: Record<ModelId, ModelIdentity> = {
     name: 'Jev',
     monogram: 'J',
     hue: 'var(--color-accent)',
-    logo: null,
-    vendor: null,
+    logo: 'models/TypeSafe.png',
+    vendor: 'TypeSafe',
   },
   anthropic: {
     name: 'Anthropic',
