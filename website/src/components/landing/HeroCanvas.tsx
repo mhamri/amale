@@ -16,7 +16,17 @@ type SceneNode = {
   /** Set when the node is a routed model and wears a logo tile. */
   model?: ModelId;
 };
-type SceneLink = { from: number; to: number; role: Role; phase: number };
+type SceneLink = {
+  from: number;
+  to: number;
+  role: Role;
+  phase: number;
+  /** Explicit start point on the source tile's edge, for links routed
+   * around a label box instead of straight between node centres. */
+  exit?: [number, number];
+  /** Explicit end point on the target tile's edge, for the same reason. */
+  entry?: [number, number];
+};
 
 const DESIGN_WIDTH = 16;
 const DESIGN_HEIGHT = 9;
@@ -46,20 +56,40 @@ const NODES: SceneNode[] = [
   { x: 14.9, y: 7.0, r: 0.42, role: 'worker', label: 'Kimi', model: 'kimi' },
 ];
 
+// A straight line between node centres would run through the model-name
+// labels under Claude Code (the Codex and GLM distribution edges), GLM (the
+// Jev consultation) and MiMo (the Kimi escalation). Those four links carry
+// explicit exit/entry points on the tile edges so no glowing line crosses a
+// label box; the rest stay centre to centre, ending under the node rings.
 const LINKS: SceneLink[] = [
   { from: 1, to: 0, role: 'coordinator', phase: 0 },
-  { from: 2, to: 0, role: 'coordinator', phase: 0.5 },
+  // Codex -> coordinator: leaves Codex's bottom edge so the line passes
+  // right of the Claude Code label box instead of through it.
+  { from: 2, to: 0, role: 'coordinator', phase: 0.5, exit: [13.9, 2.56] },
   { from: 0, to: 3, role: 'coordinator', phase: 0.12 },
   { from: 0, to: 6, role: 'coordinator', phase: 0.62 },
-  { from: 1, to: 4, role: 'coordinator', phase: 0.37 },
+  // Claude Code -> GLM: leaves Claude Code's right edge and enters GLM's
+  // top edge, clearing the Claude Code label box under its tile.
+  { from: 1, to: 4, role: 'coordinator', phase: 0.37, exit: [12.26, 2.2], entry: [12.9, 4.24] },
   { from: 2, to: 5, role: 'coordinator', phase: 0.87 },
-  { from: 4, to: 7, role: 'jev', phase: 0.24 },
+  // GLM -> Jev: runs down the two tiles' left edges, clear of the GLM label.
+  { from: 4, to: 7, role: 'jev', phase: 0.24, exit: [12.54, 4.96], entry: [12.54, 6.64] },
   { from: 6, to: 7, role: 'jev', phase: 0.74 },
   { from: 3, to: 4, role: 'review', phase: 0.44 },
   { from: 4, to: 5, role: 'review', phase: 0.94 },
-  { from: 5, to: 8, role: 'worker', phase: 0.3 },
+  // MiMo -> Kimi: runs down the two tiles' right edges, clear of the MiMo label.
+  { from: 5, to: 8, role: 'worker', phase: 0.3, exit: [15.26, 4.96], entry: [15.26, 6.64] },
   { from: 3, to: 0, role: 'review', phase: 0.58 },
   { from: 6, to: 0, role: 'review', phase: 0.08 },
+];
+
+// Effective endpoints of a link: the explicit exit/entry points where given,
+// otherwise the node centres themselves.
+const linkSegment = (link: SceneLink): [number, number, number, number] => [
+  link.exit?.[0] ?? NODES[link.from].x,
+  link.exit?.[1] ?? NODES[link.from].y,
+  link.entry?.[0] ?? NODES[link.to].x,
+  link.entry?.[1] ?? NODES[link.to].y,
 ];
 
 const NODE_COUNT = NODES.length;
@@ -70,6 +100,22 @@ const ARIA_LABEL =
   'Workers put bounded questions to Jev. A model from another Flash family reviews each finished chunk, ' +
   'a chunk that keeps failing its repairs escalates to Kimi, and accepted chunks travel back to the coordinator.';
 
+// Edge hue: each connection borrows the hue of the node it points toward,
+// so every edge reads in the colour of the model it serves. Reviewer and
+// escalation edges keep a teal cast so the verified and escalated flows stay
+// visually distinct from the chunk distribution.
+const edgeHue = (link: SceneLink): string => {
+  const target = NODES[link.to];
+  if (!target) return '--color-secondary';
+  if (link.role === 'review') return '--color-secondary';
+  if (link.role === 'worker' && target.model) return bareVar(MODELS[target.model].hue);
+  // coordinator and jev: use the target node's hue
+  if (target.model) return bareVar(MODELS[target.model].hue);
+  return bareVar(ROLE_VARIABLE[target.role as Role]);
+};
+
+const bareVar = (v: string) => v.replace(/^var\(/, '').replace(/\)$/, '');
+
 const ROLE_VARIABLE: Record<Role, string> = {
   coordinator: '--color-primary',
   worker: '--color-secondary',
@@ -79,10 +125,6 @@ const ROLE_VARIABLE: Record<Role, string> = {
 
 // Every hue the scene can paint a node with: the role hues plus each model's
 // routed hue from the identity list.
-// Extract the bare custom-property name from a var(--color-*) expression so
-// the palette lookup does not double-wrap in var().
-const bareVar = (v: string) => v.replace(/^var\(/, '').replace(/\)$/, '');
-
 const HUE_VARIABLES = [
   ...new Set([
     ...Object.values(ROLE_VARIABLE),
@@ -106,10 +148,19 @@ void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
 // fallback SVG put every node, tile and label in the same place at every
 // aspect ratio.
 //
-// The hero scene is a full-bleed background: the headline and body copy sit
-// on top of it, so every additive glow is held far below the luminance that
-// would cost the text its documented contrast ratios — a packet, its rail and
-// a node ring together stay under half the AA threshold for dim body copy.
+// Depth is built into the scene, not applied to the whole canvas:
+//   - far edges (the coordinator distribution and Jev consultation) are
+//     thinner, dimmer and softer — a whisper of the workflow;
+//   - near edges (review, escalation and accepted-chunk returns) are brighter,
+//     thicker and sharper — the handshakes that matter;
+//   - node glows are additive and soft, breathing slowly, so every node is a
+//     small light in the dark rather than a flat disc;
+//   - the packet along each active edge is a bright pulse in the edge's hue,
+//     with a tight hot core and a wider soft halo.
+//
+// The additive palette stays well below the luminance that would cost the copy
+// its documented contrast ratios: a packet, its rail and a node ring together
+// stay under half the AA threshold for dim body copy.
 const FRAGMENT_SOURCE = `
 precision mediump float;
 uniform vec2 uRes;
@@ -122,6 +173,8 @@ uniform vec3 uNodeColor[${NODE_COUNT}];
 uniform vec4 uLink[${LINK_COUNT}];
 uniform vec3 uLinkColor[${LINK_COUNT}];
 uniform float uLinkPhase[${LINK_COUNT}];
+uniform float uLinkNear[${LINK_COUNT}];
+uniform float uLinkClamp[${LINK_COUNT}];
 
 float segmentDistance(vec2 p, vec2 a, vec2 b){
   vec2 ab = b - a;
@@ -141,32 +194,52 @@ void main(){
 
   vec3 color = uBase;
 
+  // Quiet dot-grid desk texture, very low peak.
   vec2 drift = vec2(p.x, p.y + uTime * 0.05);
   vec2 cell = abs(fract(drift) - 0.5);
   color += uLine * 0.03 * glow(min(cell.x, cell.y), 0.015);
 
+  // Edges: near links are bright and crisp, far links are softer but visible.
   for (int i = 0; i < ${LINK_COUNT}; i++){
     vec2 a = uLink[i].xy;
     vec2 b = uLink[i].zw;
     float rail = segmentDistance(p, a, b);
-    color += uLine * 0.07 * glow(rail, 0.020);
+    float near = uLinkNear[i];
+    // Vertical mask: suppress glow below the target node's tile bottom so
+    // edge glow never bleeds into the model-name label beneath the tile.
+    float glowClamp = 1.0 - smoothstep(uLinkClamp[i] - 0.06, uLinkClamp[i] + 0.06, p.y);
 
+    // Far edge: visible but soft — the workflow whispered across the dark.
+    color += uLinkColor[i] * (0.22 + 0.18 * near) * glow(rail, 0.048 + 0.042 * (1.0 - near)) * glowClamp;
+    // Near edge: bright and crisp — the handshakes that matter.
+    color += uLinkColor[i] * (0.38 + 0.30 * near) * glow(rail, 0.027 + 0.024 * (1.0 - near)) * glowClamp;
+
+    // Bright travelling pulse along each link, in the link's own hue.
     float travel = fract(uTime * 0.2 + uLinkPhase[i]);
     float eased = travel * travel * (3.0 - 2.0 * travel);
     vec2 packet = a + (b - a) * eased;
     float alive = sin(travel * 3.1415926);
     float toPacket = length(p - packet);
-    color += uLinkColor[i] * alive * (0.075 * glow(toPacket, 0.05) + 0.025 * glow(toPacket, 0.16));
-    color += uLinkColor[i] * alive * 0.035 * glow(rail, 0.028) * smoothstep(0.7, 0.0, toPacket);
+    // Tight hot core plus wider soft halo, both in the link colour.
+    float nearBoost = 1.0 + 0.2 * near;
+    color += uLinkColor[i] * alive * nearBoost * (0.32 * glow(toPacket, 0.055) + 0.14 * glow(toPacket, 0.20)) * glowClamp;
+    // Rail glow that follows the packet — a brush of colour along the active path.
+    color += uLinkColor[i] * alive * nearBoost * 0.18 * glow(rail, 0.032) * smoothstep(0.5, 0.0, toPacket) * glowClamp;
   }
 
+  // Nodes: soft additive glow, breathing slowly, plus a crisp ring.
   for (int i = 0; i < ${NODE_COUNT}; i++){
     float toNode = length(p - uNode[i]);
     float radius = uNodeRadius[i];
     float breathe = 0.86 + 0.14 * sin(uTime * 1.1 + float(i) * 1.7);
-    color += uNodeColor[i] * 0.05 * glow(toNode, radius * 0.66) * breathe;
-    color += uNodeColor[i] * 0.09 * glow(abs(toNode - radius), radius * 0.10);
-    color = mix(color, uBase, 0.72 * smoothstep(radius * 0.95, radius * 0.78, toNode));
+    // Wide soft bloom behind the node.
+    color += uNodeColor[i] * 0.24 * glow(toNode, radius * 0.95) * breathe;
+    // Tighter halo at the node edge.
+    color += uNodeColor[i] * 0.30 * glow(abs(toNode - radius), radius * 0.10);
+    // Crisp ring at the node boundary.
+    color += uNodeColor[i] * 0.36 * glow(abs(toNode - radius), radius * 0.05);
+    // Fade the interior to base so the ring reads as a ring, not a filled disc.
+    color = mix(color, uBase, 0.62 * smoothstep(radius * 0.95, radius * 0.72, toNode));
   }
 
   gl_FragColor = vec4(color, 1.0);
@@ -301,6 +374,8 @@ export default function HeroCanvas() {
     const linkEnds = new Float32Array(LINK_COUNT * 4);
     const linkColors = new Float32Array(LINK_COUNT * 3);
     const linkPhases = new Float32Array(LINK_COUNT);
+    const linkNear = new Float32Array(LINK_COUNT);
+    const linkClamp = new Float32Array(LINK_COUNT);
 
     NODES.forEach((node, i) => {
       nodePositions[i * 2] = node.x;
@@ -309,12 +384,21 @@ export default function HeroCanvas() {
       nodeColors.set(palette[nodeHue(node)], i * 3);
     });
     LINKS.forEach((link, i) => {
-      linkEnds[i * 4] = NODES[link.from].x;
-      linkEnds[i * 4 + 1] = NODES[link.from].y;
-      linkEnds[i * 4 + 2] = NODES[link.to].x;
-      linkEnds[i * 4 + 3] = NODES[link.to].y;
-      linkColors.set(palette[ROLE_VARIABLE[link.role]], i * 3);
+      const [x1, y1, x2, y2] = linkSegment(link);
+      linkEnds[i * 4] = x1;
+      linkEnds[i * 4 + 1] = y1;
+      linkEnds[i * 4 + 2] = x2;
+      linkEnds[i * 4 + 3] = y2;
+      // Edge colour: the hue of the target node (or its role for non-model targets).
+      linkColors.set(palette[edgeHue(link)], i * 3);
       linkPhases[i] = link.phase;
+      // Near edges (review, escalation, accepted returns) are bright; far edges
+      // (coordinator distribution, Jev consultation) are softer but still visible.
+      linkNear[i] = (link.role === 'review' || link.role === 'worker') ? 1.0 : 0.6;
+      // Vertical glow clamp: suppress glow below the higher of the two nodes
+      // so edge glow never bleeds into any model-name label beneath a tile.
+      const higher = Math.max(NODES[link.from].y, NODES[link.to].y);
+      linkClamp[i] = higher + TILE.half + LABEL.gap * 0.5;
     });
 
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -335,6 +419,8 @@ export default function HeroCanvas() {
     gl.uniform4fv(uniform('uLink'), linkEnds);
     gl.uniform3fv(uniform('uLinkColor'), linkColors);
     gl.uniform1fv(uniform('uLinkPhase'), linkPhases);
+    gl.uniform1fv(uniform('uLinkNear'), linkNear);
+    gl.uniform1fv(uniform('uLinkClamp'), linkClamp);
 
     const draw = () => {
       if (contextLost || canvas.width < 1 || canvas.height < 1) return;
@@ -419,17 +505,23 @@ export default function HeroCanvas() {
           class="transition-opacity duration-500 ease-out-soft"
           opacity="0.25"
         >
-          {LINKS.map((link) => (
-            <line
-              x1={NODES[link.from].x}
-              y1={NODES[link.from].y}
-              x2={NODES[link.to].x}
-              y2={NODES[link.to].y}
-              stroke={`var(${ROLE_VARIABLE[link.role]})`}
-              stroke-width="0.022"
-              opacity="0.5"
-            />
-          ))}
+          {LINKS.map((link) => {
+            // Fallback edges: near links are visible, far links are dim. The
+            // routed endpoints keep the fallback clear of the labels too.
+            const near = (link.role === 'review' || link.role === 'worker') ? 0.7 : 0.3;
+            const [x1, y1, x2, y2] = linkSegment(link);
+            return (
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={`var(${edgeHue(link)})`}
+                stroke-width={near > 0.5 ? "0.032" : "0.018"}
+                opacity={near}
+              />
+            );
+          })}
           {NODES.map((node) => (
             <circle
               cx={node.x}
@@ -437,7 +529,7 @@ export default function HeroCanvas() {
               r={node.r}
               fill="var(--color-base-100)"
               stroke={`var(${nodeHue(node)})`}
-              stroke-width="0.04"
+              stroke-width="0.05"
             />
           ))}
         </g>
@@ -489,7 +581,7 @@ export default function HeroCanvas() {
                 rx={TILE.radius}
                 fill="none"
                 stroke={identity.hue}
-                stroke-width="0.035"
+                stroke-width="0.04"
               />
               {node.label ? (
                 <text

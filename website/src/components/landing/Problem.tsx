@@ -4,16 +4,14 @@ import { asset } from "../../lib/paths";
 
 export default function Problem() {
   return (
-    <section class="relative isolate overflow-hidden">
+    <section class="relative isolate overflow-hidden lg:min-h-[36rem]">
       <div class="relative mx-auto w-full max-w-7xl px-4 pt-16 sm:px-6 md:pt-24 lg:pb-8">
         <div class="animate-rise max-w-xl">
           <h1 class="font-display text-hero font-semibold tracking-tight">
-            Big-model delivery on a cheap-model budget, every chunk verified.
+            Your expensive model directs. Cheap Flash delivers.
           </h1>
           <p class="mt-5 max-w-prose text-lg leading-relaxed text-dim">
-            Amale plans the work, hands each chunk to a cheap Flash model, reviews the result and
-            verifies it before the next step. You get the same verified delivery at a fraction of
-            the token cost.
+            Each chunk is built by a cheap Flash model, then reviewed by a different model family before it can merge.
           </p>
           <div class="mt-8 flex flex-wrap gap-3">
             <a
