@@ -1,29 +1,30 @@
 import ModelTopology from '../diagrams/ModelTopology';
+import { Drifter, Glow, LightRays } from '../decor';
 
 const roles = [
   {
     name: 'Coordinator',
     chip: 'minimal turns',
     chipClass: 'badge badge-soft badge-primary shrink-0 text-xs',
-    body: 'The expensive model, kept to minimal turns. Clarifies intent, chunks the work, defines acceptance criteria and integrates results. One delegate call per chunk — no per-step instructions, no hand-written briefs, no micro-management.',
+    body: 'The expensive model, kept to minimal turns. Clarifies intent, chunks work, defines acceptance criteria and integrates results. One delegate call per chunk.',
   },
   {
     name: 'Workers',
     chip: 'routed Flash pool',
     chipClass: 'badge badge-soft badge-accent shrink-0 text-xs',
-    body: 'The routed Flash families — DeepSeek, GLM, MiMo and Solar — each own a chunk end to end: implementation, checks and repair cycles. When a decision inside the chunk is uncertain they consult Jev directly through a bundled helper instead of escalating to the coordinator.',
+    body: 'The routed Flash families (DeepSeek, GLM, MiMo and Solar) each own a chunk end to end: implementation, checks and repair cycles. Uncertain inside the chunk, they consult Jev directly instead of escalating.',
   },
   {
     name: 'Reviewer',
     chip: 'read-only',
     chipClass: 'badge badge-soft badge-secondary shrink-0 text-xs',
-    body: 'Always the other model family, reading only. Independently verifies each chunk with structured coverage and routes findings back into the worker\'s repair loop rather than to the coordinator.',
+    body: 'Always the other model family, reading only. It verifies each chunk with structured coverage and routes findings back into the worker\'s repair loop rather than to the coordinator.',
   },
   {
     name: 'Jev',
     chip: 'bounded decisions',
     chipClass: 'badge badge-soft badge-accent shrink-0 text-xs',
-    body: 'A cheap decision model that answers bounded either/or questions for workers and the coordinator. It does not enforce constraints: TypeScript code, not any model, enforces dependencies, ownership, checks and review coverage.',
+    body: 'A cheap decision model answering bounded either/or questions for workers and the coordinator. TypeScript code, not any model, enforces dependencies, ownership, checks and review coverage.',
   },
 ];
 
@@ -34,22 +35,28 @@ const mechanics = [
   },
   {
     lead: 'Only genuine boundaries escalate.',
-    body: 'Exhausted repair allowances (Flash → Kimi → host), missing evidence and ambiguous intent reach the expensive model; ordinary uncertainty goes to Jev.',
+    body: 'Exhausted repair allowances (Flash to Kimi to host), missing evidence and ambiguous intent reach the expensive model; ordinary uncertainty goes to Jev.',
   },
   {
     lead: 'Progress lives on disk.',
-    body: 'This is not an unattended background service. A closed session resumes from disk on the next invocation, with its artifacts still in place.',
+    body: 'A closed session resumes from disk on the next invocation, with its artifacts still in place.',
   },
 ];
 
 export default function Division() {
   return (
-    <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
-      <h2 class="font-display text-display font-semibold tracking-tight">
+    <section class="relative isolate mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+      <div class="decor-field" aria-hidden="true">
+        <Drifter direction="horizontal" distance={20}>
+          <LightRays hue="primary" cx={0.92} cy={-0.04} angle={18} spread={116} opacity={0.2} />
+        </Drifter>
+        <Glow hue="accent" size={620} cx={0.08} cy={0.86} opacity={0.2} />
+      </div>
+      <h2 data-reveal class="font-display text-display font-semibold tracking-tight">
         Who does what.
       </h2>
       <div class="mt-4 grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
-        <div class="min-w-0 max-w-prose">
+        <div class="min-w-0 max-w-prose" data-reveal>
           <p class="leading-relaxed text-dim">
             The coordinator holds the direction. Everything inside a chunk runs without it and comes
             back as one outcome to inspect and integrate.
@@ -59,7 +66,9 @@ export default function Division() {
             the bounded questions workers put to Jev. Teal marks a chunk reviewed by another family
             and accepted back.
           </p>
-          <h3 class="mt-10 font-display text-title font-semibold tracking-tight">How it stays cheap.</h3>
+          <h3 class="mt-10 font-display text-title font-semibold tracking-tight">
+            How it stays cheap.
+          </h3>
           <ul class="mt-4 list-inside list-disc space-y-2 leading-relaxed text-dim">
             {mechanics.map((item) => (
               <li>
@@ -72,7 +81,10 @@ export default function Division() {
       </div>
       <div class="mt-12 grid gap-6 md:grid-cols-2">
         {roles.map((role) => (
-          <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+          <article
+            data-reveal
+            class="card rounded-box border border-line bg-base-200 shadow-rest-glow-accent"
+          >
             <div class="card-body gap-3 p-6">
               <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">{role.name}</h3>

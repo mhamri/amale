@@ -1,4 +1,5 @@
 import { asset } from '../../lib/paths';
+import { Glow, GridDots } from '../decor';
 
 const docsTopics = [
   'The problem',
@@ -21,18 +22,21 @@ const sourceTopics = [
 
 export default function Continue() {
   return (
-    <section class="border-y border-line bg-base-200/50">
+    <section class="relative isolate border-y border-line bg-base-200/50">
+      <div class="decor-field" aria-hidden="true">
+        <Glow hue="accent" size={640} cx={0.16} cy={0.1} opacity={0.2} />
+        <GridDots hue="accent" spacing={28} cx={0.85} cy={0.9} opacity={0.2} />
+      </div>
       <div class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
-        <h2 class="font-display text-display font-semibold tracking-tight">
-          Read it before you trust it.
+        <h2 data-reveal class="font-display text-display font-semibold tracking-tight">
+          Read before you trust it.
         </h2>
-        <p class="mt-4 max-w-prose leading-relaxed text-dim">
-          The documentation takes the workflow apart page by page, the evidence page states what has
-          been exercised and what has not, and the primary sources ship with the build so every
-          claim can be checked in full.
+        <p data-reveal class="mt-4 max-w-prose leading-relaxed text-dim">
+          Five documentation pages take the workflow apart, and the case study proves each claim
+          with measured figures from the runs that built this site.
         </p>
-        <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-2">
-          <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+        <div class="mt-8 grid gap-6 md:grid-cols-2">
+          <article data-reveal class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
               <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Documentation</h3>
@@ -52,23 +56,25 @@ export default function Continue() {
               </a>
             </div>
           </article>
-          <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+          <article data-reveal class="card rounded-box border border-line bg-base-200 shadow-raised-glow-primary">
             <div class="card-body gap-3 p-6">
               <div class="flex items-start justify-between gap-3">
-                <h3 class="font-display text-title font-semibold tracking-tight">Evidence</h3>
-                <span class="badge badge-soft badge-secondary shrink-0 text-xs">Verified and untested</span>
+                <h3 class="font-display text-title font-semibold tracking-tight">Case study</h3>
+                <span class="badge badge-soft badge-secondary shrink-0 text-xs">
+                  Measured, with limits
+                </span>
               </div>
               <p class="text-sm leading-relaxed text-dim">
-                The record behind the workflow: the live checks and behavioral suite that were
-                actually run, the limits the record states with reasons, the dependency position,
-                and the gates you can re-run yourself.
+                Each claim this page makes, paired with a figure from the run records: 156 model
+                calls, 45 blocking defects caught by review, an estimated 7.82 US dollars, and the
+                honest limits beside them.
               </p>
-              <a class="link link-hover text-primary" href={asset('evidence/')}>
-                See the evidence
+              <a class="link link-hover text-primary" href={asset('case-study/')}>
+                See the case study
               </a>
             </div>
           </article>
-          <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+          <article data-reveal class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
               <div class="flex items-start justify-between gap-3">
                 <h3 class="font-display text-title font-semibold tracking-tight">Primary sources</h3>
@@ -82,16 +88,16 @@ export default function Continue() {
                 ))}
               </ul>
               <p class="text-sm leading-relaxed text-dim">
-                The reference documents shipped unchanged with this build — where the claims on
-                every page of this site are written out in full.
+                The skill's reference documents ship unchanged with this build, where every claim
+                on this site is written out in full.
               </p>
-              <a class="link link-hover text-primary" href={asset('evidence/')}>
+              <a class="link link-hover text-primary" href={asset('sources/planning.md')}>
                 Browse the sources
               </a>
             </div>
           </article>
         </div>
-        <p class="mt-8 text-sm leading-relaxed text-dim">
+        <p data-reveal class="mt-8 text-sm leading-relaxed text-dim">
           The skill, its source and its issues are on{' '}
           <a
             class="link link-hover text-primary"

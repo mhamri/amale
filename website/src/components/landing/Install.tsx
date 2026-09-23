@@ -1,3 +1,5 @@
+import { Glow, GridDots, Rings } from '../decor';
+
 const installCommands = `git clone https://github.com/mhamri/amale
 cd amale
 bun amale/scripts/run.ts doctor
@@ -6,7 +8,7 @@ bun amale/scripts/run.ts install`;
 const installFacts = [
   {
     lead: 'Links, never copies.',
-    body: 'Install links the canonical skill directory into the default Claude and Codex skill directories — directory junctions on Windows, directory symlinks on Unix — so the checkout stays the single source of truth.',
+    body: 'Install links the canonical skill directory into the default Claude and Codex skill directories, so the checkout stays the single source of truth.',
   },
   {
     lead: 'Refuses conflicting targets.',
@@ -14,41 +16,46 @@ const installFacts = [
   },
   {
     title: 'doctor',
-    body: 'checks local setup before anything network-facing; it does not prove network connectivity — the startup preflight covers that separately.',
+    body: 'checks local setup before anything network-facing; the startup preflight covers network connectivity separately.',
   },
   {
     lead: 'Fallback launcher.',
-    body: 'Node 24 or newer runs the erasable TypeScript directly when Bun is absent, so the same commands work without a second toolchain install.',
+    body: 'Node 24 or newer runs the erasable TypeScript directly when Bun is absent, so the same commands work without a second toolchain.',
   },
 ];
 
 export default function Install() {
   return (
-    <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+    <section class="relative isolate mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
+      <div class="decor-field" aria-hidden="true">
+        <Glow hue="secondary" size={560} cx={0.9} cy={0.12} opacity={0.22} />
+        <Rings hue="secondary" size={460} cx={0.06} cy={0.9} opacity={0.22} />
+        <GridDots hue="primary" spacing={32} cx={0.14} cy={0.1} opacity={0.18} />
+      </div>
       <div class="grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
-        <div class="min-w-0">
-          <h2 id="install" class="font-display text-display font-semibold tracking-tight">
-            Install once, then invoke /amale with your task.
+        <div class="min-w-0" data-reveal>
+          <h2
+            id="install"
+            class="font-display text-display font-semibold tracking-tight"
+          >
+            Two commands to install.
           </h2>
           <p class="mt-4 max-w-prose leading-relaxed text-dim">
-            Clone the repository and run both commands from the checkout root. The checkout must stay
-            in place afterwards, because the skill directories link back into it.
+            Clone the repository and run both commands from the checkout root. Invoke{' '}
+            <span class="font-mono text-base-content">/amale</span> with your task afterwards; the
+            skill handles the workflow and resume steps.
           </p>
           <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>shell</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{installCommands}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed">
+              <code>{installCommands}</code>
+            </pre>
           </figure>
-          <div class="alert alert-soft alert-info mt-6 max-w-prose rounded-box border border-line text-sm">
-            <span>
-              Then invoke <span class="font-mono">/amale</span> with your task; the skill handles the
-              workflow and resume steps.
-            </span>
-          </div>
         </div>
-        <div class="min-w-0 space-y-6">
-          <article class="card rounded-box border border-line bg-base-200 shadow-rest">
+        <div class="min-w-0 space-y-6" data-reveal>
+          <article class="card rounded-box border border-line bg-base-200 shadow-raised-glow-secondary">
             <div class="card-body gap-4 p-6">
               <p class="font-mono text-sm text-dim">What install actually does</p>
               <ul class="space-y-4">
@@ -82,8 +89,8 @@ export default function Install() {
               <p class="text-sm leading-relaxed text-dim">
                 Configure pi with OpenRouter, or provide{' '}
                 <code class="font-mono text-sm">OPENROUTER_API_KEY</code> through your environment.
-                The runtime reads existing credential configuration or environment, and never prints
-                or writes the key into artifacts.
+                The runtime reads existing credential configuration and never prints or writes the
+                key into artifacts.
               </p>
             </div>
           </div>
