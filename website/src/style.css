@@ -182,4 +182,19 @@
   details.dropdown:not([open]) > .dropdown-content {
     display: none;
   }
+
+  /*
+   * Soft chips: daisyUI 5 renders soft badges as the badge colour itself over
+   * an 8% tint mixed into base-100. On a base-200 card that tint is nearly
+   * the card colour, so the chip reads as coloured text rather than a chip.
+   * Add a hairline edge in the chip's own hue once here so every soft chip
+   * on the site reads as a chip, and no page needs its own rule.
+   */
+  .badge-soft.badge-primary   { border-color: var(--color-primary); }
+  .badge-soft.badge-secondary { border-color: var(--color-secondary); }
+  .badge-soft.badge-accent    { border-color: var(--color-accent); }
+  .badge-soft.badge-info      { border-color: var(--color-info); }
+  .badge-soft.badge-success   { border-color: var(--color-success); }
+  .badge-soft.badge-warning   { border-color: var(--color-warning); }
+  .badge-soft.badge-error     { border-color: var(--color-error); }
 }
