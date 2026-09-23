@@ -63,12 +63,10 @@ export default function Author() {
           </div>
           <div class="min-w-0 space-y-6">
             <article class="card overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
-              <figure class="m-0">
+              <figure class="m-0 block">
                 <img
                   src={asset('author/avatar.jpg')}
                   alt="Portrait of Mohammad Hossein Amri"
-                  width="420"
-                  height="420"
                   class="aspect-square w-full object-cover"
                 />
                 <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">
@@ -87,7 +85,7 @@ export default function Author() {
             <article class="card rounded-box border border-line bg-base-200 shadow-rest">
               <div class="card-body gap-3 p-6">
                 <div class="flex items-start justify-between gap-3">
-                  <h3 class="font-display text-title font-semibold tracking-tight">Credentials</h3>
+                  <h3 class="font-display text-title font-semibold tracking-tight">Profile facts</h3>
                   <span class="badge badge-soft badge-secondary shrink-0 text-xs">
                     From the public profile
                   </span>
