@@ -155,6 +155,18 @@
     top: 1rem;
   }
 
+  /* A soft chip must read as a chip. daisyUI renders .badge-soft as an 8%
+     tint of its hue over base-100 with only a 10% tint for the border, so
+     on a base-200 card the chip body is nearly the card colour and the chip
+     reads as coloured text. Every soft chip therefore carries a hairline
+     edge in its own hue, added once here rather than per page. daisyUI 5
+     emits .badge-soft inside the utilities cascade layer, which sorts after
+     this components layer, so the edge needs !important to hold from here
+     for every page. */
+  .badge-soft {
+    border-color: color-mix(in oklab, var(--badge-color, var(--color-base-content)) 40%, var(--color-base-100)) !important;
+  }
+
   /* daisyUI ships .footer-title uppercased at 60% opacity; the design
      system uses sentence-case labels, and the dim role for hierarchy. */
   .footer-title {
