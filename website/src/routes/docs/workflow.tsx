@@ -44,7 +44,7 @@ export default function DocsWorkflow() {
       >
         <RunLifecycle />
 
-        <section>
+        <section data-reveal>
           <h2 id="discovery" class={h2}>Discovery and specification</h2>
           <div class="mt-3 flex flex-wrap gap-2 w-full">
             <span class={source}>references/planning.md</span>
@@ -64,7 +64,7 @@ export default function DocsWorkflow() {
           </div>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="planning" class={h2}>Planning and task decomposition</h2>
           <div class="mt-3 flex flex-wrap gap-2 w-full">
             <span class={source}>references/planning.md</span>
@@ -85,7 +85,7 @@ export default function DocsWorkflow() {
           </div>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="delegation" class={h2}>Delegation</h2>
           <div class="mt-3 flex flex-wrap gap-2 w-full">
             <span class={source}>references/execution.md</span>
@@ -125,7 +125,7 @@ export default function DocsWorkflow() {
           </p>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="parallel" class={h2}>Parallel execution</h2>
           <div class="mt-3 flex flex-wrap gap-2 w-full">
             <span class={source}>references/parallelism.md</span>
@@ -170,7 +170,7 @@ export default function DocsWorkflow() {
           </p>
         </section>
 
-        <section>
+        <section data-reveal>
           <h2 id="delivery" class={h2}>Verified delivery</h2>
           <div class="mt-3 flex flex-wrap gap-2 w-full">
             <span class={source}>references/execution.md</span>

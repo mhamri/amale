@@ -1,5 +1,6 @@
 import { For, Show, type JSX } from 'solid-js';
 import { asset } from '../../lib/paths';
+import { Glow, LightRays } from '../decor';
 
 /**
  * Shared documentation shell. Every `sections` entry must match the `id`
@@ -61,14 +62,37 @@ export default function DocsLayout(props: {
             </nav>
           </aside>
           <article class="min-w-0">
-            <div class="max-w-prose">
+            {/* Header band: a full-width light-ray wash behind the page title,
+                held at low opacity so it reads as warmth on the graphite, never
+                as a shape over the copy. A small secondary glow pins the band's
+                left edge for a near/far cue at a glance. */}
+            <div class="relative isolate">
+              <div
+                class="decor-field"
+                aria-hidden="true"
+              >
+                <LightRays
+                  hue="primary"
+                  cx={0.5}
+                  cy={0}
+                  spread={108}
+                  opacity={0.28}
+                />
+                <Glow hue="secondary" size={360} cx={0.08} cy={0.12} opacity={0.34} />
+              </div>
               <header class="border-b border-line pb-6">
-                <h1 class="font-display text-display font-semibold tracking-tight">{props.title}</h1>
-                <p class="mt-3 text-lg leading-relaxed text-dim">{props.lead}</p>
+                <div class="max-w-prose">
+                  <h1 class="font-display text-display font-semibold tracking-tight">{props.title}</h1>
+                  <p class="mt-3 text-lg leading-relaxed text-dim">{props.lead}</p>
+                </div>
               </header>
             </div>
             <Show when={sections().length > 0}>
-              <nav aria-label="On this page" class="mt-8 block rounded-box border border-line bg-base-200 p-5 shadow-rest xl:hidden">
+              <nav
+                data-reveal
+                class="mt-8 block rounded-box border border-line bg-base-200 p-5 shadow-rest xl:hidden"
+                aria-label="On this page"
+              >
                 <p class="font-mono text-sm text-dim">On this page</p>
                 <ul class="mt-3 space-y-2 text-sm">
                   <For each={sections()}>
