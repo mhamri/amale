@@ -16,7 +16,17 @@ type SceneNode = {
   /** Set when the node is a routed model and wears a logo tile. */
   model?: ModelId;
 };
-type SceneLink = { from: number; to: number; role: Role; phase: number };
+type SceneLink = {
+  from: number;
+  to: number;
+  role: Role;
+  phase: number;
+  /** Explicit start point on the source tile's edge, for links routed
+   * around a label box instead of straight between node centres. */
+  exit?: [number, number];
+  /** Explicit end point on the target tile's edge, for the same reason. */
+  entry?: [number, number];
+};
 
 const DESIGN_WIDTH = 16;
 const DESIGN_HEIGHT = 9;
@@ -46,20 +56,40 @@ const NODES: SceneNode[] = [
   { x: 14.9, y: 7.0, r: 0.42, role: 'worker', label: 'Kimi', model: 'kimi' },
 ];
 
+// A straight line between node centres would run through the model-name
+// labels under Claude Code (the Codex and GLM distribution edges), GLM (the
+// Jev consultation) and MiMo (the Kimi escalation). Those four links carry
+// explicit exit/entry points on the tile edges so no glowing line crosses a
+// label box; the rest stay centre to centre, ending under the node rings.
 const LINKS: SceneLink[] = [
   { from: 1, to: 0, role: 'coordinator', phase: 0 },
-  { from: 2, to: 0, role: 'coordinator', phase: 0.5 },
+  // Codex -> coordinator: leaves Codex's bottom edge so the line passes
+  // right of the Claude Code label box instead of through it.
+  { from: 2, to: 0, role: 'coordinator', phase: 0.5, exit: [13.9, 2.56] },
   { from: 0, to: 3, role: 'coordinator', phase: 0.12 },
   { from: 0, to: 6, role: 'coordinator', phase: 0.62 },
-  { from: 1, to: 4, role: 'coordinator', phase: 0.37 },
+  // Claude Code -> GLM: leaves Claude Code's right edge and enters GLM's
+  // top edge, clearing the Claude Code label box under its tile.
+  { from: 1, to: 4, role: 'coordinator', phase: 0.37, exit: [12.26, 2.2], entry: [12.9, 4.24] },
   { from: 2, to: 5, role: 'coordinator', phase: 0.87 },
-  { from: 4, to: 7, role: 'jev', phase: 0.24 },
+  // GLM -> Jev: runs down the two tiles' left edges, clear of the GLM label.
+  { from: 4, to: 7, role: 'jev', phase: 0.24, exit: [12.54, 4.96], entry: [12.54, 6.64] },
   { from: 6, to: 7, role: 'jev', phase: 0.74 },
   { from: 3, to: 4, role: 'review', phase: 0.44 },
   { from: 4, to: 5, role: 'review', phase: 0.94 },
-  { from: 5, to: 8, role: 'worker', phase: 0.3 },
+  // MiMo -> Kimi: runs down the two tiles' right edges, clear of the MiMo label.
+  { from: 5, to: 8, role: 'worker', phase: 0.3, exit: [15.26, 4.96], entry: [15.26, 6.64] },
   { from: 3, to: 0, role: 'review', phase: 0.58 },
   { from: 6, to: 0, role: 'review', phase: 0.08 },
+];
+
+// Effective endpoints of a link: the explicit exit/entry points where given,
+// otherwise the node centres themselves.
+const linkSegment = (link: SceneLink): [number, number, number, number] => [
+  link.exit?.[0] ?? NODES[link.from].x,
+  link.exit?.[1] ?? NODES[link.from].y,
+  link.entry?.[0] ?? NODES[link.to].x,
+  link.entry?.[1] ?? NODES[link.to].y,
 ];
 
 const NODE_COUNT = NODES.length;
@@ -354,10 +384,11 @@ export default function HeroCanvas() {
       nodeColors.set(palette[nodeHue(node)], i * 3);
     });
     LINKS.forEach((link, i) => {
-      linkEnds[i * 4] = NODES[link.from].x;
-      linkEnds[i * 4 + 1] = NODES[link.from].y;
-      linkEnds[i * 4 + 2] = NODES[link.to].x;
-      linkEnds[i * 4 + 3] = NODES[link.to].y;
+      const [x1, y1, x2, y2] = linkSegment(link);
+      linkEnds[i * 4] = x1;
+      linkEnds[i * 4 + 1] = y1;
+      linkEnds[i * 4 + 2] = x2;
+      linkEnds[i * 4 + 3] = y2;
       // Edge colour: the hue of the target node (or its role for non-model targets).
       linkColors.set(palette[edgeHue(link)], i * 3);
       linkPhases[i] = link.phase;
@@ -475,14 +506,16 @@ export default function HeroCanvas() {
           opacity="0.25"
         >
           {LINKS.map((link) => {
-            // Fallback edges: near links are visible, far links are dim.
+            // Fallback edges: near links are visible, far links are dim. The
+            // routed endpoints keep the fallback clear of the labels too.
             const near = (link.role === 'review' || link.role === 'worker') ? 0.7 : 0.3;
+            const [x1, y1, x2, y2] = linkSegment(link);
             return (
               <line
-                x1={NODES[link.from].x}
-                y1={NODES[link.from].y}
-                x2={NODES[link.to].x}
-                y2={NODES[link.to].y}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
                 stroke={`var(${edgeHue(link)})`}
                 stroke-width={near > 0.5 ? "0.032" : "0.018"}
                 opacity={near}
