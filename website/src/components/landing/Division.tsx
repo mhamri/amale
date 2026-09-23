@@ -44,7 +44,7 @@ const mechanics = [
 
 export default function Division() {
   return (
-    <section class="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 md:pt-8">
+    <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <h2 class="font-display text-display font-semibold tracking-tight">
         Who does what.
       </h2>

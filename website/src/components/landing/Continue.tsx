@@ -31,7 +31,7 @@ export default function Continue() {
           been exercised and what has not, and the primary sources ship with the build so every
           claim can be checked in full.
         </p>
-        <div class="mt-8 grid gap-6 md:grid-cols-2">
+        <div class="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-2">
           <article class="card rounded-box border border-line bg-base-200 shadow-rest">
             <div class="card-body gap-3 p-6">
               <div class="flex items-start justify-between gap-3">
