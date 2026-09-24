@@ -1,15 +1,24 @@
 node_modules/
-.amale/
+.amaleh/
 *.tmp
 
 # Generated intermediate bundle; DESIGN.html is the distributable.
 /design/viewer.generated.js
 # Local screenshots and original design reference.
-/amale-design-desktop.png
+/amaleh-design-desktop.png
 /design/preview-*.png
 /photo_*.jpg
 # Local credentials and opt-in probe workspaces.
 .env
 .env.*
 !.env.example
-.amale-live/
+.amaleh-live/
+
+# SolidStart build outputs and copied public documentation.
+/website/.output/
+/website/.nitro/
+/website/.vinxi/
+/website/dist/
+/website/public/sources/
+/website/public/workflow.html
+/website/public/.nojekyll

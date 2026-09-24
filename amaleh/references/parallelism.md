@@ -1,0 +1,20 @@
+# Parallel execution without a phase barrier
+
+`delegate-batch` drives concurrency inside the runtime: one invocation takes every ready task id, runs them through a pool bounded by `maxWorkers`, and starts the next id the moment a slot frees. Use it whenever `next.parallel.ready` lists more than one candidate. A sequence of single `delegate` calls leaves configured capacity idle and is the most common reason a run feels slow and expensive. The CLI starts the batch in a detached process and returns a `cursor` within seconds. Follow it with `wait`, which blocks in the foreground until a chunk finishes and then hands back its outcome. Handle each outcome while the rest of the batch runs: integrate an accepted chunk, diagnose an escalated one and re-batch it with anything else reopened. Keep calling `wait` with the latest cursor until it reports `idle`. The skill still runs no scheduler: the batch finishes the chunks it was given and starts nothing new.
+
+Each batched task needs its own isolated checkout, prepared before the batch. Two tasks pointing at one checkout, or a single `workspace` passed for the whole batch, is refused before any worker starts, because concurrent work in one checkout serializes into ownership conflicts rather than into parallel progress.
+
+Read `next.parallel` alongside the focus action:
+
+- `ready`: dependency-ready implementation candidates. Prepare a separate workspace per candidate, then hand the whole list to `delegate-batch`.
+- `actions`: per-task verification, repair, recovery and integration actions, including tasks beyond the focus. Keep healthy tasks progressing when one needs diagnosis.
+- `independent`: a conservative batch of checks/reviews in distinct, nonconflicting task workspaces, within currently available capacity. The focus may be included: execute each listed operation once, not once for the focus and again for the batch.
+- `running` and `available`: execution ownership and remaining shared slots. A suggested batch is not a reservation; runtime guards recheck at execution.
+
+Dispatch the batch concurrently and await individual outcomes. Within a single task, run its registered checks sequentially: builds/tests may share generated files. Across independent isolated checkouts, the same lint/build command can overlap. Do not use a blanket shared resource name for unrelated work; resource claims should describe actual shared state and coupled changes.
+
+Checks and pi reviews hold durable activity leases. Duplicate verification of one task, conflicting workspace/resource access and capacity overflow are rejected. Leases are released on completion/failure; interrupted ownership is reconciled through `resume`. Do not interpret a cleared conversation as proof a child process stopped.
+
+After any task passes review and required checks, accept and integrate its actual changes, record `integrated` right after the merge, then refresh `next`. A merge without the `integrated` record leaves the run believing the chunk is still waiting, and `finish` refuses. Newly unlocked dependents need not wait for unrelated slow tasks. Integration writes to the main checkout and remains a host-controlled serial boundary. Feature-wide integration checks also remain serialized; they are not part of the suggested independent verification batch.
+
+No rule makes failed checks optional. Parallelism changes when eligible work starts, not the evidence required for acceptance. Model routing and review independence remain enforced for every pi launch.

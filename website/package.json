@@ -1,0 +1,36 @@
+{
+  "name": "amaleh-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "prebuild": "node scripts/prepare.mjs",
+    "build": "vite build",
+    "postbuild": "node scripts/postbuild.mjs",
+    "build:all": "node scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "test:static": "node scripts/check-static.mjs",
+    "test:rendered": "node scripts/check-rendered.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource/spline-sans-mono": "5.3.0",
+    "@solidjs/meta": "0.29.4",
+    "@solidjs/router": "1.0.0",
+    "@solidjs/start": "2.0.5",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.6.2",
+    "daisyui": "5.7.42",
+    "nitro": "3.0.260903-beta",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}
