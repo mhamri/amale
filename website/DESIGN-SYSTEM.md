@@ -306,18 +306,22 @@ The two terminal captures, `case-study/status-report.png` and
 `case-study/health-report.png`, are real screenshots of the skill's own output
 for the `website-polish` run. Each sits in a `figure` with a title bar, a chip
 naming it as terminal output, descriptive `alt` text and a caption, in
-`grid gap-8 md:grid-cols-2 md:gap-x-8 md:gap-y-0` — `gap-8` below md, and
-from md an 8-column gap with a zero row gap so the two figures align as one
-band. The figures each carry `md:grid md:row-span-3 md:grid-rows-subgrid` so
-their header row, image row and caption row align across both columns from the
-md breakpoint up. Each figure's title bar is
+`grid gap-8 md:grid-cols-2 md:gap-x-8 md:gap-y-0`: a 2rem gap between the
+stacked figures below md, and from md a 2rem column gap with no row gap, so
+the two figures sit side by side as one band. The figures each carry
+`md:grid md:row-span-3 md:grid-rows-subgrid`, so their title bar, screenshot
+and caption rows share one set of row heights across both columns: the two
+figures are always the same height and their captions start at the same line,
+whichever screenshot is taller. Each title bar is
 `flex items-center justify-between`, so the `terminal output` chip sits at the
-right edge of the bar. The shorter screenshot's image wrapper stretches to the
-shared subgrid row track by default grid-item stretch, and its `bg-[#0d1117]`
-fill (sampled from the bottom rows of both PNGs) extends the terminal window
-visually rather than leaving a gap. Both `<img>` elements carry an inline `clip-path:inset(0 0 3px 0)` style that hides the image's baked bottom border (#2a3140 rows and #000000 corners), so the fill reads as the same window.
-Below md the figures stack with their
-natural height.
+right edge of the bar. The shorter screenshot's wrapper stretches to the shared
+row by default grid-item stretch, and its `bg-[#0d1117]` fill is the
+terminal's own background, sampled from both PNGs, so the terminal reads as
+one longer window. Both `<img>` elements carry `clip-path: inset(0 0 3px 0)`,
+which hides the window border baked into the bottom of each PNG (two `#2a3140`
+rows and `#000000` corners) so no line crosses the fill. Below md the figures
+stack at their natural height. The status capture also appears once on the
+landing page, in the benefits section.
 
 ## Shape, borders, elevation
 
