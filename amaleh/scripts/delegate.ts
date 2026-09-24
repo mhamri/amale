@@ -33,8 +33,6 @@ async function repairStrategy(store:Store,id:string,findings:unknown[],failing:s
 const repairBrief=(findings:unknown[],failing:string[],guidance?:{confidence?:number;meaning:string},scope?:string)=>
  `Repair this task: verification failed. ${guidance?`Course guidance (Jev, confidence ${guidance.confidence}): ${guidance.meaning}`:'Apply the smallest correct fixes.'}\nBlocking review findings: ${JSON.stringify(findings)}\nFailing checks: ${JSON.stringify(failing)}${scope?`\nOut-of-scope changed paths (scope check):\n${scope}\nRevert every path outside the task's resources, or redo the work inside them`:''}\nResolve every listed defect, keep the task contract and scope, and do not run checks yourself; verification follows automatically. Consult the Jev helper for uncertain choices as instructed.`;
 
-// Built-in check: every path the worker changed must match a task resource glob,
-// so the ordinary repair loop handles scope violations exactly like failing checks.
 const globToRegExp=(glob:string)=>{
  let pattern='';
  for(let i=0;i<glob.length;i++){
@@ -102,7 +100,7 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
   let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
   for(;;){
    let s=await store.load(),t=taskOf(s,id);
-   let mutating:string[]=[],settled=false,scopeNoted=false;
+   let mutating:string[]=[],settled=false,scopeNoted=false,recordedScope:string|undefined;
    for(let pass=1;pass<=checkSettlePasses&&!settled;pass++){
     s=await store.load();t=taskOf(s,id);
     const fp=await fingerprint(t.workspace!);
@@ -114,16 +112,16 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
     s=await store.load();t=taskOf(s,id);
     const current=await fingerprint(t.workspace!);
     const scope=await scopeVerdict(store,id,current,s.workspace);
-    const scopeReceipt=t.receipts.find(r=>r.id===scopeCheckId);
-    if(scope.ran&&(!scopeReceipt||scopeReceipt.fingerprint!==scope.fingerprint)){
+    if(scope.ran&&recordedScope!==scope.fingerprint){
      await recordScope(store,id,scope);
+     recordedScope=scope.fingerprint;
      trail.push({stage:'scope',detail:{code:scope.code,outOfScope:scope.outOfScope}});
     }else if(!scope.ran&&!scopeNoted){
      scopeNoted=true;
      await store.transaction(x=>event(x,'scope-unverified',{id,reason:scope.reason}));
      trail.push({stage:'scope',detail:{ran:false,reason:scope.reason}});
     }
-    settled=t.checks.every(c=>t.receipts.some(r=>r.id===c.id&&r.fingerprint===current))&&(!scope.ran||t.receipts.some(r=>r.id===scopeCheckId&&r.fingerprint===current));
+    settled=t.checks.every(c=>t.receipts.some(r=>r.id===c.id&&r.fingerprint===current))&&(!scope.ran||recordedScope===current);
    }
    if(!settled)return finish({outcome:'escalated',stage:'unstable-checks',mutating,
     reason:`Checks never settled: ${mutating.length?mutating.join(', ')+' rewrite the workspace every run, so no receipt can match the tree acceptance compares against':'the workspace keeps changing between check runs'}. Register a check that leaves the tree unchanged, or exclude its generated output from the task workspace.`});

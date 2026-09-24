@@ -137,8 +137,13 @@ test('scopeVerdict reports an unverifiable verdict when the diff is unavailable'
 test('a task check may not reuse the built-in scope check id',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'amaleh-scope-id-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const store=await c.start(dir,{shape:clearCut,id:'reserved',host:{kind:'codex',model:'gpt-6-astra'},intent:'Keep the built-in scope check enforceable',criteria:['The reserved check id is refused']});
+ const scopeCheck={id:scopeCheckId,command:process.execPath,args:['-e','process.exit(0)']};
  const task=(checkId:string)=>({id:'a',title:'a',goal:'Deliver the task',phase:'one',deps:[],resources:['src/**'],criteria:['c'],kind:'code' as const,checks:[{id:checkId,command:process.execPath,args:['-e','process.exit(0)']}]});
- await assert.rejects(()=>c.plan(store,{tasks:[task(scopeCheckId)],integrationChecks:[]}),/reserved for the built-in scope check/);
+ await assert.rejects(()=>c.plan(store,{tasks:[task(scopeCheckId)],integrationChecks:[]}),/reserved for the built-in scope check/,'plan refuses the reserved id and names it');
  await c.plan(store,{tasks:[task('test')],integrationChecks:[]});
- assert.equal(c.taskOf(await store.load(),'a').checks[0]!.id,'test','only the reserved id is refused; other task checks register as before');
+ await assert.rejects(()=>c.amend(store,{id:'a',reason:'register the reserved id',task:task(scopeCheckId)}),/reserved for the built-in scope check/,'amend refuses the reserved id and names it');
+ await assert.rejects(()=>c.invalidate(store,{id:'a',reason:'register the reserved id',check:scopeCheck}),/reserved for the built-in scope check/,'invalidate refuses the reserved id and names it');
+ await store.transaction(s=>{c.taskOf(s,'a').status='review';});
+ await assert.rejects(()=>c.addReviewCheck(store,'a',scopeCheck),/reserved for the built-in scope check/,'review-check refuses the reserved id and names it');
+ assert.deepEqual(c.taskOf(await store.load(),'a').checks.map(c=>c.id),['test'],'only the reserved id is refused; other task checks register as before');
 });
