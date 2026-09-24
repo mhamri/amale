@@ -97,6 +97,7 @@ test('an empty provider response is transient and triggers failover',()=>{
 
 test('a provider stream cut before its finish reason is transient and triggers failover',()=>{
  assert.equal(transientProvider('Stream ended without finish_reason'),true);
+ assert.equal(transientProvider('Upstream error from Relace: The model stopped before completing the response.'),true);
 });
 
 test('a provider that returns an empty response is retried and recovers',async t=>{
