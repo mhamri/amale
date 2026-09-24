@@ -3,6 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import * as c from '../scripts/core.ts';
 
 async function fixture(t:any){
@@ -11,7 +13,6 @@ async function fixture(t:any){
  const store=await c.start(dir,{shape:clearCut,id:'probe-test',host:{kind:'codex',model:'gpt-6-astra'},intent:'Test probe and guard roles',criteria:['Probe and guard checks work correctly']});
  return {dir,store};
 }
-import { join } from 'node:path';
 
 const probeCheck:c.Check={id:'probe',command:process.execPath,args:['-e','process.exit(1)'],role:'probe'};
 const guardCheck:c.Check={id:'guard',command:process.execPath,args:['-e','process.exit(0)'],role:'guard'};
@@ -220,3 +221,15 @@ test('delegate still refuses a passing probe before the first worker run',async 
  assert.match(String(out.reason),/already passes/);
 });
 
+test('invalidate rejects an invalid reopen request before running its probe command',async t=>{
+ const {dir,store}=await fixture(t);
+ const task={id:'a',title:'a',goal:'Test',phase:'one',deps:[],resources:['a'],criteria:['works'],kind:'code' as const,
+  checks:[{id:'test',command:process.execPath,args:['-e','process.exit(1)'],role:'probe' as const}]};
+ await c.plan(store,{tasks:[task],integrationChecks:[]});
+ await fixtureClaim(store,'a',{workspace:dir,model:'deepseek/flash'});
+ await c.result(store,'a',{});
+ const marker=join(dir,'probe-ran.txt');
+ const markingProbe:c.Check={id:'marking',command:process.execPath,args:['-e',"require('fs').writeFileSync('probe-ran.txt','ran');process.exit(1)"],role:'probe'};
+ await assert.rejects(()=>c.invalidate(store,{id:'a',reason:'test',check:markingProbe,noProbe:'also a reason'}),/Pass check or noProbe, not both/);
+ assert.equal(existsSync(marker),false,'a request rejected for its shape never executes the supplied command');
+});

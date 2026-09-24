@@ -6,7 +6,8 @@ import { spawn } from 'node:child_process';
 import { hostname } from 'node:os';
 
 export type Command = { command:string; args:string[] };
-export type Check = Command & { id:string; role:'probe'|'guard' };
+export type IntegrationCheck = Command & { id:string };
+export type Check = IntegrationCheck & { role:'probe'|'guard' };
 export type Finding = { id:string; lens:string; location:string; scenario:string; evidence:string; consequence:string; blocking:boolean; disposition?:'open'|'resolved'|'refuted'; resolution?:string };
 export type ReviewCoverage = { id:string; status:'covered'|'finding'|'unreviewed'|'not-applicable'; evidence:string };
 export type Guidance = { skills?:string[]; references?:string[] };
@@ -14,7 +15,7 @@ export type Task = { id:string; title:string; goal:string; phase:string; deps:st
 export type Decision = { purpose?:'requirement'|'workflow'; id:string; question:string; criteria:Record<string,string>; state:unknown; revision:number; choice?:string; source?:string; confidence?:number; reason?:string; artifact?:string };
 export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'> & { noProbe?:string };
 export type ModelPool = { role:string; models:string[]; requiredInputs:string[]; requiresTools:boolean; notes:string };
-export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:Check[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
+export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:IntegrationCheck[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
 export type RunSummary = { id:string; status:Run['status']; intent:string; criteria:string[]; tasks:number; revision:number; continues?:string; acceptance?:Run['acceptance'] };
 export type ShapeOption = { id:string; summary:string; gains:string; costs:string };
 export type ShapeInput = { understanding:string; gaps?:string[]; pushback?:string[]; additions?:string[]; mentor?:string[]; options?:ShapeOption[]; recommendation?:string; clearCut?:string; questions?:string[]; affects?:string[]; chosen?:{option:string;quote:string} };
@@ -158,7 +159,7 @@ export async function start(workspace:string,input:{id:string;host:Run['host'];i
  event(s,'request',{request:1,kind:'intent',text:input.intent} satisfies ShapeRequest);
  if(input.shape!==undefined){const shaped=validateShape(s,input.shape);recordShape(s,shaped,await store.artifact(shaped));}
  await store.save(s);return store;}finally{await release();}}
-export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:Check[];singleChunk?:string}){await store.transaction(s=>{requireShaped(s,'plan');invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
+export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:IntegrationCheck[];singleChunk?:string}){await store.transaction(s=>{requireShaped(s,'plan');invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
 // Coverage is an explicit reviewer attestation, not proof that all defects were found.
 export function reviewObligations(s:Run,t:Task):{id:string;question:string}[]{return [
  ...t.criteria.map((criterion,i)=>({id:`criterion:${i+1}`,question:`Spec: inspect the actual behavior satisfying task criterion: ${criterion}`})),
@@ -309,16 +310,8 @@ export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
  s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback});
 }
 
-export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean}){
- if(input.check){
-  validRole(input.check);
-  const workspace=taskOf(await store.load(),input.id).workspace;
-  if(input.check.role==='probe'&&workspace){
-   let receipt:{code:number};try{receipt=await execute(input.check,workspace);}catch{receipt={code:1};}
-   invariant(receipt.code!==0,`Probe check ${input.check.id} already passes on the current checkout (${workspace}); a probe that passes there cannot detect the defect, so the reopen is refused`);
-  }
- }
- await store.transaction(s=>{
+type ReopenInput={id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean};
+function validateReopen(s:Run,input:ReopenInput){
  const t=taskOf(s,input.id),noProbe=typeof input.noProbe==='string'?input.noProbe.trim():'';
  invariant(!(input.check&&noProbe),'Pass check or noProbe, not both');
  const fromFeedback=input.feedback===true?feedbackReopen(s,t.id):undefined;
@@ -326,11 +319,22 @@ export async function invalidate(store:Store,input:{id:string;reason:string;chec
  if((t.output||t.review)&&fromFeedback===undefined)invariant(input.check||noProbe,`Reopening ${t.id} needs the probe that found the defect: pass check with the executable that shows it, so every later repair of this task runs it too, or noProbe naming why no executable can show it`);
  const earlierNoProbe=s.events.find(e=>e.type==='reopen-probe'&&(e.detail as {id?:string;noProbe?:string}).id===t.id&&(e.detail as {noProbe?:string}).noProbe);
  invariant(!noProbe||!earlierNoProbe,`${t.id} was already reopened once without a probe ("${(earlierNoProbe?.detail as {noProbe?:string})?.noProbe}"). A second defect the checks cannot see means the checks are missing something: register the probe that shows it as check`);
+ const same=input.check&&t.checks.find(c=>c.id===input.check!.id);
  if(input.check){
-  taskCheckId(input.check.id);validCommand(input.check);
-  const same=t.checks.find(c=>c.id===input.check!.id);
+  taskCheckId(input.check.id);validCommand(input.check);validRole(input.check,t.id);
   invariant(!same||JSON.stringify([same.command,same.args,same.role])===JSON.stringify([input.check.command,input.check.args,input.check.role]),`Task ${t.id} already has a different check named ${input.check.id}`);
-  if(!same){t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args,role:input.check.role});} }
+ }
+ return {t,noProbe,fromFeedback,same};
+}
+export async function invalidate(store:Store,input:ReopenInput){
+ const before=validateReopen(await store.load(),input);
+ if(input.check?.role==='probe'&&before.t.workspace){
+  let code:number;try{code=(await execute(input.check,before.t.workspace)).code;}catch{code=1;}
+  invariant(code!==0,`Probe check ${input.check.id} already passes on the current checkout (${before.t.workspace}); a probe that passes there cannot detect the defect, so the reopen is refused`);
+ }
+ await store.transaction(s=>{
+ const {t,noProbe,fromFeedback,same}=validateReopen(s,input);
+ if(input.check&&!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args,role:input.check.role});
  invalidateTree(s,input.id,input.reason,fromFeedback);
  if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
 });}

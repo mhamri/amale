@@ -65,7 +65,7 @@ test('failed finish after health acknowledgement leaves no health-acknowledged e
  });
  await c.plan(store, {
   tasks: [task('a'), task('b', ['a'])],
-  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'], role: 'guard' }],
+  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'] }],
  });
  await addHostDecisions(store, 5);
  await deliver(store, dir, 'a');
@@ -94,7 +94,7 @@ test('successful acknowledged finish records health-acknowledged and finished in
  });
  await c.plan(store, {
   tasks: [task('a'), task('b', ['a'])],
-  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'], role: 'guard' }],
+  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'] }],
  });
  await addHostDecisions(store, 5);
  await deliver(store, dir, 'a');
