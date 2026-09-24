@@ -1,5 +1,5 @@
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { join, delimiter, dirname, basename, isAbsolute } from 'node:path';
+import { readFile, writeFile, mkdir, access, realpath } from 'node:fs/promises';
+import { join, delimiter, dirname, basename, isAbsolute, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -74,6 +74,10 @@ const codedFailure=/\b(408|409|429|500|502|503|504|529)\b/;
 const transientWording=/rate.?limit|temporarily|overload|unavailable|timed? ?out|Provider returned error|Internal Server Error/i;
 const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits/i;
 export const transientProvider=(message:string)=>!settledProvider.test(message)&&((codedFailure.test(message)&&transientWording.test(message))||transientWithoutCode.test(message));
+const guardedWriteTools=new Set(['edit','write']);
+const writePathArg=(args:unknown)=>{if(!args||typeof args!=='object')return undefined;const a=args as Record<string,unknown>;for(const key of ['path','file_path','filePath'])if(typeof a[key]==='string')return a[key] as string;return undefined;};
+const escapedTarget=(workspace:string,path:string)=>{const full=resolve(workspace,path),rel=relative(workspace,full);return rel.startsWith('..')||isAbsolute(rel)?full:undefined;};
+export const resolveWrites=(workspace:string,paths:(string|undefined)[])=>{const root=resolve(workspace),writes:string[]=[],outside:string[]=[];for(const p of paths){if(typeof p!=='string'||!p.trim())continue;const full=resolve(root,p);writes.push(full);if(escapedTarget(root,p))outside.push(full);}return {paths:writes,outside};};
 export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;speedDir?:string;onSpawn?:(pid:number)=>Promise<void>;attempts?:number;idleTimeoutMs?:number;maxTurns?:number}){
  const telemetry=await trace(input.diagnosticRoot,'pi',{model:input.model,workspace:input.workspace,readOnly:!!input.readOnly,sessionDir:input.sessionDir});
  const started=Date.now();let outputTokens=0;
@@ -84,17 +88,27 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
   invariant(Number.isInteger(attempts)&&attempts>=1&&attempts<=5,'Invalid pi attempt count');
   invariant(input.prompt.length<=promptLimit,`Prompt is ${input.prompt.length} characters; the command line cannot carry more than ${promptLimit}. Hand large material to the model as a file path it reads, rather than inlining it.`);
   const pi=await piCommand();await mkdir(input.sessionDir,{recursive:true});const key=await credential();
-  const launch=()=>new Promise<{events:any[];text:string;model:string;code:number}>((done,fail)=>{
+  const launch=()=>new Promise<{events:any[];text:string;model:string;code:number;writes:{paths:string[];outside:string[]}}>((done,fail)=>{
    const args=[...pi.args,'--mode','json','--print','--provider','openrouter','--model',input.model,'--session-dir',input.sessionDir,'--no-extensions','--no-skills','--no-prompt-templates','--no-context-files','--offline','--tools',input.readOnly?'read,grep,find,ls':'read,grep,find,ls,edit,write,bash,powershell','--',input.prompt];
    // Synchronous spawn errors reject this ordinary Promise executor; no async-executor hang.
    const child=spawn(pi.command,args,{cwd:input.workspace,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe'],env:{...process.env,OPENROUTER_API_KEY:key,PI_TELEMETRY:'0'}});
    let buffer='',stderr='',events:any[]=[],text='',actual='',protocolError='',providerError='',ended=false,turns=0;
+   const writeArgs:(string|undefined)[]=[];
    let spawnError:Error|undefined;
    let writes=Promise.resolve();const record=(stage:string,data:unknown)=>{writes=writes.then(()=>telemetry.write(stage,data));writes.catch(()=>child.kill());};
+   const escapedPaths=new Set<string>();
+   let escapeError:Error|undefined;
    const parse=(line:string)=>{
     if(!line.trim())return;
-    let item:any;try{item=JSON.parse(line);}catch{protocolError='pi emitted malformed JSONL';record('protocol-error',{bytes:line.length});return;}
-    if(!item||typeof item.type!=='string'){protocolError='pi event lacks a type';return;}
+    let item:any;try{item=JSON.parse(line);}catch{if(escapeError)return;protocolError='pi emitted malformed JSONL';record('protocol-error',{bytes:line.length});return;}
+    if(!item||typeof item.type!=='string'){if(escapeError)return;protocolError='pi event lacks a type';return;}
+    if(item.type==='tool_execution_start'&&guardedWriteTools.has(item.toolName)){
+     const path=writePathArg(item.args);
+     writeArgs.push(path);
+     const target=path?escapedTarget(input.workspace,path):undefined;
+     if(target){escapedPaths.add(target);if(!escapeError){record('workspace-escape',{path:target,pid:child.pid});killTree(child);}escapeError=new Error(`Worker wrote outside the task workspace: ${[...escapedPaths].join(', ')}`);}
+    }
+    if(escapeError)return;
     if(!['message_update','tool_execution_update'].includes(item.type))events.push(item);
     if(item.type==='agent_end')ended=true;
     if(['agent_start','agent_end','tool_execution_start','tool_execution_end'].includes(item.type))record('progress',{type:item.type,tool:item.toolName,isError:item.isError});
@@ -132,10 +146,11 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     await telemetry.write('process-exit',{code,signal,stderr,protocolError,providerError,ended,actualModel:actual});
     if(spawnError)throw spawnError;
     invariant(!protocolError,protocolError);
+    if(escapeError)throw escapeError;
     invariant(!providerError,String(sanitize(providerError)));
     invariant(code===0&&ended&&text&&actual,`pi incomplete: exit ${code}, agent_end=${ended}; inspect diagnostic trace ${telemetry.id}`);
     invariant(actual===input.model||(isAlias(input.model)&&family(actual)===family(input.model)),`pi resolved a different model (${actual}); update the task route explicitly`);
-    done({events,text,model:actual,code:0});
+    done({events,text,model:actual,code:0,writes:resolveWrites(input.workspace,writeArgs)});
    })().catch(fail);});
   });
   let output;
@@ -179,10 +194,15 @@ export async function handoffFile(store:Store,id:string,name:string,body:string)
  const path=join(dir,name);await writeFile(path,body);
  return path;
 }
+export const workerPrompt=(workspace:string,briefPath:string,artifacts:string,jev:string,runtime:string,runWorkspace:string,runId:string,id:string)=>`You are an Amaleh worker owning this task end to end inside the task workspace "${workspace}". Do not invoke other skills or delegate. Do not add hypothetical features.
+Every edit and write must stay under "${workspace}". The brief at "${briefPath}", the run's artifacts at "${artifacts}", the Jev helper at "${jev}" and the run's main checkout at "${runWorkspace}" sit outside it and are read-only: read them, never edit or copy them in.
+Your brief, the run context and any binding guidance are in "${briefPath}". Read that file in full before you touch anything, and follow it as part of your instructions.
+When you face an uncertain semantic choice inside this task (approach, trade-off, interpretation), consult Jev instead of guessing or stalling: "${runtime}" "${jev}" "${runWorkspace}" ${runId} ${id} "<question>" "<optionA>|<optionB>|...". Follow its choice; on low confidence pick the safest option, record why, and continue. Return actual changed artifacts, checks and unresolved issues.`;
 export async function worker(store:Store,id:string,input:{workspace:string;model?:string;brief?:string;routing?:RoutingRequest}&Guidance){
  const route=await selectModel(store,id,'worker',input.workspace,input.routing);if(route.action!=='launch')return route;
  invariant(!input.model||input.model===route.model,'Explicit model disagrees with recorded route; omit model for automatic selection');
  const model=route.model;
+ const workspace=await realpath(input.workspace);
  const s=await store.load(),t=taskOf(s,id);const context=await packet(store,id);
  const jev=join(dirname(fileURLToPath(import.meta.url)),'jev.ts'),runId=basename(store.root),runtime=await jsRuntime();
  const brief=input.brief??'Own this task end to end: satisfy every criterion and make the registered checks pass, stay within the allowed scope and resources, and do not add hypothetical features.';
@@ -191,8 +211,8 @@ export async function worker(store:Store,id:string,input:{workspace:string;model
  const briefPath=await handoffFile(store,id,'brief.md',[`# Task ${id}\n\n## Your brief\n${brief}`,
   reopened.length?`## Why this task was reopened\nIt was accepted before and then sent back. Fix each defect below and keep the rest of the accepted work as it is; a fresh reviewer verifies each one against the actual artifact.\n${reopened.map(r=>`- ${r}`).join('\n')}`:'',
   `## Task and run context\n\`\`\`json\n${JSON.stringify(context,null,1)}\n\`\`\``,guidance].filter(Boolean).join('\n\n'));
- const prompt=`You are an Amaleh worker owning this task end to end within the supplied workspace. Do not invoke other skills or delegate. Do not add hypothetical features.\nYour brief, the run context and any binding guidance are in "${briefPath}". Read that file in full before you touch anything, and follow it as part of your instructions. It sits outside your workspace: read it, never edit it, never copy it in.\nWhen you face an uncertain semantic choice inside this task (approach, trade-off, interpretation), consult Jev instead of guessing or stalling: "${runtime}" "${jev}" "${s.workspace}" ${runId} ${id} "<question>" "<optionA>|<optionB>|...". Follow its choice; on low confidence pick the safest option, record why, and continue. Return actual changed artifacts, checks and unresolved issues.`;
- await claim(store,id,{...input,model,pid:process.pid,routeDecisionId:route.decisionId});try{const out=await piRun({...input,model,prompt,diagnosticRoot:store.root,speedDir:store.amalehDir,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});if(transientProvider(t.blocked))event(s,'provider-unavailable',{model,family:family(model),taskId:id,purpose:'worker'});});throw e;}
+ const prompt=workerPrompt(workspace,briefPath,join(store.root,'artifacts'),jev,runtime,s.workspace,runId,id);
+ await claim(store,id,{...input,workspace,model,pid:process.pid,routeDecisionId:route.decisionId});try{const out=await piRun({...input,workspace,model,prompt,diagnosticRoot:store.root,speedDir:store.amalehDir,sessionDir:join(store.root,'sessions',id),onSpawn:async pid=>{await store.transaction(s=>{taskOf(s,id).owner!.pid=pid;});}});await result(store,id,out);return {artifact:taskOf(await store.load(),id).output};}catch(e){await store.transaction(s=>{const t=taskOf(s,id);t.status='blocked';t.owner=undefined;t.blocked=(e as Error).message;event(s,'worker-blocked',{id,reason:t.blocked});if(transientProvider(t.blocked))event(s,'provider-unavailable',{model,family:family(model),taskId:id,purpose:'worker'});});throw e;}
 }
 export const diffLimit=400000;
 const receiptTailLimit=3000;
