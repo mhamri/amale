@@ -34,7 +34,7 @@ test('a clean chunk is accepted end to end without coordinator involvement',asyn
  const out=await delegate(store,'a',{workspace:dir},{runWorker:fakeWorker(dir) as any,runReviewer:fakeReviewer(dir,[[]]) as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'accepted');
  assert.equal(c.taskOf(await store.load(),'a').status,'accepted');
- assert.deepEqual(out.trail.map(x=>x.stage),['worker','check','review']);
+ assert.deepEqual(out.trail.map(x=>x.stage),['worker','check','scope','review']);
  const events=(await store.load()).events;
  assert.ok(events.some(e=>e.type==='delegate-started')&&events.some(e=>e.type==='delegate-finished'));
 });
