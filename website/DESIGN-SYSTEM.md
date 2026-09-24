@@ -452,18 +452,19 @@ rises in once, over 0.6s, and is finished well inside 700ms:
   feedback is a 160ms colour/border change only.
 - Motion answers actions: dropdowns, collapses and tabs animate as they
   open.
-- **Scrolling is never animated.** The `html` base layer leaves
-  `scroll-behavior` at the browser default, so anchor links and programmatic
-  scrolls land instantly: a measurement taken right after a scroll must
-  describe the settled position, which an animated scroll would make stale.
+- **Anchor scrolling is smooth.** The `html` base layer sets
+  `scroll-behavior: smooth`, and `scroll-padding-top` keeps a jumped-to heading
+  clear of the sticky header. A probe that measures right after a scroll
+  passes `behavior: 'instant'` to the scroll call rather than relying on the
+  page to scroll instantly.
 - **Continuous motion is permitted only inside the visualization layer** —
   the hero canvas and the orchestration diagrams described below. It is the
   subject of those components, not decoration on top of them, and it obeys
   the pause rules in that section. Nothing else loops except an explicit
   `loading-spinner`.
-- **Reduced motion:** `style.css` kills all transitions and keyframes under
-  `prefers-reduced-motion: reduce`. CSS-driven motion is therefore covered
-  automatically. Script-driven motion is not: every
+- **Reduced motion:** `style.css` kills all transitions, keyframes and
+  smooth scrolling under `prefers-reduced-motion: reduce`. CSS-driven motion
+  is therefore covered automatically. Script-driven motion is not: every
   canvas or JavaScript timeline must query
   `matchMedia('(prefers-reduced-motion: reduce)')` itself, render one static
   frame when it matches, and subscribe to that query's `change` event so a
