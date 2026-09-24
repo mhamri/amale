@@ -22,7 +22,7 @@ async function fixture(t:any,overrides:Partial<typeof testModels>={}){
  await useModels(t,dir,overrides);
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-routing-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const store=await c.start(dir,{shape:clearCut,id:'route',host:{kind:'codex',model:'gpt-6-astra'},intent:'Test enforced automatic routes',criteria:['Select suitable author and independent reviewer']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix known amount',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],kind:'code'}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix known amount',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],noProbe:'Routing test fixture with no executable checks',kind:'code'}],integrationChecks:[]});
  return {dir,store};
 }
 // Only the catalog endpoint is called now: selection is deterministic rotation, not a Jev question.
@@ -233,7 +233,7 @@ test('concurrent routes advance the rotation instead of all selecting one model'
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-rotation-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const ids=['a','b','c','d'];
  const store=await c.start(dir,{shape:clearCut,id:'rotation',host:{kind:'codex',model:'gpt-6-astra'},intent:'Distribute concurrent routes across eligible families',criteria:['Concurrent dispatch does not fixate on one vendor']});
- await c.plan(store,{tasks:ids.map(id=>({id,title:id,goal:'Fix known amount',phase:'one',deps:[],resources:[id],criteria:['correct amount'],checks:[],kind:'code' as const})),integrationChecks:[]});
+ await c.plan(store,{tasks:ids.map(id=>({id,title:id,goal:'Fix known amount',phase:'one',deps:[],resources:[id],criteria:['correct amount'],checks:[],noProbe:'Routing rotation fixture with no executable checks',kind:'code' as const})),integrationChecks:[]});
  const spaces:Record<string,string>={};
  for(const id of ids){const workspace=join(dir,'w-'+id);await mkdir(workspace,{recursive:true});spaces[id]=workspace;}
  await store.transaction(s=>{s.config.maxWorkers=ids.length;for(const id of ids)c.taskOf(s,id).workspace=spaces[id];});

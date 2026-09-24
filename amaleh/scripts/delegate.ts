@@ -4,7 +4,7 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped } from './core.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute } from './core.ts';
 import { worker, reviewer, requestJson, choiceAnswer, transientProvider } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
@@ -56,6 +56,10 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
  const trail:Trail=[];
  await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
+ // Probe pre-check: run every probe on the unchanged checkout before the first worker launch.
+ // A probe that passes means the defect is already resolved; refuse and name the passing probe.
+ const s0=await store.load(),t0=taskOf(s0,id);
+ if(t0.status==='ready'&&!t0.cycles){const probes=t0.checks.filter(c=>c.role==='probe');if(probes.length){const workspace=input.workspace??t0.workspace!;const passing:string[]=[];for(const probe of probes){let receipt:{code:number;stdout:string;stderr:string};try{receipt=await execute(probe,workspace);}catch{receipt={code:1,stdout:'',stderr:''};}if(receipt.code===0)passing.push(probe.id);}if(passing.length)return finish({outcome:'refused',reason:`Probe check${passing.length>1?'s':''} ${passing.join(', ')} already pass${passing.length===1?'es':''} on the unchanged checkout; the defect is already resolved and no worker is launched`});}}
  try{
   let out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));
   let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});

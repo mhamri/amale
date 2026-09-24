@@ -6,13 +6,13 @@ import { spawn } from 'node:child_process';
 import { hostname } from 'node:os';
 
 export type Command = { command:string; args:string[] };
-export type Check = Command & { id:string };
+export type Check = Command & { id:string; role:'probe'|'guard' };
 export type Finding = { id:string; lens:string; location:string; scenario:string; evidence:string; consequence:string; blocking:boolean; disposition?:'open'|'resolved'|'refuted'; resolution?:string };
 export type ReviewCoverage = { id:string; status:'covered'|'finding'|'unreviewed'|'not-applicable'; evidence:string };
 export type Guidance = { skills?:string[]; references?:string[] };
-export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;coordinatorPid?:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
+export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; noProbe?:string; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;coordinatorPid?:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
 export type Decision = { purpose?:'requirement'|'workflow'; id:string; question:string; criteria:Record<string,string>; state:unknown; revision:number; choice?:string; source?:string; confidence?:number; reason?:string; artifact?:string };
-export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'>;
+export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'> & { noProbe?:string };
 export type ModelPool = { role:string; models:string[]; requiredInputs:string[]; requiresTools:boolean; notes:string };
 export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:Check[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
 export type RunSummary = { id:string; status:Run['status']; intent:string; criteria:string[]; tasks:number; revision:number; continues?:string; acceptance?:Run['acceptance'] };
@@ -25,7 +25,7 @@ export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 export const idCheck=(id:string)=>invariant(typeof id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id),'Invalid identifier');
 export function validCommand(c:Command) { invariant(c&&typeof c.command==='string'&&c.command.length>0&&Array.isArray(c.args)&&c.args.every(a=>typeof a==='string'),'Commands require an executable and argument array'); }
 export function validateTasks(tasks:TaskInput[]) {
- const ids=new Set<string>(); for(const t of tasks){idCheck(t.id);invariant(!ids.has(t.id),'Duplicate task ID');ids.add(t.id);invariant(t.goal&&t.title&&Array.isArray(t.deps)&&Array.isArray(t.resources)&&Array.isArray(t.criteria)&&t.criteria.length&&Array.isArray(t.checks),'Task needs goal, title, dependencies, resources, criteria and checks');invariant(['code','research','plan'].includes(t.kind),'Invalid task kind'); for(const c of t.checks){idCheck(c.id);validCommand(c);} invariant(new Set(t.checks.map(c=>c.id)).size===t.checks.length,'Duplicate check ID');}
+ const ids=new Set<string>(); for(const t of tasks){idCheck(t.id);invariant(!ids.has(t.id),'Duplicate task ID');ids.add(t.id);invariant(t.goal&&t.title&&Array.isArray(t.deps)&&Array.isArray(t.resources)&&Array.isArray(t.criteria)&&t.criteria.length&&Array.isArray(t.checks),'Task needs goal, title, dependencies, resources, criteria and checks');invariant(['code','research','plan'].includes(t.kind),'Invalid task kind'); for(const c of t.checks){idCheck(c.id);validCommand(c);invariant(c.role==='probe'||c.role==='guard',`Check ${c.id} on task ${t.id} requires role: 'probe' or 'guard'`);} invariant(new Set(t.checks.map(c=>c.id)).size===t.checks.length,'Duplicate check ID'); if(t.kind==='code'){const hasProbe=t.checks.some(c=>c.role==='probe');invariant(hasProbe||typeof t.noProbe==='string'&&t.noProbe.trim(),`Code task ${t.id} needs at least one probe check or noProbe explaining why no executable can detect the defect`);}}
  const active=new Set<string>(),done=new Set<string>(); const visit=(id:string)=>{invariant(!active.has(id),'Dependency cycle');if(done.has(id))return;active.add(id);for(const dep of tasks.find(t=>t.id===id)!.deps){invariant(ids.has(dep),'Missing dependency');visit(dep);}active.delete(id);done.add(id);};for(const id of ids)visit(id);
 }
 export const taskOf=(s:Run,id:string)=>{const t=s.tasks.find(t=>t.id===id);invariant(t,'Unknown task');return t;};
@@ -243,7 +243,7 @@ export async function execute(command:Command,cwd:string,onSpawn?:(pid:number)=>
 export async function check(store:Store,id:string|undefined,checkId:string){const s=await store.load(),t=id?taskOf(s,id):undefined;const c=(t?t.checks:s.integrationChecks).find(c=>c.id===checkId);invariant(c,'Unknown check');const cwd=t?.workspace??s.workspace;const operation=id?await acquireActivity(store,id,'check',checkId):undefined;try{const before=await fingerprint(cwd);let receipt:{code:number;stdout:string;stderr:string};try{receipt=await execute(c,cwd,id&&operation?pid=>activitySpawned(store,id,operation,pid):undefined);}catch(error){receipt={code:1,stdout:"",stderr:"Check could not execute: "+(error as Error).message};}const after=await fingerprint(cwd);const artifact=await store.artifact({command:c,cwd,before,after,...receipt});await store.transaction(current=>{const target=id?taskOf(current,id):undefined;invariant(!target||target.workspace===cwd,'Task workspace changed during check');const list=target?target.receipts:current.integrationReceipts;const prior=list.findIndex(r=>r.id===checkId);if(prior>=0)list.splice(prior,1);list.push({id:checkId,code:receipt.code,fingerprint:before,artifact});event(current,'check',{id,checkId,code:receipt.code,artifact});});return {code:receipt.code,artifact,changed:before!==after};}finally{if(id&&operation)await releaseActivity(store,id,operation);}}
 export async function addReviewCheck(store:Store,id:string,check:Check){await store.transaction(s=>{
  const t=taskOf(s,id);invariant(t.status==='review'&&!t.activity,'Review evidence checks require an idle task awaiting review');
- idCheck(check.id);validCommand(check);invariant(!t.checks.some(c=>c.id===check.id),'Duplicate check ID');
+ idCheck(check.id);validCommand(check);invariant(check.role==='probe'||check.role==='guard',`Check ${check.id} requires role: 'probe' or 'guard'`);invariant(!t.checks.some(c=>c.id===check.id),'Duplicate check ID');
  t.checks.push(check);t.review=undefined;event(s,'review-check-added',{id,check});
 });}
 export async function review(store:Store,id:string,input:{model:string;findings:Finding[];fingerprint:string;report:string;coverage?:ReviewCoverage[]}){const artifact=await store.artifact(input);await store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='review'&&t.workspace,'Task not awaiting review');invariant(input.model&&family(input.model)!==t.family,'Review requires another model family');invariant(input.fingerprint===await fingerprint(t.workspace),'Review evidence is stale');invariant(Array.isArray(input.findings)&&typeof input.report==='string'&&input.report.length>0,'Review report required');for(const f of input.findings)invariant(f.id&&f.lens&&f.location&&f.scenario&&f.evidence&&f.consequence&&typeof f.blocking==='boolean','Finding lacks evidence');if(input.coverage!==undefined)validateReviewCoverage(s,t,input.coverage,input.findings);const findings=input.findings.map(f=>({...f,disposition:'open' as const}));t.review={family:family(input.model),fingerprint:input.fingerprint,findings,artifact,coverage:input.coverage};event(s,'review',{id,artifact});});}
@@ -305,7 +305,14 @@ export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
  s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback});
 }
 
-export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean}){await store.transaction(s=>{
+export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean;workspace?:string}){
+ if(input.check){
+  const probeRole=input.check.role??'probe';
+  const probeWithRole={...input.check,role:probeRole};
+  const probeWorkspace=input.workspace;
+  if(probeWorkspace){let receipt:{code:number;stdout:string;stderr:string};try{receipt=await execute(probeWithRole,probeWorkspace);}catch{receipt={code:1,stdout:'',stderr:''};}invariant(receipt.code!==0,`Probe check ${input.check.id} already passes on the unchanged checkout (${probeWorkspace}); the defect is already resolved and the reopen is refused`);}
+ }
+ await store.transaction(s=>{
  const t=taskOf(s,input.id),noProbe=typeof input.noProbe==='string'?input.noProbe.trim():'';
  invariant(!(input.check&&noProbe),'Pass check or noProbe, not both');
  const fromFeedback=input.feedback===true?feedbackReopen(s,t.id):undefined;
@@ -317,12 +324,11 @@ export async function invalidate(store:Store,input:{id:string;reason:string;chec
   idCheck(input.check.id);validCommand(input.check);
   const same=t.checks.find(c=>c.id===input.check!.id);
   invariant(!same||JSON.stringify([same.command,same.args])===JSON.stringify([input.check.command,input.check.args]),`Task ${t.id} already has a different check named ${input.check.id}`);
-  if(!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args});
- }
+  if(!same){t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args,role:input.check.role??'probe'});} }
  invalidateTree(s,input.id,input.reason,fromFeedback);
  if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
 });}
-export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
+export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];if(input.task.noProbe!==undefined)(t as any).noProbe=input.task.noProbe;validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
 
 export type ParallelAction={task:string;action:string;workspace?:string;resources:string[];checks?:Check[];[key:string]:unknown};
 export async function next(store:Store){
