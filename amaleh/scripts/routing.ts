@@ -6,7 +6,7 @@ import { catalog } from './adapters.ts';
 import { loadModelConfig, configPath } from './config.ts';
 import { recentSpeeds, slowModels } from './telemetry.ts';
 
-export type RoutingRequest = { role?:string; requiredInputs?:string[]; contextTokens?:number; evidence?:string };
+export type RoutingRequest = { role?:string; requiredInputs?:string[]; contextTokens?:number; evidence?:string; excludeFamilies?:string[] };
 type Purpose = 'worker'|'reviewer';
 type Scope = { taskId:string; purpose:Purpose; workspace:string; request:RoutingRequest; content?:string };
 type Grant = { action:'launch'; model:string; decisionId:string; key:string; scope:Scope };
@@ -36,6 +36,7 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
  invariant(!request.role||typeof request.role==='string','Invalid routing role');
  invariant(!request.requiredInputs||(Array.isArray(request.requiredInputs)&&request.requiredInputs.every(x=>typeof x==='string')),'Invalid required input modalities');
  invariant(request.contextTokens===undefined||(Number.isInteger(request.contextTokens)&&request.contextTokens>0),'Invalid context requirement');
+ invariant(request.excludeFamilies===undefined||(Array.isArray(request.excludeFamilies)&&request.excludeFamilies.every(x=>typeof x==='string'&&!!x.trim())),'Invalid excluded model families');
  const s=await store.load(),t=taskOf(s,id);
  invariant(s.status==='active','Run is not active');
  invariant(purpose==='worker'?['ready','repair'].includes(t.status):t.status==='review','Task is not ready for requested route');
@@ -75,7 +76,7 @@ export async function selectModel(store:Store,id:string,purpose:Purpose,workspac
  const capable=(m:any)=>!!m.parameters?.includes('tools')&&inputs.every(i=>m.modalities?.includes(i))&&(!request.contextTokens||m.context>=request.contextTokens);
  const absent=listed.filter(id=>!card.has(id)),unfit=listed.filter(id=>card.has(id)&&!capable(card.get(id)));
  let eligible=listed.filter(id=>card.has(id)&&capable(card.get(id))).map(id=>card.get(id));
- if(purpose==='reviewer')eligible=eligible.filter((m:any)=>family(m.id)!==t.family);
+ if(purpose==='reviewer'){const excluded=new Set([t.family,...(request.excludeFamilies??[])]);eligible=eligible.filter((m:any)=>!excluded.has(family(m.id)));}
  const responsive=eligible.filter((m:any)=>!cooling(s,m.id,config.providerCooldownMs));
  if(responsive.length)eligible=responsive;
  const slow=config.slowModelWindowMs?slowModels(await recentSpeeds(store.amalehDir,config.slowModelWindowMs)).filter(m=>m.role===purpose):[];
