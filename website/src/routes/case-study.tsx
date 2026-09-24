@@ -2,6 +2,7 @@ import { For } from 'solid-js';
 import PageMeta from '../components/PageMeta';
 import { asset } from '../lib/paths';
 import { Blobs, Glow, GridDots, LightRays } from '../components/decor';
+import JevAsciiMark from '../components/case-study/JevAsciiMark';
 
 const claims = [
   {
@@ -306,23 +307,30 @@ export default function CaseStudyPage() {
         </section>
 
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
-          <h2 class="font-display text-display font-semibold tracking-tight">
-            In-task decisions
-          </h2>
-          <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
-            Workers consulted Jev directly for bounded either-or questions without
-            escalating to the coordinator. 27 times across both runs.
-          </p>
-          <ul class="mt-6 space-y-3 max-w-prose">
-            <For each={jevDecisions}>
-              {(item) => (
-                <li class="flex items-start gap-3 text-sm leading-relaxed text-dim">
-                  <span class="badge badge-soft badge-accent text-xs shrink-0 mt-0.5">Jev</span>
-                  <span>{item}</span>
-                </li>
-              )}
-            </For>
-          </ul>
+          <div class="grid items-start gap-10 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:gap-14">
+            <div>
+              <h2 class="font-display text-display font-semibold tracking-tight">
+                In-task decisions
+              </h2>
+              <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
+                Workers consulted Jev directly for bounded either-or questions without
+                escalating to the coordinator. 27 times across both runs.
+              </p>
+              <ul class="mt-6 space-y-3 max-w-prose">
+                <For each={jevDecisions}>
+                  {(item) => (
+                    <li class="flex items-start gap-3 text-sm leading-relaxed text-dim">
+                      <span class="badge badge-soft badge-accent text-xs shrink-0 mt-0.5">Jev</span>
+                      <span>{item}</span>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </div>
+            <div>
+              <JevAsciiMark />
+            </div>
+          </div>
         </section>
 
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24" data-reveal>
