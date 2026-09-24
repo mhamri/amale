@@ -1,12 +1,13 @@
 import {fixtureClaim,clearCut} from './execution-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, readFile, readdir, rm, lstat, symlink, unlink, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as c from '../scripts/core.ts';
 import { choiceAnswer, hostDecision } from '../scripts/adapters.ts';
-import { install, statusHtml } from '../scripts/cli.ts';
+import { install, uninstall, statusHtml } from '../scripts/cli.ts';
 
 async function fixture(t:any){const dir=await mkdtemp(join(tmpdir(),'amaleh-test-'));t.after(()=>rm(dir,{recursive:true,force:true}));await writeFile(join(dir,'app.txt'),'original');const store=await c.start(dir,{shape:clearCut,id:'run',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});return {dir,store};}
 const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]} as c.Task);
@@ -25,6 +26,55 @@ test('resume preserves live owners and blocks abandoned effects',async t=>{const
 test('claim support remains pending after uncertain Jev judgment',async t=>{const {store}=await fixture(t);const answer=choiceAnswer({model:'typesafe/jev-1.13',answers:{selection:{type:'choice',choice:'yes',confidence:.4,probabilities:{yes:.55,no:.45}}}},{yes:'Supported',no:'Unsupported'});assert.equal(answer.choice,undefined);await store.transaction(s=>{s.decisions.push({id:'support',question:'Supported?',criteria:{yes:'supported',no:'unsupported'},state:{},revision:s.revision});});assert.equal((await c.next(store)).action,'host-decision');await hostDecision(store,'support','no','Missing evidence');assert.equal((await c.next(store)).action,'discover-specify-plan');assert.throws(()=>choiceAnswer({answers:{selection:{type:'choice',choice:'invented',confidence:1}}},{yes:'yes',no:'no'}));});
 test('artifacts survive compaction and HTML escapes untrusted text',async t=>{const {store}=await fixture(t);const artifact=await store.artifact({evidence:'retain <script>alert(1)</script>'});assert.match(await store.readArtifact(artifact),/retain/);await store.transaction(s=>{s.intent='<script>alert(1)</script>';});const {path}=await statusHtml(store);assert.ok((await readFile(path,'utf8')).includes('&lt;script&gt;'));});
 test('installer is rerunnable and refuses conflicting destinations',async t=>{const {dir}=await fixture(t);const old=process.env.CODEX_HOME;delete process.env.CODEX_HOME;try{await install(dir);const again=await install(dir);assert.ok(again.every(r=>r.status==='already linked'));const other=join(dir,'other');await mkdir(join(other,'.codex','skills','amaleh'),{recursive:true});await assert.rejects(()=>install(other),/Conflicting/);}finally{if(old)process.env.CODEX_HOME=old;}});
+const skillTargets=(home:string)=>[join(home,'.codex','skills','amaleh'),join(home,'.claude','skills','amaleh')];
+const canonicalSkill=()=>realpath(join(dirname(fileURLToPath(import.meta.url)),'..'));
+const exists=async(path:string)=>{try{await lstat(path);return true;}catch{return false;}};
+async function withoutCodexHome(run:()=>Promise<void>){const old=process.env.CODEX_HOME;delete process.env.CODEX_HOME;try{await run();}finally{if(old)process.env.CODEX_HOME=old;}}
+test('install then uninstall round trip is rerunnable and relinks after removal',async t=>{
+ const {dir}=await fixture(t);
+ await withoutCodexHome(async()=>{
+  const targets=skillTargets(dir),source=await canonicalSkill(),files=(await readdir(source)).sort().join(',');
+  assert.ok((await install(dir)).every(r=>r.status==='linked'));
+  const removed=await uninstall(dir);
+  assert.deepEqual(removed.map(r=>r.status),['removed','removed']);
+  for(const target of targets)assert.equal(await exists(target),false);
+  const again=await uninstall(dir);
+  assert.ok(again.every(r=>r.status==='not installed'));
+  assert.ok((await install(dir)).every(r=>r.status==='linked'));
+  for(const target of targets)assert.equal(await realpath(target),source);
+  assert.ok((await uninstall(dir)).every(r=>r.status==='removed'));
+  assert.equal((await readdir(source)).sort().join(','),files);
+ });
+});
+test('uninstall refuses a real directory target and removes nothing from either target',async t=>{
+ const {dir}=await fixture(t);
+ await withoutCodexHome(async()=>{
+  const [codex,claude]=skillTargets(dir),source=await canonicalSkill();
+  await install(dir);
+  await unlink(claude);
+  await mkdir(claude,{recursive:true});
+  await writeFile(join(claude,'SKILL.md'),'user copy');
+  await assert.rejects(()=>uninstall(dir),/Conflicting skill target: .*amaleh/);
+  assert.equal(await readFile(join(claude,'SKILL.md'),'utf8'),'user copy');
+  assert.equal(await exists(codex),true);
+  assert.equal(await realpath(codex),source);
+ });
+});
+test('uninstall refuses a link to another directory and preserves it',async t=>{
+ const {dir}=await fixture(t);
+ await withoutCodexHome(async()=>{
+  const [codex,claude]=skillTargets(dir),elsewhere=join(dir,'elsewhere');
+  await install(dir);
+  await unlink(claude);
+  await mkdir(elsewhere,{recursive:true});
+  await writeFile(join(elsewhere,'SKILL.md'),'other checkout');
+  await symlink(elsewhere,claude,process.platform==='win32'?'junction':'dir');
+  await assert.rejects(()=>uninstall(dir),/Conflicting skill target: .*amaleh/);
+  assert.equal(await realpath(claude),await realpath(elsewhere));
+  assert.equal(await readFile(join(elsewhere,'SKILL.md'),'utf8'),'other checkout');
+  assert.equal(await exists(codex),true);
+ });
+});
 
 test('next advances checks, review and acceptance without repeated review',async t=>{const {dir,store}=await fixture(t);await c.plan(store,{tasks:[task('a')],integrationChecks:[]});await fixtureClaim(store,'a',{workspace:dir,model:'deepseek/flash'});await c.result(store,'a',{});assert.equal((await c.next(store)).action,'check');await c.check(store,'a','test');assert.equal((await c.next(store)).action,'review');await c.review(store,'a',{coverage:await syntheticCoverage(store,'a'),model:'glm',fingerprint:await c.fingerprint(dir),findings:[],report:'Spec and Standards checked'});assert.equal((await c.next(store)).action,'accept');});
 test('concurrent checkpoint commits serialize without losing events',async t=>{const {store}=await fixture(t);await Promise.all(Array.from({length:6},(_,i)=>store.transaction(async s=>{await new Promise(r=>setTimeout(r,10));c.event(s,'concurrent',i);})));assert.equal((await store.load()).events.filter(e=>e.type==='concurrent').length,6);});
