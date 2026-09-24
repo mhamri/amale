@@ -200,6 +200,13 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
           <p class="mt-3 text-sm leading-relaxed text-dim">
             Links the canonical skill into the default Codex and Claude skill directories. Refuses conflicting targets. Windows uses directory junctions; Unix uses symlinks. Takes no workspace or run id.
           </p>
+
+          <h3 id="uninstall" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
+            uninstall
+          </h3>
+          <p class="mt-3 text-sm leading-relaxed text-dim">
+            The inverse of <span class="font-mono text-xs text-base-content">install</span>, with the same optional home argument. Removes only the two skill links when they resolve to the canonical skill directory and reports each target as <span class="font-mono text-xs text-base-content">removed</span> or <span class="font-mono text-xs text-base-content">not installed</span>. It never removes the checkout, and a real directory, a file or a link that resolves elsewhere is refused with <span class="font-mono text-xs text-base-content">Conflicting skill target: &lt;target&gt;</span>, leaving both targets untouched. Rerunning it reports every target as not installed. Takes no workspace or run id.
+          </p>
         </section>
 
         

@@ -35,7 +35,13 @@ bun amaleh/scripts/run.ts doctor
 bun amaleh/scripts/run.ts install
 ```
 
-Installation refuses conflicting destinations; keep the checkout in place after installation. Invoke `/amaleh` with your task; the skill handles the workflow and resume steps.
+Installation refuses conflicting destinations; keep the checkout in place after installation. `uninstall` reverses it:
+
+```sh
+bun amaleh/scripts/run.ts uninstall
+```
+
+It removes only the two skill links, never the checkout, and reports each target as `removed` or `not installed`. A real directory, a file or a link that points elsewhere at either target is refused with `Conflicting skill target: <target>`, and nothing is removed. Invoke `/amaleh` with your task; the skill handles the workflow and resume steps.
 
 The host runs a synthetic startup preflight through its permitted execution channel before network work. Amaleh does not edit global permission settings. Network access and permission to send project context remain host-controlled.
 

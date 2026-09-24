@@ -7,6 +7,7 @@ import { asset } from '../../lib/paths';
 const sections: DocsSection[] = [
   { id: 'prerequisites', label: 'Prerequisites' },
   { id: 'install', label: 'Install the skill' },
+  { id: 'uninstall', label: 'Uninstall the skill' },
   { id: 'credentials', label: 'Credentials and network' },
   { id: 'first-run', label: 'Your first run' },
 ];
@@ -80,6 +81,24 @@ export default function DocsGettingStarted() {
           </figure>
           <p class="mt-6 text-base leading-relaxed">
             <span class="font-mono text-sm text-base-content">doctor</span> takes no run and changes nothing. <span class="font-mono text-sm text-base-content">install</span> writes the skill links and refuses conflicting destinations; it never touches repository files or credentials.
+          </p>
+        </section>
+
+        <section data-reveal>
+          <h2 id="uninstall" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
+            Uninstall the skill
+          </h2>
+          <p class="mt-4 text-base leading-relaxed">
+            Run the uninstall operation from the checkout root to remove the skill links.
+          </p>
+          <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
+            <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
+              <span>sh</span>
+            </div>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amaleh/scripts/run.ts uninstall`}</code></pre>
+          </figure>
+          <p class="mt-6 text-base leading-relaxed">
+            <span class="font-mono text-sm text-base-content">uninstall</span> removes the links <span class="font-mono text-sm text-base-content">install</span> wrote into the Codex and Claude skill directories. It refuses conflicting targets — a real directory, a file, or a link that resolves elsewhere — and never touches the checkout.
           </p>
         </section>
 
