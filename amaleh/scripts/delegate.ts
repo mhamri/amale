@@ -81,12 +81,30 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    const failing=t.receipts.filter(r=>r.code!==0).map(r=>r.id);
    let blocking:unknown[]=[];
    if(!failing.length){
-    const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,input.lenses??['Spec','Standards','Correctness','Omissions']));
-    const pr=routePending(rev);if(pr)return finish({outcome:'route-pending',route:pr});
-    trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+    const lenses=input.lenses??['Spec','Standards','Correctness','Omissions'];
+    const obtainReview=async(excludeFamilies:string[]=[])=>{
+     const routing=excludeFamilies.length?{...input.routing,excludeFamilies:[...(input.routing?.excludeFamilies??[]),...excludeFamilies]}:input.routing;
+     const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,lenses,routing));
+     const pending=routePending(rev);
+     if(pending)return pending;
+     trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+     return undefined;
+    };
+    const first=await obtainReview();if(first)return finish({outcome:'route-pending',route:first});
     s=await store.load();t=taskOf(s,id);
     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
-    const debt=reviewCoverageDebt(s,t);
+    let debt=reviewCoverageDebt(s,t);
+    // A coverage gap with no blocking defect gets exactly one fresh reviewer from another
+    // eligible family; when that review closes the gap it can be accepted, and a second gap
+    // is host work rather than another paid review.
+    if(!blocking.length&&debt.length){
+     const firstFamily=t.review?.family;
+     const retry=await obtainReview(firstFamily?[firstFamily]:[]);
+     if(retry)return finish({outcome:'route-pending',route:retry});
+     s=await store.load();t=taskOf(s,id);
+     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
+     debt=reviewCoverageDebt(s,t);
+    }
     if(!blocking.length&&!debt.length){await accept(store,id);return finish({outcome:'accepted',cycles:t.cycles,author:t.author,reviewFamily:t.review?.family,fingerprint:t.fingerprint});}
     if(!blocking.length)return finish({outcome:'escalated',stage:'review-evidence',reason:'Reviewer left obligations unreviewed; supply the requested host evidence or a corrected independent review',obligations:debt});
    }
