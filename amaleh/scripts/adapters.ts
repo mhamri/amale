@@ -233,7 +233,6 @@ export function killTree(child:{pid?:number;kill:(signal?:NodeJS.Signals)=>boole
  killer.on('error',()=>{child.kill('SIGKILL');});
 }
 export const reviewFormatAttempts=2;
-// A preference is not a defect; only these three classes may hold up acceptance.
 export const blockingDefinition='A finding is blocking only when it is a regression of existing behaviour, a failed task criterion, or a false statement in documentation this task changed. A preference, style choice or optional improvement is never blocking.';
 // Windows caps a whole command line near 32767 characters; leave room for the
 // executable, the flags and the session paths that sit alongside the prompt.

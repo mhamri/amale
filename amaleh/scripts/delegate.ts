@@ -94,9 +94,6 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
     s=await store.load();t=taskOf(s,id);
     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
     let debt=reviewCoverageDebt(s,t);
-    // A coverage gap with no blocking defect gets exactly one fresh reviewer from another
-    // eligible family; when that review closes the gap it can be accepted, and a second gap
-    // is host work rather than another paid review.
     if(!blocking.length&&debt.length){
      const firstFamily=t.review?.family;
      const retry=await obtainReview(firstFamily?[firstFamily]:[]);
