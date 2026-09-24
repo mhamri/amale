@@ -17,14 +17,15 @@ import { humanRequested, renderResult, stripFlags } from './render.ts';
 const esc=(s:unknown)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export async function statusHtml(store:core.Store){const s=await store.load();const content=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amaleh ${esc(s.id)}</title><style>body{max-width:1050px;margin:40px auto;padding:20px;font:16px/1.6 system-ui;background:#f7f6ef;color:#243832}article{padding:18px;border:1px solid #bdcbbb;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}.muted{color:#52665f}</style><h1>${esc(s.intent)}</h1><p>${esc(s.status)} · revision ${s.revision} · ${esc(s.host.model)}</p><h2>Next action</h2><pre>${esc(JSON.stringify(await core.next(store),null,2))}</pre><h2>Acceptance criteria</h2><ul>${s.criteria.map(c=>`<li>${esc(c)}</li>`).join('')}</ul><h2>Work graph</h2>${s.tasks.map(t=>`<article><h3>${esc(t.id)} · ${esc(t.title)}</h3><p>${esc(t.phase)} / ${esc(t.status)} / ${esc(t.depth)} / repair cycle ${t.cycles}</p><p>Depends on: ${esc(t.deps.join(', ')||'entry')}</p><p>${esc(t.goal)}</p><p class="muted">${esc(t.blocked??'')}</p></article>`).join('')}<h2>Decisions</h2>${s.decisions.map(d=>`<p>${esc(d.question)} → ${esc(d.choice??'host decision pending')} (${esc(d.source??'pending')})</p>`).join('')}<p>Evidence and full history remain in this run’s durable records.</p></html>`;const path=join(store.root,'status.html');await writeFile(path,content);return {path};}
 export async function install(targetHome=homedir()){const source=await realpath(join(dirname(fileURLToPath(import.meta.url)),'..'));const targets=[join(process.env.CODEX_HOME??join(targetHome,'.codex'),'skills','amaleh'),join(targetHome,'.claude','skills','amaleh')];const result=[];for(const target of targets){await mkdir(dirname(target),{recursive:true});try{await lstat(target);core.invariant(await realpath(target)===source,`Conflicting skill target: ${target}`);result.push({target,status:'already linked'});}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;await symlink(source,target,process.platform==='win32'?'junction':'dir');core.invariant(await realpath(target)===source,'Link verification failed');result.push({target,status:'linked'});}}return result;}
-async function finishGate(store:core.Store,input:{claims:string[];acknowledgeWarnings?:string}){
+export async function finishGate(store:core.Store,input:{claims:string[];acknowledgeWarnings?:string}){
  const health=await processHealth(store);
  if(health.available&&health.warnings.length){
   const reason=typeof input.acknowledgeWarnings==='string'?input.acknowledgeWarnings.trim():'';
   core.invariant(reason,'Delegation health warnings block finish:\n'+health.warnings.map(w=>'- '+w).join('\n')+'\nCorrect the process and re-run, or re-run finish with acknowledgeWarnings set to a written reason for overriding these warnings.');
-  await store.transaction(s=>core.event(s,'health-acknowledged',{reason,warnings:health.warnings}));
+  await store.transaction(async s=>{core.event(s,'health-acknowledged',{reason,warnings:health.warnings});await core.finishRun(s,input.claims);});
+ }else{
+  await core.finish(store,input.claims);
  }
- await core.finish(store,input.claims);
 }
 // See references/runtime.md (delegate-batch, wait)
 async function launchBatch(store:core.Store,args:{workspace:string;runId:string;inputPath?:string},input:BatchInput,startupMs=30000){

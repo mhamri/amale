@@ -5,7 +5,7 @@
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
 import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute } from './core.ts';
-import { worker, reviewer, requestJson, choiceAnswer, transientProvider } from './adapters.ts';
+import { worker, reviewer, requestJson, choiceAnswer, transientProvider, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
 
@@ -14,6 +14,7 @@ export type DelegateOutcome = { task:string; trail:Trail; outcome:string; [key:s
 const real:DelegateDeps = { runWorker:worker, runReviewer:reviewer, runCheck:check };
 type Trail = { stage:string; detail:unknown }[];
 const routePending = (r:unknown) => r && typeof r==='object' && 'action' in r && (r as any).action!=='launch' ? r as {action:string} : undefined;
+const escapedPaths=(error:unknown)=>error instanceof WorkspaceEscape?error.paths:undefined;
 
 async function repairStrategy(store:Store,id:string,findings:unknown[],failing:string[],fetcher?:typeof fetch){
  try{
@@ -45,6 +46,7 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
   try{return await attempt(n);}
   catch(error){
    const reason=(error as Error).message;
+   if(error instanceof WorkspaceEscape)throw error;
    if(n>=budget||!transientProvider(reason))throw error;
    await store.transaction(s=>{const t=taskOf(s,id);t.status=before;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt:n,reason});});
    trail.push({stage:'provider-failover',detail:{stage,attempt:n,reason}});
@@ -61,9 +63,11 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
  const s0=await store.load(),t0=taskOf(s0,id);
  if(t0.status==='ready'&&!t0.cycles){const probes=t0.checks.filter(c=>c.role==='probe');if(probes.length){const workspace=input.workspace??t0.workspace!;const passing:string[]=[];for(const probe of probes){let receipt:{code:number;stdout:string;stderr:string};try{receipt=await execute(probe,workspace);}catch{receipt={code:1,stdout:'',stderr:''};}if(receipt.code===0)passing.push(probe.id);}if(passing.length)return finish({outcome:'refused',reason:`Probe check${passing.length>1?'s':''} ${passing.join(', ')} already pass${passing.length===1?'es':''} on the unchanged checkout; the defect is already resolved and no worker is launched`});}}
  try{
-  let out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));
-  let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
+  let out:unknown;
+  try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));}
+  catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
   trail.push({stage:'worker',detail:out});
+  let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
   for(;;){
    let s=await store.load(),t=taskOf(s,id);
    let mutating:string[]=[],settled=false;
@@ -85,12 +89,27 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    const failing=t.receipts.filter(r=>r.code!==0).map(r=>r.id);
    let blocking:unknown[]=[];
    if(!failing.length){
-    const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,input.lenses??['Spec','Standards','Correctness','Omissions']));
-    const pr=routePending(rev);if(pr)return finish({outcome:'route-pending',route:pr});
-    trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+    const lenses=input.lenses??['Spec','Standards','Correctness','Omissions'];
+    const obtainReview=async(excludeFamilies:string[]=[])=>{
+     const routing=excludeFamilies.length?{...input.routing,excludeFamilies:[...(input.routing?.excludeFamilies??[]),...excludeFamilies]}:input.routing;
+     const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,lenses,routing));
+     const pending=routePending(rev);
+     if(pending)return pending;
+     trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+     return undefined;
+    };
+    const first=await obtainReview();if(first)return finish({outcome:'route-pending',route:first});
     s=await store.load();t=taskOf(s,id);
     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
-    const debt=reviewCoverageDebt(s,t);
+    let debt=reviewCoverageDebt(s,t);
+    if(!blocking.length&&debt.length){
+     const firstFamily=t.review?.family;
+     const retry=await obtainReview(firstFamily?[firstFamily]:[]);
+     if(retry)return finish({outcome:'route-pending',route:retry});
+     s=await store.load();t=taskOf(s,id);
+     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
+     debt=reviewCoverageDebt(s,t);
+    }
     if(!blocking.length&&!debt.length){await accept(store,id);return finish({outcome:'accepted',cycles:t.cycles,author:t.author,reviewFamily:t.review?.family,fingerprint:t.fingerprint});}
     if(!blocking.length)return finish({outcome:'escalated',stage:'review-evidence',reason:'Reviewer left obligations unreviewed; supply the requested host evidence or a corrected independent review',obligations:debt});
    }
@@ -102,7 +121,8 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    const guidance=await repairStrategy(store,id,blocking,failing,d.fetcher);
    if(guidance)trail.push({stage:'jev-strategy',detail:guidance});
    await repair(store,id);
-   out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:t.workspace!,brief:repairBrief(blocking,failing,guidance),skills:input.skills,references:input.references}));
+   try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:t.workspace!,brief:repairBrief(blocking,failing,guidance),skills:input.skills,references:input.references}));}
+   catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'repair-worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
    pending=routePending(out);
    if(pending)return (pending as any).action==='host-takeover'?finish({outcome:'escalated',stage:'host-takeover',model:(pending as any).model}):finish({outcome:'route-pending',route:pending});
    trail.push({stage:'repair-worker',detail:{cycle:taskOf(await store.load(),id).cycles}});
