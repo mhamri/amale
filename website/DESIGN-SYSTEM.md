@@ -673,8 +673,11 @@ thing it explains.
 canvas and every model tile render at full opacity; the layering inside the
 scene supplies the depth. Far edges — the coordinator distribution and the Jev
 consultation — are thinner, dimmer and softer, a whisper of the workflow, while
-near edges — review, escalation and the accepted-chunk returns — are brighter,
-thicker and sharper. Node glows are additive and soft and breathe slowly, so a
+near edges — the cross-family review, the escalation to Kimi and the
+accepted-chunk returns — are brighter, thicker and sharper. On top of that
+banding each link carries its own fixed weight, described below, which thins
+the coordinator's dispatches and the returns one step. Node glows are additive
+and soft and breathe slowly, so a
 node is a small light in the dark rather than a flat disc, and the packet
 travelling each active edge is a bright pulse in that edge's own hue with a
 tight hot core and a wider soft halo. The additive palette stays below the
@@ -682,15 +685,60 @@ luminance that would cost the copy its contrast ratios: a packet, its rail and
 a node ring together stay under half the AA threshold for `dim` body copy.
 
 A straight line between two node centres would run through the model-name label
-under Claude Code, GLM and MiMo. The four links involved carry explicit exit and
-entry points on the tile edges instead, and edge glow is clamped below the
-higher of the two tiles, so no glowing line and no glow reaches a label box —
-the same "no label is crossed" rule the diagrams obey.
+under Claude Code, GLM and MiMo. Those links carry an explicit exit point
+instead — on the tile edge where the link leaves sideways, and below the tile's
+label where it leaves downwards — and edge glow is clamped below the higher of
+the two tiles, so no glowing line and no glow reaches a label box — the same
+"no label is crossed" rule the diagrams obey. The two links that run down a column — GLM
+to Jev and MiMo to Kimi — sit on the vertical centre line of both tiles
+(x = 12.9 and x = 14.9 of the 16 × 9 design box) and each starts below the
+upper tile's own label, so the centre line is the connection's axis and the
+name it passes is never in its way. Jev answers all four Flash workers:
+DeepSeek, GLM, MiMo and Solar each hold a violet query link to it.
 
-Each model node wears a **logo tile**: a rounded square carrying the vendor's
-real mark when `website/public/models/` holds one, and otherwise a monogram
-in that model's routed hue. The tile is the same size and shape either way, so
-a missing logo reads as a deliberate mark rather than a hole. The shipped
+**One fixed weight per link.** Every entry in the `LINKS` table of
+`HeroCanvas.tsx` carries a `weight`, and the split is the workflow's own: the
+ordinary dispatch and return traffic between the coordinator and a worker tile
+runs at `THIN_WEIGHT` 0.7 — the four dispatch links to DeepSeek, Solar, GLM and
+MiMo, and the two accepted-chunk returns into the hub — while Jev's four
+queries, the cross-family review loop and the escalation to Kimi keep
+`FULL_WEIGHT` 1. The number is data written on the link itself, never a runtime
+random, and one number drives both renderers, so the canvas and the no-WebGL
+SVG thin exactly the same connections: the fragment shader reads it as
+`uniform float uLinkWeight[...]` and multiplies it into the rail's glow width
+and brightness, and the fallback `<line>` sets `stroke-width` from it on top of
+the near/far stroke (0.032 of a design unit for the near band, 0.018 for the
+far one). A thinned near link stays thicker than an untouched far one, so the
+two dimensions never invert, and the travelling packet keeps its size because
+it marks the event rather than the rail. Measured with the vividness probe,
+thinning these six links holds the vivid-pixel share the unthinned scene
+carried — about 1.4% at 1024 and 1.5% at 1440 CSS pixels against a 1.20% floor
+— which is why 0.7, the top of the allowed range, is the weight these links
+use.
+
+**One design box, one source of colour.** The scene is drawn in a 16 × 9 box
+fitted inside the canvas the way SVG `preserveAspectRatio` `xMidYMid meet`
+fits a `viewBox` — the shader scales by `min(width / 16, height / 9)` and
+insets the remainder — so the canvas and the fallback SVG put every node, tile
+and label in the same place at every aspect ratio. No hex value is ever
+written into the component: the canvas resolves each palette custom property
+once after mount through `getComputedStyle`, which keeps the daisyUI theme in
+`style.css` the single source of truth for both renderers. A model node glows
+in its own routed hue from `models.ts`; the coordinator and the reviewer keep
+their role hues. Labels under the tiles are supporting label copy at 0.15 of a
+design unit — at most 13.5 CSS pixels in the widest fit — set in the sans
+stack, because a model name is a topic rather than a string a reader could type
+or search. Every labelled tile sits at x ≥ 10.5 of the 16 design units, clear
+of the hero copy at `lg` and wider; `Problem.tsx` crops the band onto that
+region below `lg`. The fallback group ships at `opacity="0.25"`, the quiet
+background weight of the live frame, and the identity tiles sit outside it, so
+they never fade.
+
+Each model node wears a **logo tile**: one rounded square, 0.72 of a design unit
+with a 0.18 corner radius, carrying the vendor's real mark when
+`website/public/models/` holds one, and otherwise a monogram in that model's
+routed hue. The tile is the same size and shape either way, so a missing logo
+reads as a deliberate mark rather than a hole. The shipped
 mechanism reads the model's `logo` field in `website/src/lib/models.ts`, not
 the directory listing: a mark appears only when the file is in that folder
 **and** the field points at it, so adding a file alone upgrades nothing. A

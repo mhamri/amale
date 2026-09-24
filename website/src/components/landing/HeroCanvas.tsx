@@ -9,18 +9,16 @@ type SceneNode = {
   y: number;
   r: number;
   role: Role;
-  /** Rendered only for model nodes: the identity layer labels models, while
-   * the coordinator and reviewer stay anonymous dim anchors whose roles the
-   * aria-label and the topology diagram carry. */
   label?: string;
-  /** Set when the node is a routed model and wears a logo tile. */
   model?: ModelId;
 };
+
 type SceneLink = {
   from: number;
   to: number;
   role: Role;
   phase: number;
+  weight: number;
   exit?: [number, number];
   entry?: [number, number];
 };
@@ -28,19 +26,13 @@ type SceneLink = {
 const DESIGN_WIDTH = 16;
 const DESIGN_HEIGHT = 9;
 
-// One tile size and shape for every model node, whether it carries a vendor
-// mark or a monogram.
 const TILE = { side: 0.72, half: 0.36, radius: 0.18 };
-
-// The model name under a tile is supporting label copy, so it is set below
-// body scale: 0.15 of the 16-unit design box is at most 13.5 CSS pixels in the
-// widest fit of the band. It stays in the sans stack — a model name is a topic
-// a reader cannot type or search, so monospace would be decoration.
 const LABEL = { size: 0.15, gap: 0.42 };
 
-// Every labelled tile sits at x >= 10.5 of the 16 design units, clear of the
-// copy block at lg and wider; Problem.tsx crops the band to that region below
-// lg. The coordinator hub is an unlabelled glow left of the tiles.
+const LINK_STROKE = { near: 0.032, far: 0.018 };
+const FULL_WEIGHT = 1;
+const THIN_WEIGHT = 0.7;
+
 const NODES: SceneNode[] = [
   { x: 7.5, y: 4.6, r: 0.9, role: 'coordinator' },
   { x: 11.9, y: 2.2, r: 0.42, role: 'coordinator', label: 'Claude Code', model: 'anthropic' },
@@ -53,20 +45,27 @@ const NODES: SceneNode[] = [
   { x: 14.9, y: 7.0, r: 0.42, role: 'worker', label: 'Kimi', model: 'kimi' },
 ];
 
+const belowLabel = (node: number): [number, number] => [
+  NODES[node].x,
+  NODES[node].y + TILE.half + LABEL.gap + LABEL.size,
+];
+
 const LINKS: SceneLink[] = [
-  { from: 1, to: 0, role: 'coordinator', phase: 0 },
-  { from: 2, to: 0, role: 'coordinator', phase: 0.5, exit: [13.9, 2.56] },
-  { from: 0, to: 3, role: 'coordinator', phase: 0.12 },
-  { from: 0, to: 6, role: 'coordinator', phase: 0.62 },
-  { from: 1, to: 4, role: 'coordinator', phase: 0.37, exit: [12.26, 2.2], entry: [12.9, 4.24] },
-  { from: 2, to: 5, role: 'coordinator', phase: 0.87 },
-  { from: 4, to: 7, role: 'jev', phase: 0.24, exit: [12.54, 4.96], entry: [12.54, 6.64] },
-  { from: 6, to: 7, role: 'jev', phase: 0.74 },
-  { from: 3, to: 4, role: 'review', phase: 0.44 },
-  { from: 4, to: 5, role: 'review', phase: 0.94 },
-  { from: 5, to: 8, role: 'worker', phase: 0.3, exit: [15.26, 4.96], entry: [15.26, 6.64] },
-  { from: 3, to: 0, role: 'review', phase: 0.58 },
-  { from: 6, to: 0, role: 'review', phase: 0.08 },
+  { from: 1, to: 0, role: 'coordinator', phase: 0, weight: FULL_WEIGHT },
+  { from: 2, to: 0, role: 'coordinator', phase: 0.5, exit: [13.9, 2.56], weight: FULL_WEIGHT },
+  { from: 0, to: 3, role: 'coordinator', phase: 0.12, weight: THIN_WEIGHT },
+  { from: 0, to: 6, role: 'coordinator', phase: 0.62, weight: THIN_WEIGHT },
+  { from: 1, to: 4, role: 'coordinator', phase: 0.37, exit: [12.26, 2.2], entry: [12.9, 4.24], weight: THIN_WEIGHT },
+  { from: 2, to: 5, role: 'coordinator', phase: 0.87, weight: THIN_WEIGHT },
+  { from: 4, to: 7, role: 'jev', phase: 0.24, exit: belowLabel(4), weight: FULL_WEIGHT },
+  { from: 6, to: 7, role: 'jev', phase: 0.74, weight: FULL_WEIGHT },
+  { from: 3, to: 4, role: 'review', phase: 0.44, weight: FULL_WEIGHT },
+  { from: 4, to: 5, role: 'review', phase: 0.94, weight: FULL_WEIGHT },
+  { from: 5, to: 8, role: 'worker', phase: 0.3, exit: belowLabel(5), weight: FULL_WEIGHT },
+  { from: 3, to: 0, role: 'review', phase: 0.58, weight: THIN_WEIGHT },
+  { from: 6, to: 0, role: 'review', phase: 0.08, weight: THIN_WEIGHT },
+  { from: 3, to: 7, role: 'jev', phase: 0.52, weight: FULL_WEIGHT },
+  { from: 5, to: 7, role: 'jev', phase: 0.62, weight: FULL_WEIGHT },
 ];
 
 const linkSegment = (link: SceneLink): [number, number, number, number] => [
@@ -75,6 +74,8 @@ const linkSegment = (link: SceneLink): [number, number, number, number] => [
   link.entry?.[0] ?? NODES[link.to].x,
   link.entry?.[1] ?? NODES[link.to].y,
 ];
+
+const isNearLink = (link: SceneLink) => link.role === 'review' || link.role === 'worker';
 
 const NODE_COUNT = NODES.length;
 const LINK_COUNT = LINKS.length;
@@ -102,8 +103,6 @@ const ROLE_VARIABLE: Record<Role, string> = {
   review: '--color-secondary',
 };
 
-// Every hue the scene can paint a node with: the role hues plus each model's
-// routed hue from the identity list.
 const HUE_VARIABLES = [
   ...new Set([
     ...Object.values(ROLE_VARIABLE),
@@ -112,9 +111,6 @@ const HUE_VARIABLES = [
 ];
 const SCENE_VARIABLES = ['--color-base-100', '--color-line', ...HUE_VARIABLES];
 
-// A model node glows in its own routed hue; the coordinator and the reviewer
-// keep their role hues. Returns a bare custom-property name (e.g.
-// '--color-secondary') so consumers can wrap it in var() themselves.
 const nodeHue = (node: SceneNode) =>
   bareVar(node.model ? MODELS[node.model].hue : ROLE_VARIABLE[node.role]);
 
@@ -122,10 +118,6 @@ const VERTEX_SOURCE = `
 attribute vec2 aPos;
 void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
-// The design box is fitted inside the canvas exactly the way SVG
-// preserveAspectRatio "xMidYMid meet" fits a viewBox, so the shader and the
-// fallback SVG put every node, tile and label in the same place at every
-// aspect ratio.
 const FRAGMENT_SOURCE = `
 precision mediump float;
 uniform vec2 uRes;
@@ -140,6 +132,7 @@ uniform vec3 uLinkColor[${LINK_COUNT}];
 uniform float uLinkPhase[${LINK_COUNT}];
 uniform float uLinkNear[${LINK_COUNT}];
 uniform float uLinkClamp[${LINK_COUNT}];
+uniform float uLinkWeight[${LINK_COUNT}];
 
 float segmentDistance(vec2 p, vec2 a, vec2 b){
   vec2 ab = b - a;
@@ -166,12 +159,13 @@ void main(){
   for (int i = 0; i < ${LINK_COUNT}; i++){
     vec2 a = uLink[i].xy;
     vec2 b = uLink[i].zw;
+    float weight = uLinkWeight[i];
     float rail = segmentDistance(p, a, b);
     float near = uLinkNear[i];
     float glowClamp = 1.0 - smoothstep(uLinkClamp[i] - 0.06, uLinkClamp[i] + 0.06, p.y);
 
-    color += uLinkColor[i] * (0.22 + 0.18 * near) * glow(rail, 0.048 + 0.042 * (1.0 - near)) * glowClamp;
-    color += uLinkColor[i] * (0.38 + 0.30 * near) * glow(rail, 0.027 + 0.024 * (1.0 - near)) * glowClamp;
+    color += uLinkColor[i] * weight * (0.22 + 0.18 * near) * glow(rail, weight * (0.048 + 0.042 * (1.0 - near))) * glowClamp;
+    color += uLinkColor[i] * weight * (0.38 + 0.30 * near) * glow(rail, weight * (0.027 + 0.024 * (1.0 - near))) * glowClamp;
 
     float travel = fract(uTime * 0.2 + uLinkPhase[i]);
     float eased = travel * travel * (3.0 - 2.0 * travel);
@@ -180,7 +174,7 @@ void main(){
     float toPacket = length(p - packet);
     float nearBoost = 1.0 + 0.2 * near;
     color += uLinkColor[i] * alive * nearBoost * (0.32 * glow(toPacket, 0.055) + 0.14 * glow(toPacket, 0.20)) * glowClamp;
-    color += uLinkColor[i] * alive * nearBoost * 0.18 * glow(rail, 0.032) * smoothstep(0.5, 0.0, toPacket) * glowClamp;
+    color += uLinkColor[i] * weight * alive * nearBoost * 0.18 * glow(rail, 0.032) * smoothstep(0.5, 0.0, toPacket) * glowClamp;
   }
 
   for (int i = 0; i < ${NODE_COUNT}; i++){
@@ -234,10 +228,6 @@ function buildProgram(gl: WebGLRenderingContext) {
   return program;
 }
 
-// The palette lives once, in the daisyUI theme in style.css. Letting the
-// browser resolve each custom property to an rgb() triple keeps the canvas
-// and the fallback SVG reading the same source instead of duplicating hex
-// values.
 function readPalette(host: HTMLElement, variables: string[]) {
   const probe = document.createElement('span');
   probe.style.position = 'absolute';
@@ -327,6 +317,7 @@ export default function HeroCanvas() {
     const linkPhases = new Float32Array(LINK_COUNT);
     const linkNear = new Float32Array(LINK_COUNT);
     const linkClamp = new Float32Array(LINK_COUNT);
+    const linkWeight = new Float32Array(LINK_COUNT);
 
     NODES.forEach((node, i) => {
       nodePositions[i * 2] = node.x;
@@ -342,7 +333,8 @@ export default function HeroCanvas() {
       linkEnds[i * 4 + 3] = y2;
       linkColors.set(palette[edgeHue(link)], i * 3);
       linkPhases[i] = link.phase;
-      linkNear[i] = (link.role === 'review' || link.role === 'worker') ? 1.0 : 0.6;
+      linkNear[i] = isNearLink(link) ? 1.0 : 0.6;
+      linkWeight[i] = link.weight;
       const higher = Math.max(NODES[link.from].y, NODES[link.to].y);
       linkClamp[i] = higher + TILE.half + LABEL.gap * 0.5;
     });
@@ -367,6 +359,7 @@ export default function HeroCanvas() {
     gl.uniform1fv(uniform('uLinkPhase'), linkPhases);
     gl.uniform1fv(uniform('uLinkNear'), linkNear);
     gl.uniform1fv(uniform('uLinkClamp'), linkClamp);
+    gl.uniform1fv(uniform('uLinkWeight'), linkWeight);
 
     const draw = () => {
       if (contextLost || canvas.width < 1 || canvas.height < 1) return;
@@ -442,17 +435,13 @@ export default function HeroCanvas() {
             />
           </clipPath>
         </defs>
-        {/* The fallback is the scene for no-JS, no-WebGL and reduced-motion
-            visitors: same quiet background weight as the live frame, with the
-            identity tiles above it. The presentation attribute keeps the
-            mounted opacity-0 toggle in charge of the fade. */}
         <g
           ref={fallback}
           class="transition-opacity duration-500 ease-out-soft"
           opacity="0.25"
         >
           {LINKS.map((link) => {
-            const near = (link.role === 'review' || link.role === 'worker') ? 0.7 : 0.3;
+            const near = isNearLink(link);
             const [x1, y1, x2, y2] = linkSegment(link);
             return (
               <line
@@ -461,8 +450,8 @@ export default function HeroCanvas() {
                 x2={x2}
                 y2={y2}
                 stroke={`var(${edgeHue(link)})`}
-                stroke-width={near > 0.5 ? "0.032" : "0.018"}
-                opacity={near}
+                stroke-width={(near ? LINK_STROKE.near : LINK_STROKE.far) * link.weight}
+                opacity={near ? 0.7 : 0.3}
               />
             );
           })}
@@ -477,8 +466,6 @@ export default function HeroCanvas() {
             />
           ))}
         </g>
-        {/* Model tiles sit outside the fading fallback group, so they stay
-            visible with no JavaScript, no WebGL, and over the live scene. */}
         <g>
         {NODES.map((node) => {
           if (!node.model) return null;
