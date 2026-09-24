@@ -95,6 +95,10 @@ test('an empty provider response is transient and triggers failover',()=>{
  assert.equal(transientProvider('403: Your account lacks access to this model'),false);
 });
 
+test('a provider stream cut before its finish reason is transient and triggers failover',()=>{
+ assert.equal(transientProvider('Stream ended without finish_reason'),true);
+});
+
 test('a provider that returns an empty response is retried and recovers',async t=>{
  const dir=await fixture(t),counter=join(dir,'launches.txt'),entry=join(dir,'fake-pi.ts');
  await writeFile(entry,scriptedPi(join(dir,'argv.jsonl'),counter,[failed('error','Provider returned an empty response'),{type:'agent_end'}],[assistant,{type:'agent_end'}]));
