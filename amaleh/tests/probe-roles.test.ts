@@ -24,6 +24,18 @@ test('plan refuses a task check without role',async t=>{
  await assert.rejects(()=>c.plan(store,{tasks:[task],integrationChecks:[]}),/requires role/);
 });
 
+test('a run saved before checks had roles still loads, and only new contracts must declare roles',async t=>{
+ const {store}=await fixture(t);
+ const legacy=(id:string)=>({id,title:id,goal:'Test',phase:'one',deps:[],resources:[id],criteria:['works'],kind:'code' as const,noProbe:'fixture',checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}]});
+ await c.plan(store,{tasks:[legacy('a')],integrationChecks:[]});
+ await store.transaction(s=>{delete (c.taskOf(s,'a').checks[0] as any).role;delete (c.taskOf(s,'a') as any).noProbe;});
+ const loaded=await store.load();
+ assert.equal(c.taskOf(loaded,'a').checks[0].role,undefined,'the legacy check is read back as saved');
+ const b={...legacy('b'),checks:[probeCheck]};
+ await c.plan(store,{tasks:[c.taskOf(loaded,'a'),b],integrationChecks:[]});
+ await assert.rejects(()=>c.plan(store,{tasks:[c.taskOf(loaded,'a'),b,{...legacy('c'),checks:[{id:'test',command:process.execPath,args:[]}] as any}],integrationChecks:[]}),/Check test on task c requires role/);
+});
+
 test('plan refuses a code task with no probe and no noProbe',async t=>{
  const {store}=await fixture(t);
  const task={id:'a',title:'a',goal:'Test',phase:'one',deps:[],resources:['a'],criteria:['works'],kind:'code' as const,
