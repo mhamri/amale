@@ -68,7 +68,7 @@ test('the worker prompt names the task workspace and the read-only handoff paths
  for(const path of [briefPath,artifacts,jev,run]){assert.ok(prompt.includes(path),path+' must be named');assert.match(prompt,/read-only/,path+' must be marked read-only');}
 });
 
-const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]} as c.Task);
+const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard'}],noProbe:'Test fixture; workspace confinement is asserted by the test, not by an executable probe'} as c.Task);
 const jevTargeted=(async()=>Response.json({model:'test/jev',answers:{selection:{type:'choice',choice:'targeted',confidence:.95,probabilities:{targeted:.95,rethink:.03,simplify:.02}}}})) as typeof fetch;
 async function delegateFixture(t:any,tasks:c.Task[]=[task('a')]){
  keepModels(t);
@@ -108,7 +108,7 @@ test('an escaped write escalates with stage workspace-escape and leaves the task
 });
 
 test('an escape during a repair run escalates without another repair cycle or failover',async t=>{
- const failingCheck:c.Task['checks'][number]={id:'test',command:process.execPath,args:['-e','process.exit(1)']};
+ const failingCheck:c.Task['checks'][number]={id:'test',command:process.execPath,args:['-e','process.exit(1)'],role:'probe'};
  const {dir,store}=await delegateFixture(t,[{...task('a'),checks:[failingCheck]}]);
  const escaped=[join(tmpdir(),'elsewhere','repair-leak.ts')];
  const workers=[cleanWorker(dir),escapingWorker(dir,escaped)];let call=0;
@@ -132,5 +132,5 @@ test('a worker whose writes all stay inside is accepted',async t=>{
 
 test('a registered check may use any id without conflict',async t=>{
  const {dir,store}=await delegateFixture(t);
- await assert.doesNotReject(()=>c.plan(store,{tasks:[task('a'),{...task('b'),checks:[{id:'my-check',command:'x',args:[]}]}],integrationChecks:[]}));
+ await assert.doesNotReject(()=>c.plan(store,{tasks:[task('a'),{...task('b'),checks:[{id:'my-check',command:'x',args:[],role:'guard'}]}],integrationChecks:[]}));
 });
