@@ -452,14 +452,18 @@ rises in once, over 0.6s, and is finished well inside 700ms:
   feedback is a 160ms colour/border change only.
 - Motion answers actions: dropdowns, collapses and tabs animate as they
   open.
+- **Scrolling is never animated.** The `html` base layer leaves
+  `scroll-behavior` at the browser default, so anchor links and programmatic
+  scrolls land instantly: a measurement taken right after a scroll must
+  describe the settled position, which an animated scroll would make stale.
 - **Continuous motion is permitted only inside the visualization layer** —
   the hero canvas and the orchestration diagrams described below. It is the
   subject of those components, not decoration on top of them, and it obeys
   the pause rules in that section. Nothing else loops except an explicit
   `loading-spinner`.
-- **Reduced motion:** `style.css` kills all transitions, keyframes and
-  smooth scrolling under `prefers-reduced-motion: reduce`. CSS-driven motion
-  is therefore covered automatically. Script-driven motion is not: every
+- **Reduced motion:** `style.css` kills all transitions and keyframes under
+  `prefers-reduced-motion: reduce`. CSS-driven motion is therefore covered
+  automatically. Script-driven motion is not: every
   canvas or JavaScript timeline must query
   `matchMedia('(prefers-reduced-motion: reduce)')` itself, render one static
   frame when it matches, and subscribe to that query's `change` event so a
@@ -648,8 +652,8 @@ is the lead, and it stays above 4.7:1 while the `base-content` title stays above
 
 ## Visualization layer
 
-The site shows delegation instead of only describing it. Two component kinds
-carry that, and both are subject to the rules here.
+The site shows delegation instead of only describing it. Three component
+kinds carry that, and all are subject to the rules here.
 
 **Hero canvas** — one per site, on the landing page only. A WebGL scene whose
 subject is the workflow itself: Claude Code or Codex running the coordinator,
@@ -705,6 +709,27 @@ one has a single subject named in its own caption: the model topology on the
 landing page and the documentation overview, and one diagram per remaining
 documentation page showing that page's subject (the run lifecycle, the review
 and repair loop, the install and first-run sequence, the operation map).
+
+**The TypeSafe Jev mark in ASCII** — `case-study/JevAsciiMark.tsx`, beside
+the In-task decisions section on the case-study page. Its geometry is the real
+mark: `scripts/generate-jev-mask-field.mjs` decodes the dark strokes of
+`public/models/TypeSafe.png` once into a coverage grid committed as
+`case-study/jev-mark-field.ts`, and `case-study/jev-mark-frame.ts` ray-marches
+that grid through an extruded slab — the strokes only, so every enclosed hole
+of the knot stays a hole at every angle — shading each cell by surface normal
+and depth on a ten-character ramp in `text-accent`. The `<pre>` is scaled by its
+container (`@container` plus a `cqw` font size), so the mark fills its grid
+column at every width and cannot overflow at 320 px. The wrapper carries
+`data-jev-mark` and exposes its pose as `data-tilt` ("x,y" in radians) and
+`data-spin` (radians); the pointer tilts it with easing and page scroll turns
+it about its vertical axis, while the rendered yaw is clamped to a frontal
+sector. The rest pose sits close to face-on with only a slight tilt, so the
+prerendered still frame reads as the mark's hollow boxes rather than a filled
+silhouette while the depth shading keeps the extrusion visible. Under `prefers-reduced-motion: reduce` it
+renders one still frame and ignores input, with a `change` listener so
+toggling the preference takes effect immediately; an IntersectionObserver and
+a `visibilitychange` listener stop rendering off screen and in a hidden tab;
+cleanup removes every listener.
 
 Required of every visual in this layer, without exception:
 
