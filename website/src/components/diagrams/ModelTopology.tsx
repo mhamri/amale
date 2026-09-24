@@ -1,7 +1,7 @@
 import { onCleanup, onMount } from 'solid-js';
 
 /**
- * Model topology — how an Amale run's models work together.
+ * Model topology — how an Amaleh run's models work together.
  *
  * Server-rendered, complete and meaningful with no JavaScript: a static SVG
  * (a narrow stack below md, a wide instrument panel from md) whose labels are
@@ -17,7 +17,7 @@ import { onCleanup, onMount } from 'solid-js';
  */
 
 const ARIA_LABEL =
-  'Model topology of an Amale run: the coordinator host (Claude Code or Codex) ' +
+  'Model topology of an Amaleh run: the coordinator host (Claude Code or Codex) ' +
   'hands a chunk to a routed Flash worker family — DeepSeek, GLM, MiMo or Solar — ' +
   'the worker asks Jev a bounded question, the other model family reviews ' +
   'read-only, a repair escalates to Kimi, and the accepted chunk returns to the coordinator.';

@@ -19,7 +19,7 @@ export default function FinalCall() {
           Direct the next build.
         </h2>
         <p class="mt-4 leading-relaxed text-dim">
-          Install once, invoke <span class="font-mono text-base-content">/amale</span> with your
+          Install once, invoke <span class="font-mono text-base-content">/amaleh</span> with your
           task, and get back work each chunk of which was checked and independently reviewed.
         </p>
         <div class="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">

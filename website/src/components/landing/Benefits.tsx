@@ -92,7 +92,7 @@ export default function Benefits() {
         <div class="grid items-stretch md:grid-cols-[minmax(0,32rem)_minmax(0,1fr)]">
           <div class="flex min-w-0 flex-col justify-center gap-4 border-b border-line p-6 sm:p-8 md:border-b-0 md:border-r">
             <p class="text-base leading-relaxed text-base-content">
-              This site was rebuilt through Amale's own runs: 156 model calls, 45 blocking defects
+              This site was rebuilt through Amaleh's own runs: 156 model calls, 45 blocking defects
               caught by review before merge, an estimated 7.82 US dollars.
             </p>
             <p class="text-sm leading-relaxed text-dim">

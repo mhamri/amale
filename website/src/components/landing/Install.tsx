@@ -1,9 +1,9 @@
 import { Glow, GridDots, Rings } from '../decor';
 
-const installCommands = `git clone https://github.com/mhamri/amale
-cd amale
-bun amale/scripts/run.ts doctor
-bun amale/scripts/run.ts install`;
+const installCommands = `git clone https://github.com/mhamri/amaleh
+cd amaleh
+bun amaleh/scripts/run.ts doctor
+bun amaleh/scripts/run.ts install`;
 
 const installFacts = [
   {
@@ -42,7 +42,7 @@ export default function Install() {
           </h2>
           <p class="mt-4 max-w-prose leading-relaxed text-dim">
             Clone the repository and run both commands from the checkout root. Invoke{' '}
-            <span class="font-mono text-base-content">/amale</span> with your task afterwards; the
+            <span class="font-mono text-base-content">/amaleh</span> with your task afterwards; the
             skill handles the workflow and resume steps.
           </p>
           <figure class="mt-6 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">

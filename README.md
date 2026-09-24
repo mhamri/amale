@@ -1,8 +1,8 @@
-# Amale
+# Amaleh
 
-**عمله** is pronounced **ʿamaleh** (roughly **Ah-mah-leh**) and means **workers / laborers** in Persian. *Amale* is the project's Latin-script name: coordinated workers contributing to a shared, verified outcome.
+**عمله** is pronounced **ʿamaleh** (roughly **Ah-mah-leh**) and means **workers / laborers** in Persian. *Amaleh* is the project's Latin-script name: coordinated workers contributing to a shared, verified outcome.
 
-**Why Amale exists: top-tier models are too expensive to do the work.** Without structure, an expensive model spends its premium context writing every edit, every check, every micro-decision. Amale turns that model into a director instead of a laborer: it segments work into chunks with clear outcomes, delegates each chunk to cheap Flash models, and only verifies direction at chunk boundaries. The result is the same verified delivery at a fraction of the token cost.
+**Why Amaleh exists: top-tier models are too expensive to do the work.** Without structure, an expensive model spends its premium context writing every edit, every check, every micro-decision. Amaleh turns that model into a director instead of a laborer: it segments work into chunks with clear outcomes, delegates each chunk to cheap Flash models, and only verifies direction at chunk boundaries. The result is the same verified delivery at a fraction of the token cost.
 
 A self-contained workflow skill for Codex and Claude: discovery, planning, delegated parallel implementation, independent review and verified delivery. Disk checkpoints let another session resume the work.
 
@@ -24,39 +24,39 @@ Use Bun, or Node 24 or newer for the fallback launcher. Configure pi with OpenRo
 First clone the repository to a stable location:
 
 ```sh
-git clone https://github.com/mhamri/amale
-cd amale
+git clone https://github.com/mhamri/amaleh
+cd amaleh
 ```
 
-Installation links `amale/` into the current user's Codex and Claude skill directories, so the clone must live somewhere you will not move or delete. From that checkout root, run:
+Installation links `amaleh/` into the current user's Codex and Claude skill directories, so the clone must live somewhere you will not move or delete. From that checkout root, run:
 
 ```sh
-bun amale/scripts/run.ts doctor
-bun amale/scripts/run.ts install
+bun amaleh/scripts/run.ts doctor
+bun amaleh/scripts/run.ts install
 ```
 
-Installation refuses conflicting destinations; keep the checkout in place after installation. Invoke `/amale` with your task; the skill handles the workflow and resume steps.
+Installation refuses conflicting destinations; keep the checkout in place after installation. Invoke `/amaleh` with your task; the skill handles the workflow and resume steps.
 
-The host runs a synthetic startup preflight through its permitted execution channel before network work. Amale does not edit global permission settings. Network access and permission to send project context remain host-controlled.
+The host runs a synthetic startup preflight through its permitted execution channel before network work. Amaleh does not edit global permission settings. Network access and permission to send project context remain host-controlled.
 
 ## Documentation
 
 - [Website source](website/): SolidStart with reusable Solid components and daisyUI, prerendered for GitHub Pages.
 
-- [Skill entry point](amale/SKILL.md)
-- [CLI operations and inputs](amale/references/runtime.md)
-- [Execution and network permissions](amale/references/execution.md)
-- [Review and acceptance](amale/references/review.md)
-- [Verification and limitations](amale/references/verification.md)
+- [Skill entry point](amaleh/SKILL.md)
+- [CLI operations and inputs](amaleh/references/runtime.md)
+- [Execution and network permissions](amaleh/references/execution.md)
+- [Review and acceptance](amaleh/references/review.md)
+- [Verification and limitations](amaleh/references/verification.md)
 - [Interactive workflow graph](DESIGN.html): open the downloaded file in a browser, or browse the copy shipped with the website at `/workflow.html`, linked from the [workflow documentation page](website/src/routes/docs/workflow.tsx).
 
 ## Diagnostics
 
-`diagnose` reads durable state, runtime traces, host-reported actions and a **process-health** assessment: coordinator decisions per task, worker-side Jev usage, delegation vs manual dispatch, and model-family distribution, with warnings that name the exact anti-pattern when a run drifts back into expensive-model micro-management. `host-action` records native edits, delegation, permission outcomes and next steps across sessions. `diagnostic-export` creates a local summary with free text and source identifiers omitted; it never uploads it. See the [command reference](amale/references/runtime.md#host-actions-and-diagnostic-export).
+`diagnose` reads durable state, runtime traces, host-reported actions and a **process-health** assessment: coordinator decisions per task, worker-side Jev usage, delegation vs manual dispatch, and model-family distribution, with warnings that name the exact anti-pattern when a run drifts back into expensive-model micro-management. `host-action` records native edits, delegation, permission outcomes and next steps across sessions. `diagnostic-export` creates a local summary with free text and source identifiers omitted; it never uploads it. See the [command reference](amaleh/references/runtime.md#host-actions-and-diagnostic-export).
 
 ### Checking a finished run
 
-Run these from the repository the run worked in. `<skill>` is the installed skill directory, typically `~/.claude/skills/amale`.
+Run these from the repository the run worked in. `<skill>` is the installed skill directory, typically `~/.claude/skills/amaleh`.
 
 ```sh
 bun <skill>/scripts/run.ts list .
@@ -71,7 +71,7 @@ bun <skill>/scripts/run.ts health . <run-id>
 `health` deliberately stays quiet about chunks that failed and recovered, because a run that stumbles and retries is still a healthy run. To see what the stumbles cost, read the outcomes and the check receipts from the newest revision:
 
 ```sh
-last=$(ls .amale/runs/<run-id>/revision-*.json | tail -1)
+last=$(ls .amaleh/runs/<run-id>/revision-*.json | tail -1)
 jq -r '[.events[]|select(.type=="delegate-finished")|.detail.outcome]
        |group_by(.)|map({(.[0]):length})|add' "$last"
 jq -r '.tasks[]|"\(.id): \(.status) [\([.receipts[]|.id+":"+(.code|tostring)]|join(", "))]"' "$last"
@@ -84,7 +84,7 @@ A run is fine when `health` reports no warnings and every task is `accepted`. In
 ## Development
 
 ```sh
-cd amale
+cd amaleh
 bun install --frozen-lockfile
 bun run check
 bun run test:node
@@ -98,7 +98,7 @@ bun design/build.ts
 bun design/preview.ts
 ```
 
-Preview binds loopback port 4179; `AMALE_PREVIEW_PORT` selects another port. Both scripts also run with modern Node. Edit `design/viewer.ts` and `design/template.html`, then rebuild `DESIGN.html`.
+Preview binds loopback port 4179; `AMALEH_PREVIEW_PORT` selects another port. Both scripts also run with modern Node. Edit `design/viewer.ts` and `design/template.html`, then rebuild `DESIGN.html`.
 
 Local runs, credentials, screenshots, development reports and intermediate bundles are excluded. Windows execution has been tested; macOS/Linux use portable APIs but have not yet been exercised here.
 
@@ -117,8 +117,8 @@ npm run preview
 
 Preview opens a static server at `http://127.0.0.1:4180`. For development, use `npm run dev`. Use Node 24 or newer; CI pins the latest stable verified release listed in [dependency sources](website/DEPENDENCIES.md).
 
-Set `SITE_BASE=/amale/` when building and previewing this repository as a GitHub project site (PowerShell: `$env:SITE_BASE='/amale/'`; POSIX shell: `export SITE_BASE=/amale/`). The default is `/` for local development or a custom domain. The static check verifies that links and assets stay within the configured base path.
+Set `SITE_BASE=/amaleh/` when building and previewing this repository as a GitHub project site (PowerShell: `$env:SITE_BASE='/amaleh/'`; POSIX shell: `export SITE_BASE=/amaleh/`). The default is `/` for local development or a custom domain. The static check verifies that links and assets stay within the configured base path.
 
 [The Pages workflow](.github/workflows/pages.yml) installs the lockfile, type-checks, builds, and validates the rendered output on pull requests. Pushes or manual runs on the default branch also upload `website/.output/public` and deploy it to GitHub Pages. In repository **Settings → Pages → Build and deployment**, select **GitHub Actions** once, then merge these changes to the default branch. CI derives `/repository-name/` automatically (or `/` for an `owner.github.io` repository); set the repository Actions variable `SITE_BASE` to `/` for a custom domain. Deployment requires the repository's Pages environment to allow the default branch.
 
-Only the explicit public build is uploaded, never the repository root or `.amale` state. See [website dependency sources](website/DEPENDENCIES.md) for versions, verification dates, and update guidance.
+Only the explicit public build is uploaded, never the repository root or `.amaleh` state. See [website dependency sources](website/DEPENDENCIES.md) for versions, verification dates, and update guidance.

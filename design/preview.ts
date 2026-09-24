@@ -1,12 +1,12 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 
-const port = Number(process.env.AMALE_PREVIEW_PORT ?? 4179);
+const port = Number(process.env.AMALEH_PREVIEW_PORT ?? 4179);
 createServer(async (request, response) => {
   const documents: Record<string,string> = { '/':'DESIGN.html', '/DESIGN.html':'DESIGN.html' };
   // Serve shipped documentation only, never local runs or audit artifacts.
   for (const name of ['runtime','effort','verification','parallelism']) {
-    const path = `amale/references/${name}.md`;
+    const path = `amaleh/references/${name}.md`;
     documents['/' + path] = path;
   }
   const document = documents[request.url ?? ''];
@@ -20,4 +20,4 @@ createServer(async (request, response) => {
   } catch {
     response.writeHead(500).end('Build DESIGN.html first.');
   }
-}).listen(port, '127.0.0.1', () => console.log(`Amale design: http://127.0.0.1:${port}`));
+}).listen(port, '127.0.0.1', () => console.log(`Amaleh design: http://127.0.0.1:${port}`));

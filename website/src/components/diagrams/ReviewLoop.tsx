@@ -293,7 +293,7 @@ export default function ReviewLoop() {
             <T x={672} y={412} s={9.5}>takes over</T>
           </Box>
           <Box x={240} y={300} w={180} h={96} step={7} tone="dim">
-            <T x={254} y={346} s={12} f="fill-base-content" b mono>.amale run state</T>
+            <T x={254} y={346} s={12} f="fill-base-content" b mono>.amaleh run state</T>
             <T x={254} y={368} s={10}>revisions + artifacts</T>
             <T x={254} y={384} s={10}>retained across sessions</T>
           </Box>

@@ -1,5 +1,5 @@
 import { createHandler, StartServer } from '@solidjs/start/server';
-export default createHandler(() => <StartServer document={props => <html lang="en" data-theme="amale">
+export default createHandler(() => <StartServer document={props => <html lang="en" data-theme="amaleh">
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>

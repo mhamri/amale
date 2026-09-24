@@ -5,7 +5,7 @@
  */
 
 /** The repository the skill, its source and its issues live in. */
-export const REPOSITORY_URL = 'https://github.com/mhamri/amale';
+export const REPOSITORY_URL = 'https://github.com/mhamri/amaleh';
 
 /** Where a reader can fund the work. */
 export const SPONSOR_URL = 'https://github.com/sponsors/mhamri';

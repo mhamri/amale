@@ -96,8 +96,8 @@ export default function CaseStudyPage() {
   return (
     <>
       <PageMeta
-        title="Case study — Amale"
-        description="How Amale built this site: every claim the landing page makes, proven with measured figures from the run records that built it."
+        title="Case study — Amaleh"
+        description="How Amaleh built this site: every claim the landing page makes, proven with measured figures from the run records that built it."
       />
       <main id="main">
         <section class="relative isolate min-h-[30rem] overflow-hidden pb-4 pt-32 md:pb-8 md:pt-32">
@@ -125,7 +125,7 @@ export default function CaseStudyPage() {
           </div>
           <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
             <h1 class="font-display text-hero font-semibold tracking-tight">
-              How Amale built this site
+              How Amaleh built this site
             </h1>
             <p class="mt-5 text-lg leading-relaxed text-dim max-w-prose" data-reveal>
               Every claim the landing page makes about the skill is backed by a measured figure
@@ -136,7 +136,7 @@ export default function CaseStudyPage() {
               The project's name is <span lang="fa" dir="rtl">عمله</span>, transliterated as{' '}
               <em>ʿamalah</em> and pronounced <strong class="text-base-content">Ah-mah-leh</strong>
               . It is a Persian word meaning <strong>workers / laborers</strong> — people
-              contributing effort to a shared result. <em>Amale</em> is the project's Latin-script
+              contributing effort to a shared result. <em>Amaleh</em> is the project's Latin-script
               name.
             </p>
           </div>
@@ -264,7 +264,7 @@ export default function CaseStudyPage() {
             Claim and proof
           </h2>
           <p class="mt-4 text-base leading-relaxed text-dim max-w-prose">
-            Each claim the landing page makes about Amale, paired with the measured figure
+            Each claim the landing page makes about Amaleh, paired with the measured figure
             that backs it.
           </p>
           <div class="mt-8 grid gap-6 md:grid-cols-2">

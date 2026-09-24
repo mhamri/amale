@@ -33,8 +33,8 @@ export default function DocsWorkflow() {
   return (
     <>
       <PageMeta
-        title="Workflow — Amale documentation"
-        description="How an Amale run moves from discovery and planning through delegated parallel execution to verified delivery."
+        title="Workflow — Amaleh documentation"
+        description="How an Amaleh run moves from discovery and planning through delegated parallel execution to verified delivery."
       />
       <DocsLayout
         current="workflow"

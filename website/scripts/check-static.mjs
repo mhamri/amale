@@ -405,7 +405,7 @@ const TYPABLE_PATTERNS = [
 ];
 
 /*
- * The skill's own CLI operation names, from amale/scripts/cli.ts.
+ * The skill's own CLI operation names, from amaleh/scripts/cli.ts.
  * DESIGN-SYSTEM.md counts a CLI operation name as a typable string, so a chip
  * naming one of these has not taken monospace as decoration. The list is
  * closed on purpose: a bare word counts as typable only when it is one of
@@ -764,7 +764,7 @@ async function checkOutputSanity() {
   await stat(resolve(publicDir, '.nojekyll'));
 
   const rootEntries = await readdir(publicDir);
-  const forbidden = new Set(['.amale', '.git', 'node_modules', 'package.json', '.output', '.vite']);
+  const forbidden = new Set(['.amaleh', '.git', 'node_modules', 'package.json', '.output', '.vite']);
   for (const name of rootEntries) {
     assert.ok(!forbidden.has(name),
       `Private or build files must not ship at the output root: ${name}`);

@@ -24,13 +24,13 @@ export default function DocsCommands() {
   return (
     <>
       <PageMeta
-        title="Command reference — Amale documentation"
+        title="Command reference — Amaleh documentation"
         description="Every CLI operation, its purpose and its input shape, drawn from the shipped runtime reference."
       />
       <DocsLayout
         current="commands"
         title="Command reference"
-        lead="Every CLI operation available through the Amale runtime, grouped by purpose. Each entry states what the operation does and the input shape it expects, drawn from the shipped runtime reference files."
+        lead="Every CLI operation available through the Amaleh runtime, grouped by purpose. Each entry states what the operation does and the input shape it expects, drawn from the shipped runtime reference files."
         sections={sections}
       >
         <OperationMap />
@@ -143,7 +143,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>sh</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amale/scripts/cli.ts list ./my-project`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amaleh/scripts/cli.ts list ./my-project`}</code></pre>
           </figure>
 
           <h3 id="status" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
@@ -963,23 +963,23 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
                   <td class="text-dim">OpenRouter credential. The runtime never prints or writes it into artifacts.</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-xs font-medium text-base-content">AMALE_PI_ENTRY</td>
+                  <td class="font-mono text-xs font-medium text-base-content">AMALEH_PI_ENTRY</td>
                   <td class="text-dim">Names the installed pi JavaScript entry if the default resolution is wrong.</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-xs font-medium text-base-content">AMALE_RUNTIME</td>
-                  <td class="text-dim">Override the runtime executable. Checked before AMALE_NODE.</td>
+                  <td class="font-mono text-xs font-medium text-base-content">AMALEH_RUNTIME</td>
+                  <td class="text-dim">Override the runtime executable. Checked before AMALEH_NODE.</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-xs font-medium text-base-content">AMALE_NODE</td>
-                  <td class="text-dim">Fallback executable path for pi. Checked after AMALE_RUNTIME.</td>
+                  <td class="font-mono text-xs font-medium text-base-content">AMALEH_NODE</td>
+                  <td class="text-dim">Fallback executable path for pi. Checked after AMALEH_RUNTIME.</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-xs font-medium text-base-content">AMALE_HOST_PID</td>
+                  <td class="font-mono text-xs font-medium text-base-content">AMALEH_HOST_PID</td>
                   <td class="text-dim">Optional process ID to record as the host process for claim operations.</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-xs font-medium text-base-content">AMALE_JEV_MODEL</td>
+                  <td class="font-mono text-xs font-medium text-base-content">AMALEH_JEV_MODEL</td>
                   <td class="text-dim">Verified current OpenRouter Jev model ID, used when the installed default becomes stale.</td>
                 </tr>
               </tbody>

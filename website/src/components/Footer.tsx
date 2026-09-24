@@ -8,7 +8,7 @@ const siteLinks = [
 ];
 
 const projectLinks = [
-  { label: 'GitHub repository', href: 'https://github.com/mhamri/amale' },
+  { label: 'GitHub repository', href: 'https://github.com/mhamri/amaleh' },
   { label: 'Documentation', href: asset('docs/') },
 ];
 
@@ -22,9 +22,9 @@ export default function Footer() {
       <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
         <div class="footer gap-10 sm:footer-horizontal">
           <aside class="max-w-sm">
-            <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amale home">
+            <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amaleh home">
               <img src={asset('mark.svg')} width="30" height="30" alt="" class="size-[30px]" />
-              <span class="font-display text-xl font-semibold tracking-tight">amale</span>
+              <span class="font-display text-xl font-semibold tracking-tight">amaleh</span>
             </a>
             <p class="mt-3 text-sm leading-relaxed text-dim">
               A coding workflow for Codex and Claude that plans, builds, reviews and verifies — and
@@ -64,7 +64,7 @@ export default function Footer() {
           <p>ʿamalah (Ah-mah-leh) — Persian for workers / laborers.</p>
           <p>
             Source and issues on{' '}
-            <a class="link-hover link text-base-content" href="https://github.com/mhamri/amale" target="_blank" rel="noopener noreferrer">
+            <a class="link-hover link text-base-content" href="https://github.com/mhamri/amaleh" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
           </p>

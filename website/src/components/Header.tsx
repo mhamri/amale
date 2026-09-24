@@ -6,13 +6,13 @@ const primaryLinks = [
   { label: 'Case study', href: asset('case-study/') },
 ];
 
-const github = { label: 'GitHub', href: 'https://github.com/mhamri/amale' };
+const github = { label: 'GitHub', href: 'https://github.com/mhamri/amaleh' };
 
 function Brand() {
   return (
-    <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amale home">
+    <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amaleh home">
       <img src={asset('mark.svg')} width="30" height="30" alt="" class="size-[30px]" />
-      <span class="font-display text-xl font-semibold tracking-tight">amale</span>
+      <span class="font-display text-xl font-semibold tracking-tight">amaleh</span>
     </a>
   );
 }

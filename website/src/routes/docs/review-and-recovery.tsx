@@ -32,7 +32,7 @@ export default function DocsReviewAndRecovery() {
   return (
     <>
       <PageMeta
-        title="Review and recovery — Amale documentation"
+        title="Review and recovery — Amaleh documentation"
         description="Cross-family independent review with structured coverage, the Flash to Kimi to host repair escalation, durable resume, and the diagnose, host-action and diagnostic-export operations."
       />
       <DocsLayout
@@ -151,7 +151,7 @@ export default function DocsReviewAndRecovery() {
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
             <p>
-              Run revisions and immutable artifacts live under the target workspace’s neutral <span class="font-mono text-sm text-base-content">.amale</span> directory and must be retained when clearing chat or moving work. This release uses explicit material-transition checkpoints and skill-driven restoration: no native hooks are installed and no native summary replacement is claimed, so run state stays durable even if a final response or compaction hook never occurs.
+              Run revisions and immutable artifacts live under the target workspace’s neutral <span class="font-mono text-sm text-base-content">.amaleh</span> directory and must be retained when clearing chat or moving work. This release uses explicit material-transition checkpoints and skill-driven restoration: no native hooks are installed and no native summary replacement is claimed, so run state stays durable even if a final response or compaction hook never occurs.
             </p>
             <p>
               Invoking the skill again lists the workspace’s runs and resumes the matching one from its last checkpoint, without the old chat. <span class="font-mono text-sm text-base-content">status</span> is the small restoration index: intent, constraints, accepted decisions, current task, unresolved failures, escalation history and next actions.

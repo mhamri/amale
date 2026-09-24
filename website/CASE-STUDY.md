@@ -1,8 +1,8 @@
-# Case study data: how Amale built this website
+# Case study data: how Amaleh built this website
 
 This file is the single source for every figure the website states about the runs that built it.
 The `/case-study/` page and the landing page quote these figures; they never compute or restate
-them from anywhere else. The figures were read from the run records under `.amale/runs/` on
+them from anywhere else. The figures were read from the run records under `.amaleh/runs/` on
 2026-09-23 with the `health` and `status` operations and the review artifacts.
 
 ## The two runs
@@ -61,5 +61,7 @@ Quoted in substance from reviewer findings. Each was blocking, and each was fixe
 - `public/case-study/health-report.png` — `health` for `website-polish`: delegation health, model
   speed per role and estimated spend by model.
 
-Both are real terminal output of the skill, framed as a terminal window. Alt text states what
-each shows.
+Both show the text the skill printed for `website-polish` on 2026-09-23, framed as a terminal
+window, with the command and the state folder under their current names (`amaleh/scripts/run.ts`,
+`.amaleh`). The model speed table is the one printed that day; `health` now counts every call
+since, so a fresh run prints larger counts there. Alt text states what each shows.

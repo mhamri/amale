@@ -6,7 +6,7 @@
 @plugin "daisyui" { themes: false; logs: false; }
 
 /*
- * Amale design system — "night ledger".
+ * Amaleh design system — "night ledger".
  * One dark theme, layered graphite surfaces, a brass primary, a teal
  * "verified" support hue and a violet accent used sparingly.
  * Everything on every page is built from this theme plus daisyUI
@@ -14,7 +14,7 @@
  * belong in this file; the contract lives in website/DESIGN-SYSTEM.md.
  */
 @plugin "daisyui/theme" {
-  name: "amale";
+  name: "amaleh";
   default: true;
   color-scheme: dark;
   /* Surfaces: page, raised surface, elevated surface. */

@@ -227,13 +227,13 @@ export default function InstallSequence() {
           </Box>
           <Box x={8} y={136} w={124} h={52} step={4} tone="primary">
             <T x={20} y={156} s={10} f="fill-primary" mono b>5</T>
-            <T x={20} y={172} s={11.5} f="fill-base-content" b mono>invoke /amale</T>
+            <T x={20} y={172} s={11.5} f="fill-base-content" b mono>invoke /amaleh</T>
             <T x={20} y={183} s={8}>state the outcome</T>
           </Box>
           <Box x={156} y={136} w={124} h={52} step={5} tone="dim">
             <T x={168} y={156} s={10} f="fill-primary" mono b>6</T>
             <T x={168} y={172} s={11} f="fill-base-content" b>run state on disk</T>
-            <T x={168} y={183} s={8} mono>.amale/ checkpoint</T>
+            <T x={168} y={183} s={8} mono>.amaleh/ checkpoint</T>
           </Box>
           <Box x={8} y={200} w={124} h={52} step={6} tone="accent">
             <T x={20} y={220} s={10} f="fill-primary" mono b>7</T>
@@ -288,13 +288,13 @@ export default function InstallSequence() {
 
           <Box x={128} y={148} w={180} h={70} step={4} tone="primary">
             <T x={142} y={170} s={12} f="fill-primary" mono b>5</T>
-            <T x={142} y={192} s={14.5} f="fill-base-content" b mono>invoke /amale</T>
+            <T x={142} y={192} s={14.5} f="fill-base-content" b mono>invoke /amaleh</T>
             <T x={142} y={208} s={11}>state the outcome</T>
           </Box>
           <Box x={420} y={148} w={180} h={70} step={5} tone="dim">
             <T x={434} y={170} s={12} f="fill-primary" mono b>6</T>
             <T x={434} y={192} s={15} f="fill-base-content" b>run state on disk</T>
-            <T x={434} y={208} s={9} mono>.amale/ checkpoint</T>
+            <T x={434} y={208} s={9} mono>.amaleh/ checkpoint</T>
           </Box>
 
           <Box x={240} y={278} w={180} h={70} step={6} tone="accent">
@@ -326,9 +326,9 @@ export default function InstallSequence() {
       </div>
       <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">
         The install and first-run sequence: clone{' '}
-        <span class="break-all font-mono">https://github.com/mhamri/amale</span> to a stable location you keep,
+        <span class="break-all font-mono">https://github.com/mhamri/amaleh</span> to a stable location you keep,
         then doctor, install and preflight prepare the machine and credential; invoking the skill
-        starts a run that checkpoints to <span class="font-mono">.amale</span> and resumes when
+        starts a run that checkpoints to <span class="font-mono">.amaleh</span> and resumes when
         invoked again.
       </figcaption>
     </figure>

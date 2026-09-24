@@ -5,7 +5,7 @@ import ModelTopology from '../../components/diagrams/ModelTopology';
 import { asset } from '../../lib/paths';
 
 const sections: DocsSection[] = [
-  { id: 'problem', label: 'The problem Amale solves' },
+  { id: 'problem', label: 'The problem Amaleh solves' },
   { id: 'division', label: 'How the work is divided' },
   { id: 'routing', label: 'Routing and escalation' },
   { id: 'host', label: 'What stays with the host' },
@@ -48,27 +48,27 @@ export default function DocsOverview() {
   return (
     <>
       <PageMeta
-        title="Overview — Amale documentation"
-        description="Why Amale exists, and how the coordinator, workers, reviewer and Jev divide the work of a delegated run."
+        title="Overview — Amaleh documentation"
+        description="Why Amaleh exists, and how the coordinator, workers, reviewer and Jev divide the work of a delegated run."
       />
       <DocsLayout
         current="overview"
         title="Overview"
-        lead="Amale is a self-contained workflow skill for Codex and Claude: discovery, planning, delegated parallel implementation, independent review and verified delivery. This page explains why it exists and who does what."
+        lead="Amaleh is a self-contained workflow skill for Codex and Claude: discovery, planning, delegated parallel implementation, independent review and verified delivery. This page explains why it exists and who does what."
         sections={sections}
       >
         <section data-reveal>
           <h2 id="problem" class="scroll-mt-24 font-display text-display font-semibold tracking-tight">
-            The problem Amale solves
+            The problem Amaleh solves
           </h2>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
             <p>
-              Top-tier models are too expensive to do the work. Without structure, an expensive model spends its premium context writing every edit, every check and every micro-decision. Amale turns that model into a director instead of a laborer: it segments the work into chunks with clear outcomes, delegates each chunk to cheap Flash models, and verifies direction only at the chunk boundaries.
+              Top-tier models are too expensive to do the work. Without structure, an expensive model spends its premium context writing every edit, every check and every micro-decision. Amaleh turns that model into a director instead of a laborer: it segments the work into chunks with clear outcomes, delegates each chunk to cheap Flash models, and verifies direction only at the chunk boundaries.
             </p>
             <p>
               The project's name is <span lang="fa" dir="rtl">عمله</span> — Persian in origin, pronounced{' '}
               <span class="text-base-content">Ah-mah-leh</span>, meaning{' '}
-              <span class="text-base-content">workers / laborers</span>. <em>Amale</em> is the
+              <span class="text-base-content">workers / laborers</span>. <em>Amaleh</em> is the
               Latin-script name for coordinated workers contributing to a shared, verified outcome.
             </p>
             <p class="mt-4">
@@ -77,7 +77,7 @@ export default function DocsOverview() {
           </div>
           <div class="alert alert-soft alert-info rounded-box mt-6 border border-line text-sm">
             <span>
-              Amale is not an unattended background service. A closed session resumes from disk on the next invocation, and the host keeps control of network access and project context.
+              Amaleh is not an unattended background service. A closed session resumes from disk on the next invocation, and the host keeps control of network access and project context.
             </span>
           </div>
         </section>
@@ -153,7 +153,7 @@ export default function DocsOverview() {
               The host prepares an isolated workspace for each task and integrates the accepted results. Integration stays serial: parallel chunks work in their own checkouts, and their changes meet again in the main workspace.
             </p>
             <p>
-              Network access and permission to send project context remain host-controlled, and Amale never edits global permission settings. Credentials stay in the host environment or in pi’s configuration, never in the repository.
+              Network access and permission to send project context remain host-controlled, and Amaleh never edits global permission settings. Credentials stay in the host environment or in pi’s configuration, never in the repository.
             </p>
           </div>
           <p class="mt-6 text-base leading-relaxed">

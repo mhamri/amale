@@ -48,7 +48,7 @@ export default function Continue() {
                 ))}
               </ul>
               <p class="text-sm leading-relaxed text-dim">
-                From the problem Amale solves through installation, the workflow, review and
+                From the problem Amaleh solves through installation, the workflow, review and
                 recovery, to a command reference drawn from the skill's own reference files.
               </p>
               <a class="link link-hover text-primary" href={asset('docs/')}>
@@ -101,7 +101,7 @@ export default function Continue() {
           The skill, its source and its issues are on{' '}
           <a
             class="link link-hover text-primary"
-            href="https://github.com/mhamri/amale"
+            href="https://github.com/mhamri/amaleh"
             target="_blank"
             rel="noopener noreferrer"
           >

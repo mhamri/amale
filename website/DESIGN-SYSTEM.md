@@ -1,4 +1,4 @@
-# Amale website design system
+# Amaleh website design system
 
 This document is a binding contract. Every page — the landing page, the five
 documentation pages and the case-study page — is built from the tokens and
@@ -10,7 +10,7 @@ page-specific.
 
 ## Aesthetic direction
 
-Amale is a delivery workflow for coding agents: plan, build, review, verify,
+Amaleh is a delivery workflow for coding agents: plan, build, review, verify,
 resume. The site's visual language is a **night ledger** — a calm, layered
 graphite workspace where warm brass marks action, teal marks "verified", and
 violet marks orchestration. Depth is deliberate: surfaces step lighter as they
@@ -42,7 +42,7 @@ content that is not a sequence, tinted near-black pretending to be black,
 
 ## Palette
 
-The daisyUI theme `amale` (declared in `style.css`, `default: true`,
+The daisyUI theme `amaleh` (declared in `style.css`, `default: true`,
 `color-scheme: dark`) defines every colour. Use the semantic roles; never
 introduce a new hex in a page.
 
@@ -286,7 +286,7 @@ captures the case study shows.
 
 ## Case-study page
 
-`/case-study/`, titled around "How Amale built this site", is one continuous
+`/case-study/`, titled around "How Amaleh built this site", is one continuous
 document: a single `max-w-7xl` wrapper with the rhythm set between blocks
 inside it, as the spacing rules above require. Every claim on it is about the
 skill and each one is paired with a figure from `CASE-STUDY.md`; the page's own
@@ -764,8 +764,8 @@ the directory listing: a mark appears only when the file is in that folder
 mark drawn in `currentColor` — MiMo's and OpenAI's — resolves to black inside
 an `<image>`, so its identity entry also sets a light `tileFill`; that is a
 tile surface, not a recolouring of the mark. Logos are third-party marks used
-to name the models Amale routes to; they are not redrawn, recoloured or
-combined with the Amale mark.
+to name the models Amaleh routes to; they are not redrawn, recoloured or
+combined with the Amaleh mark.
 
 **Orchestration and topic diagrams** — SVG plus a small script timeline. Each
 one has a single subject named in its own caption: the model topology on the
@@ -844,7 +844,7 @@ Diagram panel wrapper, for any visual in this layer:
 `bg-base-100/85 backdrop-blur-md border-b border-line shadow-rest` — the
 sticky bar is the shell's one raised surface, so it carries the resting tier;
 brand lockup is the
-mark plus the wordmark `amale` in `font-display` — the Arabic-script word
+mark plus the wordmark `amaleh` in `font-display` — the Arabic-script word
 عمله never appears in the lockup or any document title; it may appear only
 in body copy, always with its pronunciation (Ah-mah-leh), its meaning
 (workers / laborers) and its **Persian origin** (the word is Persian, not

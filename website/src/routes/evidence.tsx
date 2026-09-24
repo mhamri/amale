@@ -6,7 +6,7 @@ export default function EvidenceRedirect() {
   const target = asset('case-study/');
   return (
     <>
-      <PageMeta title="Redirecting — Amale" description="This page has moved to the case study." />
+      <PageMeta title="Redirecting — Amaleh" description="This page has moved to the case study." />
       <Meta http-equiv="refresh" content={`0; url=${target}`} />
       <main id="main">
         <section class="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24">

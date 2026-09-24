@@ -53,9 +53,9 @@ export default function Author() {
           <div class="min-w-0">
             <h2 class="font-display text-display font-semibold tracking-tight">Get connected.</h2>
             <p class="mt-3 max-w-prose text-sm leading-relaxed text-dim">
-              Amale is built by Mohammad Hossein Amri, a software engineer in Kuala Lumpur,
+              Amaleh is built by Mohammad Hossein Amri, a software engineer in Kuala Lumpur,
               Malaysia. He has over 13 years in the industry, works at menumiz (AU), and writes
-              C#/.NET, TypeScript and cloud applications. He built Amale to direct cheap models
+              C#/.NET, TypeScript and cloud applications. He built Amaleh to direct cheap models
               instead of typing every edit with an expensive one.
             </p>
             <p class="mt-3 max-w-prose text-sm leading-relaxed text-dim">

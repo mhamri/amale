@@ -18,11 +18,11 @@ const firstRun = [
   },
   {
     title: 'Link the skill',
-    body: 'Run the install operation. It links amale/ into the current user’s Codex and Claude skill directories and refuses conflicting destinations, then leaves the checkout in place for the link to point at.',
+    body: 'Run the install operation. It links amaleh/ into the current user’s Codex and Claude skill directories and refuses conflicting destinations, then leaves the checkout in place for the link to point at.',
   },
   {
     title: 'Invoke the skill with your task',
-    body: 'Invoke /amale with the outcome you want. The skill handles discovery, planning, delegation, review and resume; you do not ask it which step comes next.',
+    body: 'Invoke /amaleh with the outcome you want. The skill handles discovery, planning, delegation, review and resume; you do not ask it which step comes next.',
   },
   {
     title: 'Resume by invoking again',
@@ -34,8 +34,8 @@ export default function DocsGettingStarted() {
   return (
     <>
       <PageMeta
-        title="Getting started — Amale documentation"
-        description="Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amale run."
+        title="Getting started — Amaleh documentation"
+        description="Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run."
       />
       <DocsLayout
         current="getting-started"
@@ -57,7 +57,7 @@ export default function DocsGettingStarted() {
               <span class="text-base-content">pi configured with OpenRouter</span>, or <span class="text-base-content">OPENROUTER_API_KEY</span> provided through your environment.
             </li>
             <li>
-              <span class="text-base-content">A <span class="font-mono text-sm">git clone</span> of the repository</span>. Clone <span class="font-mono text-sm">https://github.com/mhamri/amale</span> to a stable location. Installation links the amale/ directory into your skill directories, so the checkout must stay in place afterwards.
+              <span class="text-base-content">A <span class="font-mono text-sm">git clone</span> of the repository</span>. Clone <span class="font-mono text-sm">https://github.com/mhamri/amaleh</span> to a stable location. Installation links the amaleh/ directory into your skill directories, so the checkout must stay in place afterwards.
             </li>
             <li>
               <span class="text-base-content">No global package installation</span>. The runtime has no npm runtime dependencies; installation only links the skill directories.
@@ -76,7 +76,7 @@ export default function DocsGettingStarted() {
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>sh</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`git clone https://github.com/mhamri/amale\ncd amale\nbun amale/scripts/run.ts doctor\nbun amale/scripts/run.ts install`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`git clone https://github.com/mhamri/amaleh\ncd amaleh\nbun amaleh/scripts/run.ts doctor\nbun amaleh/scripts/run.ts install`}</code></pre>
           </figure>
           <p class="mt-6 text-base leading-relaxed">
             <span class="font-mono text-sm text-base-content">doctor</span> takes no run and changes nothing. <span class="font-mono text-sm text-base-content">install</span> writes the skill links and refuses conflicting destinations; it never touches repository files or credentials.
@@ -99,7 +99,7 @@ export default function DocsGettingStarted() {
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>sh</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amale/scripts/run.ts preflight ./my-project my-run preflight.json`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amaleh/scripts/run.ts preflight ./my-project my-run preflight.json`}</code></pre>
           </figure>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -144,8 +144,8 @@ export default function DocsGettingStarted() {
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
               <span>sh</span>
             </div>
-            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amale/scripts/run.ts list ./my-project
-bun amale/scripts/run.ts start ./my-project my-first-run input.json`}</code></pre>
+            <pre class="overflow-x-auto p-4 font-mono text-sm leading-relaxed"><code>{`bun amaleh/scripts/run.ts list ./my-project
+bun amaleh/scripts/run.ts start ./my-project my-first-run input.json`}</code></pre>
           </figure>
           <p class="mt-6 text-base leading-relaxed">
             Next, read the <a class="link link-hover text-primary" href={asset('docs/workflow/')}>workflow</a> to see how a run moves from discovery to verified delivery, or go straight to the <a class="link link-hover text-primary" href={asset('docs/commands/')}>command reference</a>.

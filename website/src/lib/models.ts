@@ -1,5 +1,5 @@
 /*
- * One identity list for every model Amale routes to: the Latin-script name,
+ * One identity list for every model Amaleh routes to: the Latin-script name,
  * the routed hue, the monogram and the vendor mark live in one place. The
  * hero's logo tiles read from here — a model whose vendor publishes a mark
  * renders that mark, and a model without one renders its monogram in the
@@ -10,9 +10,9 @@
  * correctly named file into that folder on its own changes nothing — the
  * shipped mechanism reads the `logo` field, not the directory listing.
  *
- * Vendor marks are third-party marks used only to name the models Amale
+ * Vendor marks are third-party marks used only to name the models Amaleh
  * routes to. They are served from this site, never hotlinked, and never
- * redrawn, recoloured or combined with the Amale mark.
+ * redrawn, recoloured or combined with the Amaleh mark.
  */
 
 export type ModelId =
@@ -30,7 +30,7 @@ export type ModelIdentity = {
   name: string;
   /** Single letter rendered when no vendor mark exists. */
   monogram: string;
-  /** The model's routed hue: a colour custom property from the amale theme. */
+  /** The model's routed hue: a colour custom property from the amaleh theme. */
   hue: string;
   /** Vendor mark under public/, or null when none is published. */
   logo: string | null;
