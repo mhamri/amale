@@ -262,6 +262,7 @@ export default function OperationMap() {
           <T x={44} y={178} s={7} mono>save · artifact · fingerprint · host-action</T>
           <T x={44} y={189} s={7} mono>diagnostic-export · doctor · install · html</T>
           <T x={44} y={200} s={7} mono>effort-configure … effort-reconcile (5)</T>
+          <T x={44} y={211} s={7} mono>uninstall</T>
         </svg>
 
         <svg
@@ -308,7 +309,7 @@ export default function OperationMap() {
           <Panel x={483} y={286} step={5} tone="info" title="evidence"
             ops={['save', 'artifact', 'fingerprint', 'host-action', 'diagnostic-export']} />
           <Panel x={639} y={286} step={5} tone="info" title="bootstrap & effort"
-            ops={['doctor', 'install', 'html', 'effort-* (5 operations)']} opsSize={7.5} />
+            ops={['doctor', 'install', 'html', 'uninstall', 'effort-* (5 operations)']} opsSize={7.5} />
         </svg>
       </div>
       <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">

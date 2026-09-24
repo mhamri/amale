@@ -200,6 +200,13 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
           <p class="mt-3 text-sm leading-relaxed text-dim">
             Links the canonical skill into the default Codex and Claude skill directories. Refuses conflicting targets. Windows uses directory junctions; Unix uses symlinks. Takes no workspace or run id.
           </p>
+
+          <h3 id="uninstall" class="mt-8 scroll-mt-24 font-display text-title font-semibold tracking-tight">
+            uninstall
+          </h3>
+          <p class="mt-3 text-sm leading-relaxed text-dim">
+            Removes the skill links install created from the Codex and Claude skill directories. Refuses conflicting targets. Windows uses directory junctions; Unix uses symlinks. Takes no workspace or run id.
+          </p>
         </section>
 
         
