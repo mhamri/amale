@@ -306,8 +306,18 @@ The two terminal captures, `case-study/status-report.png` and
 `case-study/health-report.png`, are real screenshots of the skill's own output
 for the `website-polish` run. Each sits in a `figure` with a title bar, a chip
 naming it as terminal output, descriptive `alt` text and a caption, in
-`grid gap-8 md:grid-cols-2`. The status capture also appears once on the
-landing page, in the benefits section.
+`grid gap-8 md:grid-cols-2 md:gap-x-8 md:gap-y-0` — `gap-8` below md, and
+from md an 8-column gap with a zero row gap so the two figures align as one
+band. The figures each carry `md:grid md:row-span-3 md:grid-rows-subgrid` so
+their header row, image row and caption row align across both columns from the
+md breakpoint up. Each figure's title bar is
+`flex items-center justify-between`, so the `terminal output` chip sits at the
+right edge of the bar. The shorter screenshot's image wrapper stretches to the
+shared subgrid row track by default grid-item stretch, and its `bg-[#0d1117]`
+fill (sampled from the bottom rows of both PNGs) extends the terminal window
+visually rather than leaving a gap. Both `<img>` elements carry an inline `clip-path:inset(0 0 3px 0)` style that hides the image's baked bottom border (#2a3140 rows and #000000 corners), so the fill reads as the same window.
+Below md the figures stack with their
+natural height.
 
 ## Shape, borders, elevation
 
