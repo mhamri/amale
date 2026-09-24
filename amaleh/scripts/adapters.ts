@@ -203,9 +203,9 @@ export async function taskDiff(mainWorkspace:string,workspace:string){
  const main=(await git(['rev-parse','HEAD'],mainWorkspace))?.trim();
  const base=(main&&(await git(['merge-base','HEAD',main],workspace))?.trim())||(await git(['rev-parse','HEAD'],workspace))?.trim();
  if(!base)return undefined;
- const [stat,patch,untracked]=await Promise.all([git(['diff','--relative','--stat',base],workspace),git(['diff','--relative',base],workspace),git(['ls-files','--others','--exclude-standard'],workspace)]);
+ const [stat,patch,names,untracked]=await Promise.all([git(['diff','--relative','--stat',base],workspace),git(['diff','--relative',base],workspace),git(['diff','--relative','--name-only',base],workspace),git(['ls-files','--others','--exclude-standard'],workspace)]);
  if(patch===undefined)return undefined;
- return {base,stat:stat?.trim()??'',untracked:(untracked??'').split(/\r?\n/).filter(Boolean),patch:patch.length>diffLimit?patch.slice(0,diffLimit)+`\n[diff truncated at ${diffLimit} characters; read the remaining changed files named in stat directly]`:patch};
+ return {base,stat:stat?.trim()??'',paths:(names??'').split(/\r?\n/).filter(Boolean),untracked:(untracked??'').split(/\r?\n/).filter(Boolean),patch:patch.length>diffLimit?patch.slice(0,diffLimit)+`\n[diff truncated at ${diffLimit} characters; read the remaining changed files named in stat directly]`:patch};
 }
 async function receiptTail(store:Store,artifact:string){
  try{const r=JSON.parse(await store.readArtifact(artifact));const tail=(text:unknown)=>String(text??'').slice(-receiptTailLimit);return {stdout:tail(r.stdout),stderr:tail(r.stderr)};}catch{return undefined;}
