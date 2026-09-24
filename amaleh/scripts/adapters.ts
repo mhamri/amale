@@ -141,8 +141,6 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     done({events,text,model:actual,code:0,stopReason});
    })().catch(fail);});
   });
-  // A finished run whose last message was cut off by the output limit gets one
-  // continuation in the same session; a second cut-off returns the partial reply.
   const run=async(prompt:string,continueSession:boolean)=>{
    for(let attempt=1;;attempt++){
     await telemetry.write('attempt',{attempt,of:attempts});
@@ -156,8 +154,6 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
    }
   };
   let output=await run(input.prompt,false);
-  // Workers get the continuation; a reviewer's truncated report already has its
-  // own format-retry loop, and only workers own the session being continued.
   if(!input.readOnly&&output.stopReason==='length'){
    await telemetry.write('length-continue',{sessionDir:input.sessionDir});
    output=await run(continuePrompt,true);
