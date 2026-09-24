@@ -72,7 +72,7 @@ export async function catalog(store?:Store,fetcher:typeof fetch=fetch){const dat
 const settledProvider=/credits? (are )?exhausted|insufficient (credit|balance|fund)|top ?up|quota exceeded|billing|unauthorized|invalid api key|lacks access|no endpoints found/i;
 const codedFailure=/\b(408|409|429|500|502|503|504|529)\b/;
 const transientWording=/rate.?limit|temporarily|overload|unavailable|timed? ?out|Provider returned error|Internal Server Error/i;
-const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits/i;
+const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits|provider returned an empty response/i;
 export const transientProvider=(message:string)=>!settledProvider.test(message)&&((codedFailure.test(message)&&transientWording.test(message))||transientWithoutCode.test(message));
 export async function piRun(input:{workspace:string;model:string;prompt:string;sessionDir:string;readOnly?:boolean;diagnosticRoot?:string;speedDir?:string;onSpawn?:(pid:number)=>Promise<void>;attempts?:number;idleTimeoutMs?:number;maxTurns?:number}){
  const telemetry=await trace(input.diagnosticRoot,'pi',{model:input.model,workspace:input.workspace,readOnly:!!input.readOnly,sessionDir:input.sessionDir});
@@ -84,11 +84,12 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
   invariant(Number.isInteger(attempts)&&attempts>=1&&attempts<=5,'Invalid pi attempt count');
   invariant(input.prompt.length<=promptLimit,`Prompt is ${input.prompt.length} characters; the command line cannot carry more than ${promptLimit}. Hand large material to the model as a file path it reads, rather than inlining it.`);
   const pi=await piCommand();await mkdir(input.sessionDir,{recursive:true});const key=await credential();
-  const launch=()=>new Promise<{events:any[];text:string;model:string;code:number}>((done,fail)=>{
-   const args=[...pi.args,'--mode','json','--print','--provider','openrouter','--model',input.model,'--session-dir',input.sessionDir,'--no-extensions','--no-skills','--no-prompt-templates','--no-context-files','--offline','--tools',input.readOnly?'read,grep,find,ls':'read,grep,find,ls,edit,write,bash,powershell','--',input.prompt];
+  const continuePrompt='Your previous reply was cut off by the output length limit. Continue the task from where you stopped and bring it to completion; end with the final answer exactly as the original prompt asked.';
+  const launch=(prompt:string,continueSession:boolean)=>new Promise<{events:any[];text:string;model:string;code:number;stopReason:string}>((done,fail)=>{
+   const args=[...pi.args,'--mode','json','--print',...(continueSession?['--continue']:[]),'--provider','openrouter','--model',input.model,'--session-dir',input.sessionDir,'--no-extensions','--no-skills','--no-prompt-templates','--no-context-files','--offline','--tools',input.readOnly?'read,grep,find,ls':'read,grep,find,ls,edit,write,bash,powershell','--',prompt];
    // Synchronous spawn errors reject this ordinary Promise executor; no async-executor hang.
    const child=spawn(pi.command,args,{cwd:input.workspace,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe'],env:{...process.env,OPENROUTER_API_KEY:key,PI_TELEMETRY:'0'}});
-   let buffer='',stderr='',events:any[]=[],text='',actual='',protocolError='',providerError='',ended=false,turns=0;
+   let buffer='',stderr='',events:any[]=[],text='',actual='',protocolError='',providerError='',ended=false,turns=0,stopReason='';
    let spawnError:Error|undefined;
    let writes=Promise.resolve();const record=(stage:string,data:unknown)=>{writes=writes.then(()=>telemetry.write(stage,data));writes.catch(()=>child.kill());};
    const parse=(line:string)=>{
@@ -101,7 +102,8 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     if(item.type==='message_end'&&item.message?.role==='assistant'){
      if(!Array.isArray(item.message.content)||item.message.content.some((c:any)=>!c||typeof c.type!=='string'||(c.type==='text'&&typeof c.text!=='string'))||typeof item.message.model!=='string'){protocolError='pi assistant event has invalid model/content shape';record('protocol-error',{reason:protocolError});return;}
      actual=item.message.model??actual;text=(item.message.content??[]).filter((c:any)=>c.type==='text').map((c:any)=>c.text).join('\n');
-     if(['error','aborted','length'].includes(item.message.stopReason)||item.message.errorMessage)providerError=String(item.message.errorMessage??`Assistant stopped: ${item.message.stopReason}`);
+     if(typeof item.message.stopReason==='string')stopReason=item.message.stopReason;
+     if(['error','aborted'].includes(item.message.stopReason)||item.message.errorMessage)providerError=String(item.message.errorMessage??`Assistant stopped: ${item.message.stopReason}`);
      const usage=item.message.usage;if(usage)outputTokens+=Number(usage.output)||0;if(usage)record('usage',{inputTokens:usage.input,outputTokens:usage.output,cacheRead:usage.cacheRead,cacheWrite:usage.cacheWrite,cost:usage.cost?.total,costSource:'pi-estimate',model:actual});
      turns++;
      if(input.maxTurns&&turns===input.maxTurns&&!ended&&item.message.stopReason==='toolUse'){providerError=`Stopped after ${turns} turns, the limit for this call, without a final answer. Inspect diagnostic trace ${telemetry.id}.`;record('turn-limit',{turns,pid:child.pid});void killTree(child);}
@@ -133,21 +135,33 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     if(spawnError)throw spawnError;
     invariant(!protocolError,protocolError);
     invariant(!providerError,String(sanitize(providerError)));
-    invariant(code===0&&ended&&text&&actual,`pi incomplete: exit ${code}, agent_end=${ended}; inspect diagnostic trace ${telemetry.id}`);
+    invariant(code===0&&ended&&actual,`pi incomplete: exit ${code}, agent_end=${ended}; inspect diagnostic trace ${telemetry.id}`);
+    invariant(!input.readOnly||!!text,`pi returned no final text for a reviewer call, whose JSON report is the reply; inspect diagnostic trace ${telemetry.id}`);
     invariant(actual===input.model||(isAlias(input.model)&&family(actual)===family(input.model)),`pi resolved a different model (${actual}); update the task route explicitly`);
-    done({events,text,model:actual,code:0});
+    done({events,text,model:actual,code:0,stopReason});
    })().catch(fail);});
   });
-  let output;
-  for(let attempt=1;;attempt++){
-   await telemetry.write('attempt',{attempt,of:attempts});
-   try{output=await launch();break;}
-   catch(error){
-    const message=(error as Error).message;
-    if(attempt>=attempts||!transientProvider(message))throw error;
-    await telemetry.write('transient-provider',{attempt,message});
-    await new Promise(r=>setTimeout(r,1000*attempt));
+  // A finished run whose last message was cut off by the output limit gets one
+  // continuation in the same session; a second cut-off returns the partial reply.
+  const run=async(prompt:string,continueSession:boolean)=>{
+   for(let attempt=1;;attempt++){
+    await telemetry.write('attempt',{attempt,of:attempts});
+    try{return await launch(prompt,continueSession);}
+    catch(error){
+     const message=(error as Error).message;
+     if(attempt>=attempts||!transientProvider(message))throw error;
+     await telemetry.write('transient-provider',{attempt,message});
+     await new Promise(r=>setTimeout(r,1000*attempt));
+    }
    }
+  };
+  let output=await run(input.prompt,false);
+  // Workers get the continuation; a reviewer's truncated report already has its
+  // own format-retry loop, and only workers own the session being continued.
+  if(!input.readOnly&&output.stopReason==='length'){
+   await telemetry.write('length-continue',{sessionDir:input.sessionDir});
+   output=await run(continuePrompt,true);
+   if(output.stopReason==='length')await telemetry.write('length-partial',{message:'The continuation stopped on the length limit too; the partial reply goes to checks and review'});
   }
   await telemetry.end('success',{model:output.model});
   if(input.speedDir)await recordSpeed(input.speedDir,{at:new Date(started).toISOString(),model:input.model,role:input.readOnly?'reviewer':'worker',ms:Date.now()-started,outputTokens}).catch(()=>{});
