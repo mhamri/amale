@@ -213,34 +213,40 @@ export default function CaseStudyPage() {
             The first shows the readable status report. The second shows delegation health, model
             speed per role and estimated spend by model.
           </p>
-          <div class="mt-8 grid gap-8 md:grid-cols-2">
-            <figure class="overflow-hidden rounded-box border border-line bg-base-200 shadow-raised shadow-rest-glow-primary" data-reveal>
+          <div class="mt-8 grid gap-8 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
+            <figure class="md:grid md:row-span-3 md:grid-rows-subgrid overflow-hidden rounded-box border border-line bg-base-200 shadow-raised shadow-rest-glow-primary" data-reveal>
               <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
                 <span>status for website-polish</span>
                 <span class="badge badge-soft badge-primary font-sans text-xs">terminal output</span>
               </div>
-              <img
-                src={asset('case-study/status-report.png')}
-                alt="Terminal output showing the status report for the website-polish run: tasks, statuses, check receipts and completion summary."
-                class="w-full"
-                loading="lazy"
-              />
+              <div class="bg-[#0d1117]">
+                <img
+                  src={asset('case-study/status-report.png')}
+                  alt="Terminal output showing the status report for the website-polish run: tasks, statuses, check receipts and completion summary."
+                  class="w-full"
+                  style={{'clip-path': 'inset(0 0 3px 0)'}}
+                  loading="lazy"
+                />
+              </div>
               <figcaption class="px-4 py-3 text-sm text-dim border-t border-line">
                 Status report for website-polish: tasks, their statuses, registered check receipts
                 and the completion summary.
               </figcaption>
             </figure>
-            <figure class="overflow-hidden rounded-box border border-line bg-base-200 shadow-raised shadow-rest-glow-secondary" data-reveal>
+            <figure class="md:grid md:row-span-3 md:grid-rows-subgrid overflow-hidden rounded-box border border-line bg-base-200 shadow-raised shadow-rest-glow-secondary" data-reveal>
               <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
                 <span>health for website-polish</span>
                 <span class="badge badge-soft badge-secondary font-sans text-xs">terminal output</span>
               </div>
-              <img
-                src={asset('case-study/health-report.png')}
-                alt="Terminal output showing delegation health for website-polish: worker versus reviewer versus manual dispatch counts, model speed per role, and estimated spend per model."
-                class="w-full"
-                loading="lazy"
-              />
+              <div class="bg-[#0d1117]">
+                <img
+                  src={asset('case-study/health-report.png')}
+                  alt="Terminal output showing delegation health for website-polish: worker versus reviewer versus manual dispatch counts, model speed per role, and estimated spend per model."
+                  class="w-full"
+                  style={{'clip-path': 'inset(0 0 3px 0)'}}
+                  loading="lazy"
+                />
+              </div>
               <figcaption class="px-4 py-3 text-sm text-dim border-t border-line">
                 Delegation health for website-polish: worker versus reviewer versus manual
                 dispatch counts, model speed per role, and estimated spend by model.
