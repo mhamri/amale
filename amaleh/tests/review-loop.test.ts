@@ -9,7 +9,7 @@ import {delegate} from '../scripts/delegate.ts';
 import {selectModel} from '../scripts/routing.ts';
 import {reviewer, blockingDefinition} from '../scripts/adapters.ts';
 
-const task=(id:string)=>({id,title:id,goal:'Keep a finished review instead of discarding it',phase:'one',deps:[],resources:['review-loop'],criteria:['An incomplete review is retried once'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]});
+const task=(id:string)=>({id,title:id,goal:'Keep a finished review instead of discarding it',phase:'one',deps:[],resources:['review-loop'],criteria:['An incomplete review is retried once'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}],noProbe:'Test fixture; the reviewed behaviour is asserted by the test, not by an executable probe'});
 async function fixture(t:any){
  const dir=await mkdtemp(join(tmpdir(),'amaleh-review-loop-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await writeFile(join(dir,'app.txt'),'original');
@@ -62,7 +62,7 @@ test('a second coverage gap escalates as host work and leaves the task actionabl
  const reviewed=c.taskOf(await store.load(),'a');
  assert.equal(reviewed.status,'review','host evidence work needs the review state, not a running or repair one');
  assert.equal((await c.next(store)).action,'review-evidence-needed');
- await c.addReviewCheck(store,'a',{id:'probe',command:process.execPath,args:['-e','process.exit(0)']});
+ await c.addReviewCheck(store,'a',{id:'probe',command:process.execPath,args:['-e','process.exit(0)'],role:'probe'});
  assert.equal(c.taskOf(await store.load(),'a').status,'review','the coordinator can register the requested probe without a delegation refusal');
 });
 test('a task left in review is delegated again straight to checks and review, without a new worker run',async t=>{
@@ -112,7 +112,7 @@ async function routingFixture(t:any){
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-review-loop-fixture-not-real';
  t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const store=await c.start(dir,{shape:clearCut,id:'review-route',host:{kind:'codex',model:'gpt-6-astra'},intent:'Route an independent reviewer',criteria:['A gap is retried by another family']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Review actual behaviour',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],kind:'code'}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Review actual behaviour',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],kind:'code',noProbe:'Test fixture; reviewer routing is asserted by the test, not by an executable probe'}],integrationChecks:[]});
  return {dir,store};
 }
 async function awaitingReview(store:c.Store,dir:string){

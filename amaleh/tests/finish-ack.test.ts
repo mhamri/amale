@@ -17,7 +17,8 @@ async function fixture(t: any) {
 const task = (id: string, deps: string[] = []): c.TaskInput => ({
  id, title: id, goal: 'Correct observable behavior', phase: 'checkout',
  deps, resources: [id], criteria: ['correct result'], kind: 'code' as const,
- checks: [{ id: 'test', command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+ checks: [{ id: 'test', command: process.execPath, args: ['-e', 'process.exit(0)'], role: 'guard' }],
+ noProbe: 'Test fixture; the acknowledged behaviour is asserted by the test, not by an executable probe',
 });
 
 async function syntheticCoverage(store: c.Store, id: string) {
@@ -64,7 +65,7 @@ test('failed finish after health acknowledgement leaves no health-acknowledged e
  });
  await c.plan(store, {
   tasks: [task('a'), task('b', ['a'])],
-  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'], role: 'guard' }],
  });
  await addHostDecisions(store, 5);
  await deliver(store, dir, 'a');
@@ -93,7 +94,7 @@ test('successful acknowledged finish records health-acknowledged and finished in
  });
  await c.plan(store, {
   tasks: [task('a'), task('b', ['a'])],
-  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+  integrationChecks: [{ id: 'all', command: process.execPath, args: ['-e', 'process.exit(0)'], role: 'guard' }],
  });
  await addHostDecisions(store, 5);
  await deliver(store, dir, 'a');

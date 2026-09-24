@@ -18,7 +18,7 @@ async function scopeFixture(t:any,resources:string[]){
  git(root,['add','-A']);git(root,['commit','-m','base','--no-gpg-sign']);
  await mkdir(join(root,'task'));const workspace=await realpath(join(root,'task'));
  const store=await c.start(root,{shape:clearCut,id:'scope',host:{kind:'codex',model:'gpt-6-astra'},intent:'Keep worker changes inside the task resources',criteria:['Changes stay in scope']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Write the source the task owns',phase:'one',deps:[],resources,criteria:['source updated'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Write the source the task owns',phase:'one',deps:[],resources,criteria:['source updated'],kind:'code' as const,noProbe:'Synthetic fixture: the scope verdict, not a check, is under test',checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}]}],integrationChecks:[]});
  return {root,workspace,store};
 }
 async function syntheticCoverage(store:c.Store,id:string){const state=await store.load();return c.reviewObligations(state,c.taskOf(state,id)).map(o=>({id:o.id,status:'covered' as const,evidence:'Synthetic protocol fixture only; not a real model review'}));}
@@ -77,7 +77,7 @@ test('a workspace outside Git records that the scope check could not run instead
  const dir=await mkdtemp(join(tmpdir(),'amaleh-noscope-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await writeFile(join(dir,'app.txt'),'original');
  const store=await c.start(dir,{shape:clearCut,id:'nogit',host:{kind:'codex',model:'gpt-6-astra'},intent:'Keep changes in scope without Git',criteria:['Changes stay in scope']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Write the source the task owns',phase:'one',deps:[],resources:['src/**'],criteria:['source updated'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Write the source the task owns',phase:'one',deps:[],resources:['src/**'],criteria:['source updated'],kind:'code' as const,noProbe:'Synthetic fixture: the scope verdict, not a check, is under test',checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}]}],integrationChecks:[]});
  const inner=worker(dir,[async()=>{}]);
  const out=await delegate(store,'a',{workspace:dir},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'accepted');
@@ -127,7 +127,7 @@ test('scopeVerdict reports an unverifiable verdict when the diff is unavailable'
  const dir=await mkdtemp(join(tmpdir(),'amaleh-nodiff-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await writeFile(join(dir,'app.txt'),'original');
  const store=await c.start(dir,{shape:clearCut,id:'nodiff',host:{kind:'codex',model:'gpt-6-astra'},intent:'Keep changes in scope without Git',criteria:['Changes stay in scope']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'g',phase:'one',deps:[],resources:['src/**'],criteria:['c'],kind:'code' as const,checks:[]}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'g',phase:'one',deps:[],resources:['src/**'],criteria:['c'],kind:'code' as const,noProbe:'Synthetic fixture: the scope verdict, not a check, is under test',checks:[]}],integrationChecks:[]});
  await store.transaction(s=>{c.taskOf(s,'a').workspace=dir;});
  const verdict=await scopeVerdict(store,'a',await c.fingerprint(dir),store.root);
  assert.equal(verdict.ran,false);
@@ -137,8 +137,8 @@ test('scopeVerdict reports an unverifiable verdict when the diff is unavailable'
 test('a task check may not reuse the built-in scope check id',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'amaleh-scope-id-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const store=await c.start(dir,{shape:clearCut,id:'reserved',host:{kind:'codex',model:'gpt-6-astra'},intent:'Keep the built-in scope check enforceable',criteria:['The reserved check id is refused']});
- const scopeCheck={id:scopeCheckId,command:process.execPath,args:['-e','process.exit(0)']};
- const task=(checkId:string)=>({id:'a',title:'a',goal:'Deliver the task',phase:'one',deps:[],resources:['src/**'],criteria:['c'],kind:'code' as const,checks:[{id:checkId,command:process.execPath,args:['-e','process.exit(0)']}]});
+ const scopeCheck={id:scopeCheckId,command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const};
+ const task=(checkId:string)=>({id:'a',title:'a',goal:'Deliver the task',phase:'one',deps:[],resources:['src/**'],criteria:['c'],kind:'code' as const,noProbe:'Synthetic fixture: the scope verdict, not a check, is under test',checks:[{id:checkId,command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}]});
  await assert.rejects(()=>c.plan(store,{tasks:[task(scopeCheckId)],integrationChecks:[]}),/reserved for the built-in scope check/,'plan refuses the reserved id and names it');
  await c.plan(store,{tasks:[task('test')],integrationChecks:[]});
  await assert.rejects(()=>c.amend(store,{id:'a',reason:'register the reserved id',task:task(scopeCheckId)}),/reserved for the built-in scope check/,'amend refuses the reserved id and names it');

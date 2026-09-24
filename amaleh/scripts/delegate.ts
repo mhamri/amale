@@ -4,7 +4,7 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, type Task } from './core.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, type Check, type Task } from './core.ts';
 import { worker, reviewer, requestJson, choiceAnswer, transientProvider, taskDiff, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
@@ -29,6 +29,15 @@ async function repairStrategy(store:Store,id:string,findings:unknown[],failing:s
   if(answer.choice)return {choice:answer.choice,confidence:answer.confidence,meaning:criteria[answer.choice as keyof typeof criteria]};
  }catch{}
  return undefined;
+}
+
+async function passingProbes(checks:Check[],workspace:string){
+ const passing:string[]=[];
+ for(const probe of checks.filter(c=>c.role==='probe')){
+  let code:number;try{code=(await execute(probe,workspace)).code;}catch{code=1;}
+  if(code===0)passing.push(probe.id);
+ }
+ return passing;
 }
 
 const repairBrief=(findings:unknown[],failing:string[],guidance?:{confidence?:number;meaning:string},scope?:string)=>
@@ -94,6 +103,11 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
  await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status)||resumableReview(t),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
  const resumeAtVerification=resumableReview(taskOf(await store.load(),id));
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
+ const s0=await store.load(),t0=taskOf(s0,id);
+ if(t0.status==='ready'&&!t0.output){
+  const passing=await passingProbes(t0.checks,input.workspace??t0.workspace!);
+  if(passing.length)return finish({outcome:'refused',passing,reason:`Probe check${passing.length>1?'s':''} ${passing.join(', ')} already pass${passing.length===1?'es':''} on the unchanged checkout; a probe that passes there cannot detect the task defect, so no worker is launched`});
+ }
  try{
   let out:unknown,pending:{action:string}|undefined;
   if(resumeAtVerification)trail.push({stage:'resume-verification',detail:{output:taskOf(await store.load(),id).output}});

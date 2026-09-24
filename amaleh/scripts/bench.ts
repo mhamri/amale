@@ -50,7 +50,7 @@ async function untouchedSpecs(spaces:Record<string,string>,specs:Record<string,s
 }
 
 const taskOfUnit=(unit:Unit):TaskInput=>({id:unit.id,title:unit.title,goal:`${unit.goal}. The file spec.test.ts already exists and must not be edited; create ${unit.module} beside it so every case passes.`,
- phase:'bench',deps:[],resources:[unit.id],criteria:unit.criteria,kind:'code',checks:[{id:'spec',command:'bun',args:['test','spec.test.ts']}]});
+ phase:'bench',deps:[],resources:[unit.id],criteria:unit.criteria,kind:'code',checks:[{id:'spec',command:'bun',args:['test','spec.test.ts'],role:'probe' as const}]});
 
 export function scorecard(health:Extract<Awaited<ReturnType<typeof processHealth>>,{available:true}>,accepted:number,green:number,edited:string[],totals:Record<string,unknown>,elapsedMs:number){
  const metric=(name:string)=>Number(health.metrics[name]??0);

@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import * as c from '../scripts/core.ts';
 import {delegate} from '../scripts/delegate.ts';
 
-const task=(id:string)=>({id,title:id,goal:`Deliver ${id}`,phase:'one',deps:[],resources:[id],criteria:[`${id} works`],checks:[],kind:'code' as const});
+const task=(id:string)=>({id,title:id,goal:`Deliver ${id}`,phase:'one',deps:[],resources:[id],criteria:[`${id} works`],checks:[],noProbe:`Fixture task ${id} with no executable checks`,kind:'code' as const});
 const options:c.ShapeOption[]=[
  {id:'headline',summary:'Short headline and one line of copy over the scene',gains:'The scene stays visible',costs:'Less room for detail'},
  {id:'split',summary:'Copy on the left, scene on the right',gains:'Both stay readable',costs:'Scene shrinks on phones'}];
@@ -105,7 +105,7 @@ test('a second reopen without a probe is refused: the checks are missing somethi
  await c.invalidate(store,{id:'hero',reason:'Clipped glyph',noProbe:'Seen only in a screenshot'});
  await fixtureClaim(store,'hero',{workspace:dir,model:'deepseek/flash'});await c.result(store,'hero',{done:true});
  await assert.rejects(()=>c.invalidate(store,{id:'hero',reason:'Overflow at 320',noProbe:'again'}),/already reopened once without a probe \("Seen only in a screenshot"\)/);
- await c.invalidate(store,{id:'hero',reason:'Overflow at 320',check:{id:'rendered',command:process.execPath,args:['-e','0']}});
+ await c.invalidate(store,{id:'hero',reason:'Overflow at 320',check:{id:'rendered',command:process.execPath,args:['-e','process.exit(1)'],role:'probe' as const}});
  assert.ok(c.taskOf(await store.load(),'hero').checks.some(ch=>ch.id==='rendered'));
 });
 
