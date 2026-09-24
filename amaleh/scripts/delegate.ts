@@ -4,7 +4,7 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped } from './core.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped, type Task } from './core.ts';
 import { worker, reviewer, requestJson, choiceAnswer, transientProvider, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
@@ -14,6 +14,7 @@ export type DelegateOutcome = { task:string; trail:Trail; outcome:string; [key:s
 const real:DelegateDeps = { runWorker:worker, runReviewer:reviewer, runCheck:check };
 type Trail = { stage:string; detail:unknown }[];
 const routePending = (r:unknown) => r && typeof r==='object' && 'action' in r && (r as any).action!=='launch' ? r as {action:string} : undefined;
+const resumableReview=(t:Task)=>t.status==='review'&&!!t.output&&!t.activity&&!t.owner;
 const escapedPaths=(error:unknown)=>error instanceof WorkspaceEscape?error.paths:undefined;
 
 async function repairStrategy(store:Store,id:string,findings:unknown[],failing:string[],fetcher?:typeof fetch){
@@ -56,14 +57,18 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
 export async function delegate(store:Store,id:string,input:{workspace?:string;brief?:string;routing?:RoutingRequest;lenses?:string[];skills?:string[];references?:string[]}={},deps:Partial<DelegateDeps>={}):Promise<DelegateOutcome>{
  const d:DelegateDeps={...real,...deps};
  const trail:Trail=[];
- await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
+ await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status)||resumableReview(t),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
+ const resumeAtVerification=resumableReview(taskOf(await store.load(),id));
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
  try{
-  let out:unknown;
-  try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));}
-  catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
-  trail.push({stage:'worker',detail:out});
-  let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
+  let out:unknown,pending:{action:string}|undefined;
+  if(resumeAtVerification)trail.push({stage:'resume-verification',detail:{output:taskOf(await store.load(),id).output}});
+  else{
+   try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));}
+   catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
+   trail.push({stage:'worker',detail:out});
+   pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
+  }
   for(;;){
    let s=await store.load(),t=taskOf(s,id);
    let mutating:string[]=[],settled=false;

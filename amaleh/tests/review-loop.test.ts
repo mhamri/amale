@@ -65,6 +65,18 @@ test('a second coverage gap escalates as host work and leaves the task actionabl
  await c.addReviewCheck(store,'a',{id:'probe',command:process.execPath,args:['-e','process.exit(0)']});
  assert.equal(c.taskOf(await store.load(),'a').status,'review','the coordinator can register the requested probe without a delegation refusal');
 });
+test('a task left in review is delegated again straight to checks and review, without a new worker run',async t=>{
+ const {dir,store}=await fixture(t);
+ await syntheticWorker(dir)(store,'a',{workspace:dir});
+ const calls:string[]=[],routings:unknown[]=[];
+ let workerRuns=0;
+ const countingWorker=async(...args:unknown[])=>{workerRuns++;return (syntheticWorker(dir) as any)(...args);};
+ const out=await delegate(store,'a',{workspace:dir},{runWorker:countingWorker as any,runReviewer:syntheticReviews(dir,[{model:'z-ai/glm-flash'}],calls,routings) as any});
+ assert.equal(out.outcome,'accepted');
+ assert.equal(workerRuns,0,'the finished worker output is reused, not bought again');
+ assert.deepEqual(calls,['z-ai/glm-flash']);
+ assert.ok(out.trail.some(s=>s.stage==='resume-verification'));
+});
 test('a blocking finding from the retry drives repair rather than escalation',async t=>{
  const {dir,store}=await fixture(t);
  const calls:string[]=[],routings:unknown[]=[];
