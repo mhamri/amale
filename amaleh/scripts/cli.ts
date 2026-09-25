@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir, realpath, lstat, symlink, open } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, realpath, lstat, symlink, unlink, open } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -16,7 +16,10 @@ import { humanRequested, renderResult, stripFlags } from './render.ts';
 
 const esc=(s:unknown)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export async function statusHtml(store:core.Store){const s=await store.load();const content=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Amaleh ${esc(s.id)}</title><style>body{max-width:1050px;margin:40px auto;padding:20px;font:16px/1.6 system-ui;background:#f7f6ef;color:#243832}article{padding:18px;border:1px solid #bdcbbb;margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}.muted{color:#52665f}</style><h1>${esc(s.intent)}</h1><p>${esc(s.status)} · revision ${s.revision} · ${esc(s.host.model)}</p><h2>Next action</h2><pre>${esc(JSON.stringify(await core.next(store),null,2))}</pre><h2>Acceptance criteria</h2><ul>${s.criteria.map(c=>`<li>${esc(c)}</li>`).join('')}</ul><h2>Work graph</h2>${s.tasks.map(t=>`<article><h3>${esc(t.id)} · ${esc(t.title)}</h3><p>${esc(t.phase)} / ${esc(t.status)} / ${esc(t.depth)} / repair cycle ${t.cycles}</p><p>Depends on: ${esc(t.deps.join(', ')||'entry')}</p><p>${esc(t.goal)}</p><p class="muted">${esc(t.blocked??'')}</p></article>`).join('')}<h2>Decisions</h2>${s.decisions.map(d=>`<p>${esc(d.question)} → ${esc(d.choice??'host decision pending')} (${esc(d.source??'pending')})</p>`).join('')}<p>Evidence and full history remain in this run’s durable records.</p></html>`;const path=join(store.root,'status.html');await writeFile(path,content);return {path};}
-export async function install(targetHome=homedir()){const source=await realpath(join(dirname(fileURLToPath(import.meta.url)),'..'));const targets=[join(process.env.CODEX_HOME??join(targetHome,'.codex'),'skills','amaleh'),join(targetHome,'.claude','skills','amaleh')];const result=[];for(const target of targets){await mkdir(dirname(target),{recursive:true});try{await lstat(target);core.invariant(await realpath(target)===source,`Conflicting skill target: ${target}`);result.push({target,status:'already linked'});}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;await symlink(source,target,process.platform==='win32'?'junction':'dir');core.invariant(await realpath(target)===source,'Link verification failed');result.push({target,status:'linked'});}}return result;}
+const skillSource=async()=>realpath(join(dirname(fileURLToPath(import.meta.url)),'..'));
+const skillTargets=(targetHome:string)=>[join(process.env.CODEX_HOME??join(targetHome,'.codex'),'skills','amaleh'),join(targetHome,'.claude','skills','amaleh')];
+export async function install(targetHome=homedir()){const source=await skillSource(),result=[];for(const target of skillTargets(targetHome)){await mkdir(dirname(target),{recursive:true});try{await lstat(target);core.invariant(await realpath(target)===source,`Conflicting skill target: ${target}`);result.push({target,status:'already linked'});}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;await symlink(source,target,process.platform==='win32'?'junction':'dir');core.invariant(await realpath(target)===source,'Link verification failed');result.push({target,status:'linked'});}}return result;}
+export async function uninstall(targetHome=homedir()){const source=await skillSource(),planned:Array<{target:string;status:'removed'|'not installed'}>=[];for(const target of skillTargets(targetHome)){let entry;try{entry=await lstat(target);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;planned.push({target,status:'not installed'});continue;}let resolved:string|undefined;if(entry.isSymbolicLink()){try{resolved=await realpath(target);}catch{resolved=undefined;}}core.invariant(resolved===source,`Conflicting skill target: ${target}`);planned.push({target,status:'removed'});}for(const entry of planned)if(entry.status==='removed')await unlink(entry.target);return planned;}
 export async function finishGate(store:core.Store,input:{claims:string[];acknowledgeWarnings?:string}){
  const health=await processHealth(store);
  if(health.available&&health.warnings.length){
@@ -48,6 +51,7 @@ const attachedFlag='--attached';
 async function executeMain(args=process.argv.slice(2),attached=false){
  const [operation,workspace=process.cwd(),runId,inputPath]=args;
  if(operation==='install')return install(args[1]);
+ if(operation==='uninstall')return uninstall(args[1]);
  if(operation==='doctor'){const pi=await adapters.piCommand();let auth=false;try{auth=!!await adapters.credential();}catch{}return {runtime:{engine:process.versions.bun?'bun':'node',version:process.versions.bun??process.versions.node,nodeCompatibility:process.versions.node,executable:process.execPath},platform:process.platform,pi,openrouterConfigured:auth,dependencies:'No npm runtime dependencies',jevEndpoint:'https://openrouter.ai/api/alpha/decisions'};}
  if(operation==='list'){let ids:string[];try{ids=(await readdir(join(resolve(workspace),'.amaleh','runs'))).filter(id=>/^[a-zA-Z0-9_-]+$/.test(id));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return [];throw e;}const summaries=await Promise.all(ids.map(async id=>{try{return await core.summarize(workspace,id);}catch(e){return {id,status:'blocked',intent:'<unreadable: '+(e as Error).message+'>',criteria:[],tasks:0,revision:-1} satisfies core.RunSummary;}}));return summaries.sort((a:core.RunSummary,b:core.RunSummary)=>b.revision-a.revision||a.id.localeCompare(b.id));}
  const input=inputPath?JSON.parse(await readFile(resolve(inputPath),'utf8')):{};
@@ -113,7 +117,7 @@ case 'host-exception':return core.hostException(store,input);
 export async function main(args=process.argv.slice(2)){
  const attached=args.includes(attachedFlag),argv=stripFlags(args).filter(a=>a!==attachedFlag);
  const [operation,workspace,runId]=argv;
- if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','diagnostic-export','wait'].includes(operation))return executeMain(argv);
+ if(!workspace||!runId||['status','next','diagnose','artifact','list','doctor','install','uninstall','diagnostic-export','wait'].includes(operation))return executeMain(argv);
  const store=new core.Store(workspace,runId),operationTrace=await trace(store.root,'cli:'+operation,{runId});
  try{const value=await executeMain(argv,attached);await operationTrace.end('success');return value;}catch(error){await operationTrace.end('failed',{name:(error as Error).name,message:(error as Error).message});throw error;}
 }

@@ -6,7 +6,7 @@ The skill installer links the canonical directory into Claude and Codex. There a
 
 - A real OpenRouter Jev decisions request succeeded using pi's existing OpenRouter credential. No separate TypeSafe key is required. Response model: typesafe/jev-1.13-20260917. OpenRouter uses its alpha decisions endpoint; the adapter does not send Jev requests to chat completions.
 - A live isolated billing fixture traversed Jev routing → deepseek/deepseek-v4.1-flash implementation → z-ai/glm-5.3-flash independent read-only review → exact amount tests → acceptance/integration/completion. The task corrected multiplication of unit price by quantity; tests covered expected totals 20 and 5.
-- Behavioral tests cover valid completion, graph validation, stale/failed checks, independent review, repair escalation, concurrent checkpointing, dependency-ready progress, conflicting workspaces, live/dead ownership, decision uncertainty, artifact retention, HTML escaping, installation reruns, completed-run resume, upstream invalidation, cross-host takeover and contract amendment.
+- Behavioral tests cover valid completion, graph validation, stale/failed checks, independent review, repair escalation, concurrent checkpointing, dependency-ready progress, conflicting workspaces, live/dead ownership, decision uncertainty, artifact retention, HTML escaping, installation reruns, uninstall round trips, uninstall reruns, uninstall refusal of a real directory or a foreign link, completed-run resume, upstream invalidation, cross-host takeover and contract amendment.
 - Static checking uses TypeScript strict mode. The skill-creator validator passes.
 - Bun-first launching and Node fallback were exercised, including an empty PATH that makes Bun unavailable.
 
