@@ -79,9 +79,12 @@ export function consentSignalsSetTo(choice: ConsentChoice): ConsentSignals {
   return Object.fromEntries(consentSignals.map((signal) => [signal, choice])) as ConsentSignals;
 }
 
+export const consentGrantedEvent = 'amaleh_consent_granted';
+
 declare global {
   interface Window {
     gtag?: (command: 'consent', action: 'update', signals: ConsentSignals) => void;
+    dataLayer?: unknown[];
   }
 }
 
@@ -106,6 +109,7 @@ function tryStoreConsentChoice(choice: ConsentChoice): boolean {
 export function setConsentChoice(choice: ConsentChoice): void {
   tryStoreConsentChoice(choice);
   window.gtag?.('consent', 'update', consentSignalsSetTo(choice));
+  if (choice === 'granted') window.dataLayer?.push({ event: consentGrantedEvent });
 }
 
 const storedChoiceUpdate = consentSignals.map((signal) => `${signal}:choice`).join(',');
