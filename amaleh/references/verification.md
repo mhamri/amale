@@ -22,7 +22,7 @@ All checks dated 2026-09-19. Exact development dependencies and transitive resol
 | pi | 0.85.1 | https://registry.npmjs.org/@earendil-works%2Fpi-coding-agent/latest |
 | TypeScript, development only | 7.0.2 | https://registry.npmjs.org/typescript/latest |
 | Node types, development only | 26.6.2 | https://registry.npmjs.org/%40types%2Fnode/latest |
-| Jev OpenRouter model | ~typesafe/jev-latest (alias; typesafe/jev-1.13 also passes) | `preflight` returned ready for both ids on 2026-09-25 |
+| Jev OpenRouter model | typesafe/jev-1.13 | https://openrouter.ai/typesafe/jev-1.13; verified by live typed response |
 
 ## Practical limits
 
