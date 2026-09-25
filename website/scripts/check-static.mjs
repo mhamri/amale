@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { consentDefaultsScript, consentRegions } from '../src/lib/consent.ts';
 
 const publicDir = fileURLToPath(new URL('../.output/public/', import.meta.url));
 const stylePath = fileURLToPath(new URL('../src/style.css', import.meta.url));
@@ -134,6 +135,37 @@ async function checkPage({ file, page, label }) {
     `${label}: ${file} must have unique element ids`);
 
   assert.match(html, /name="description"/, `${label}: ${file} must declare a meta description`);
+
+  const occurrences = (text, needle) => text.split(needle).length - 1;
+  const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
+  const bodyTag = html.indexOf('<body');
+  const afterBody = html.slice(html.indexOf('>', bodyTag) + 1).trimStart();
+
+  assert.equal(occurrences(html, 'https://www.googletagmanager.com/gtm.js?id='), 1,
+    `${label}: ${file} must load the GTM container script GTM-T8QCHM2H exactly once`);
+  assert.equal(occurrences(html, 'GTM-T8QCHM2H'), 2,
+    `${label}: ${file} must name GTM-T8QCHM2H once in the script and once in the noscript iframe`);
+  const headScripts = [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  assert.equal(headScripts[0], consentDefaultsScript,
+    `${label}: ${file} must set the Consent Mode defaults from src/lib/consent.ts in the first <head> script`);
+  for (const region of consentRegions) {
+    assert.ok(headScripts[0].includes(JSON.stringify(region)),
+      `${label}: ${file} consent defaults must deny consent in region ${region}`);
+  }
+  assert.ok(headScripts[1]?.includes("})(window,document,'script','dataLayer','GTM-T8QCHM2H');"),
+    `${label}: ${file} must load GTM in the second <head> script, right after the consent defaults`);
+  const gtmIndex = head.indexOf("'GTM-T8QCHM2H'");
+  const firstAsset = head.search(/<link\b[^>]*rel="(?:stylesheet|modulepreload)"/i);
+  assert.ok(firstAsset === -1 || gtmIndex < firstAsset,
+    `${label}: ${file} must place the GTM script before any stylesheet or module preload`);
+
+  assert.ok(!html.includes('ads-twitter.com') && !/twq\(/.test(html),
+    `${label}: ${file} must not load the X base code; GTM container tag 4 loads it`);
+
+  assert.equal(occurrences(html, 'ns.html?id=GTM-T8QCHM2H'), 1,
+    `${label}: ${file} must carry the GTM noscript iframe exactly once`);
+  assert.match(afterBody, /^<noscript><iframe src="https:\/\/www\.googletagmanager\.com\/ns\.html\?id=GTM-T8QCHM2H" height="0" width="0" style="display:none;visibility:hidden"><\/iframe><\/noscript>/,
+    `${label}: ${file} must put the GTM noscript iframe as the first thing after <body>`);
 
   const pageDir = dirname(page) + '';
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
