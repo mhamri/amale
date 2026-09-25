@@ -4,16 +4,19 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, event, reviewCoverageDebt, openDelegations, next, requireShaped } from './core.ts';
-import { worker, reviewer, requestJson, choiceAnswer, transientProvider } from './adapters.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, family, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, type Check, type Task } from './core.ts';
+import { worker, reviewer, requestJson, choiceAnswer, transientProvider, settledProviderFailure, taskDiff, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
+export { scopeCheckId };
 
 export type DelegateDeps = { runWorker:typeof worker; runReviewer:typeof reviewer; runCheck:typeof check; fetcher?:typeof fetch };
 export type DelegateOutcome = { task:string; trail:Trail; outcome:string; [key:string]:unknown };
 const real:DelegateDeps = { runWorker:worker, runReviewer:reviewer, runCheck:check };
 type Trail = { stage:string; detail:unknown }[];
 const routePending = (r:unknown) => r && typeof r==='object' && 'action' in r && (r as any).action!=='launch' ? r as {action:string} : undefined;
+const resumableReview=(t:Task)=>t.status==='review'&&!!t.output&&!t.activity&&!t.owner;
+const escapedPaths=(error:unknown)=>error instanceof WorkspaceEscape?error.paths:undefined;
 
 async function repairStrategy(store:Store,id:string,findings:unknown[],failing:string[],fetcher?:typeof fetch){
  try{
@@ -28,13 +31,59 @@ async function repairStrategy(store:Store,id:string,findings:unknown[],failing:s
  return undefined;
 }
 
-const repairBrief=(findings:unknown[],failing:string[],guidance?:{confidence?:number;meaning:string})=>
- `Repair this task: verification failed. ${guidance?`Course guidance (Jev, confidence ${guidance.confidence}): ${guidance.meaning}`:'Apply the smallest correct fixes.'}\nBlocking review findings: ${JSON.stringify(findings)}\nFailing checks: ${JSON.stringify(failing)}\nResolve every listed defect, keep the task contract and scope, and do not run checks yourself; verification follows automatically. Consult the Jev helper for uncertain choices as instructed.`;
+async function passingProbes(checks:Check[],workspace:string){
+ const passing:string[]=[];
+ for(const probe of checks.filter(c=>c.role==='probe')){
+  let code:number;try{code=(await execute(probe,workspace)).code;}catch{code=1;}
+  if(code===0)passing.push(probe.id);
+ }
+ return passing;
+}
+
+const repairBrief=(findings:unknown[],failing:string[],guidance?:{confidence?:number;meaning:string},scope?:string)=>
+ `Repair this task: verification failed. ${guidance?`Course guidance (Jev, confidence ${guidance.confidence}): ${guidance.meaning}`:'Apply the smallest correct fixes.'}\nBlocking review findings: ${JSON.stringify(findings)}\nFailing checks: ${JSON.stringify(failing)}${scope?`\nOut-of-scope changed paths (scope check):\n${scope}\nRevert every path outside the task's resources, or redo the work inside them`:''}\nResolve every listed defect, keep the task contract and scope, and do not run checks yourself; verification follows automatically. Consult the Jev helper for uncertain choices as instructed.`;
+
+const globToRegExp=(glob:string)=>{
+ let pattern='';
+ for(let i=0;i<glob.length;i++){
+  if(glob[i]==='*'){
+   if(glob[i+1]==='*'){pattern+='(?:.*/)?';i++;if(glob[i+1]==='/')i++;else pattern+='.*';}
+   else pattern+='[^/]*';
+  }
+  else if(glob[i]==='?')pattern+='[^/]';
+  else pattern+=/[.+^${}()|[\]\\]/.test(glob[i])?'\\'+glob[i]:glob[i];
+ }
+ return new RegExp('^'+pattern+'$');
+};
+export function inScope(resource:string,path:string){
+ if(resource==='*')return true;
+ if(!resource.includes('*'))return path===resource||path.startsWith(resource+'/');
+ return globToRegExp(resource).test(path);
+}
+export type ScopeVerdict={ran:boolean;code:number;outOfScope:string[];changedPaths:string[];resources:string[];fingerprint:string;reason?:string};
+export async function scopeVerdict(store:Store,id:string,fingerprint:string,mainWorkspace?:string):Promise<ScopeVerdict>{
+ const s=await store.load(),t=taskOf(s,id),workspace=t.workspace!;
+ const diff=mainWorkspace===undefined?undefined:await taskDiff(mainWorkspace,workspace);
+ if(!diff)return {ran:false,code:0,outOfScope:[],changedPaths:[],resources:t.resources,fingerprint,reason:`no Git diff is available for ${workspace}; the scope check could not run`};
+ const changedPaths=[...new Set([...diff.paths,...diff.untracked].map(p=>p.replace(/\\/g,'/')))];
+ const outOfScope=changedPaths.filter(p=>!t.resources.some(r=>inScope(r,p)));
+ return {ran:true,code:outOfScope.length?1:0,outOfScope,changedPaths,resources:t.resources,fingerprint};
+}
+async function recordScope(store:Store,id:string,verdict:ScopeVerdict){
+ const stdout=verdict.outOfScope.length?`Changed paths outside the task's resources:\n${verdict.outOfScope.map(p=>`- ${p}`).join('\n')}\nRevert them or bring the work inside the task's resources.`:'Every changed path is inside the task\'s resources.';
+ const artifact=await store.artifact({command:{command:scopeCheckId,args:[]},resources:verdict.resources,changedPaths:verdict.changedPaths,outOfScope:verdict.outOfScope,code:verdict.code,stdout,stderr:''});
+ await store.transaction(s=>{const t=taskOf(s,id);const prior=t.receipts.findIndex(r=>r.id===scopeCheckId);if(prior>=0)t.receipts.splice(prior,1);t.receipts.push({id:scopeCheckId,code:verdict.code,fingerprint:verdict.fingerprint,artifact});event(s,'check',{id,checkId:scopeCheckId,code:verdict.code,artifact});});
+ return stdout;
+}
 
 // A check that writes into the workspace invalidates its own receipt and every
 // earlier one, and acceptance compares receipts against the current tree. Re-run
 // until every receipt matches the tree the checks leave behind.
 export const checkSettlePasses=3;
+async function recordFailover(store:Store,id:string,stage:'worker'|'reviewer',trail:Trail,heldStatus:Task['status'],attempt:number,reason:string){
+ await store.transaction(s=>{const t=taskOf(s,id);t.status=heldStatus;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt,reason});});
+ trail.push({stage:'provider-failover',detail:{stage,attempt,reason}});
+}
 // A provider outage is not a defect in the task, so it must not consume a repair
 // cycle: restore the status the task held and route again, which now skips the
 // model recorded unavailable.
@@ -45,24 +94,57 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
   try{return await attempt(n);}
   catch(error){
    const reason=(error as Error).message;
+   if(error instanceof WorkspaceEscape)throw error;
    if(n>=budget||!transientProvider(reason))throw error;
-   await store.transaction(s=>{const t=taskOf(s,id);t.status=before;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt:n,reason});});
-   trail.push({stage:'provider-failover',detail:{stage,attempt:n,reason}});
+   await recordFailover(store,id,stage,trail,before,n,reason);
+  }
+ }
+}
+const reviewFailureIsTerminal=(error:unknown)=>error instanceof WorkspaceEscape||settledProviderFailure((error as Error).message);
+async function consumedReviewFamily(store:Store,id:string,from:number){
+ const s=await store.load();
+ const consumed=s.events.slice(from).filter(e=>e.type==='route-used'&&(e.detail as {taskId?:string}).taskId===id&&(e.detail as {purpose?:string}).purpose==='reviewer');
+ const model=(consumed.at(-1)?.detail as {model?:string}|undefined)?.model;
+ return model?family(model):undefined;
+}
+async function reviewFailover<T>(store:Store,id:string,trail:Trail,routing:RoutingRequest|undefined,attempt:(routing:RoutingRequest|undefined)=>Promise<T>):Promise<T>{
+ const budget=(await loadModelConfig()).providerFailovers;
+ let current=routing;
+ for(let n=1;;n++){
+  const state=await store.load(),heldStatus=taskOf(state,id).status,cursor=state.events.length;
+  try{return await attempt(current);}
+  catch(error){
+   const reason=(error as Error).message;
+   if(reviewFailureIsTerminal(error)||n>=budget)throw error;
+   const failed=await consumedReviewFamily(store,id,cursor);
+   if(failed&&!current?.excludeFamilies?.includes(failed))current={...(current??{}),excludeFamilies:[...(current?.excludeFamilies??[]),failed]};
+   await recordFailover(store,id,'reviewer',trail,heldStatus,n,reason);
   }
  }
 }
 export async function delegate(store:Store,id:string,input:{workspace?:string;brief?:string;routing?:RoutingRequest;lenses?:string[];skills?:string[];references?:string[]}={},deps:Partial<DelegateDeps>={}):Promise<DelegateOutcome>{
  const d:DelegateDeps={...real,...deps};
  const trail:Trail=[];
- await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
+ await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status)||resumableReview(t),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
+ const resumeAtVerification=resumableReview(taskOf(await store.load(),id));
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
+ const s0=await store.load(),t0=taskOf(s0,id);
+ if(t0.status==='ready'&&!t0.output){
+  const passing=await passingProbes(t0.checks,input.workspace??t0.workspace!);
+  if(passing.length)return finish({outcome:'refused',passing,reason:`Probe check${passing.length>1?'s':''} ${passing.join(', ')} already pass${passing.length===1?'es':''} on the unchanged checkout; a probe that passes there cannot detect the task defect, so no worker is launched`});
+ }
  try{
-  let out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));
-  let pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
-  trail.push({stage:'worker',detail:out});
+  let out:unknown,pending:{action:string}|undefined;
+  if(resumeAtVerification)trail.push({stage:'resume-verification',detail:{output:taskOf(await store.load(),id).output}});
+  else{
+   try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));}
+   catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
+   trail.push({stage:'worker',detail:out});
+   pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
+  }
   for(;;){
    let s=await store.load(),t=taskOf(s,id);
-   let mutating:string[]=[],settled=false;
+   let mutating:string[]=[],settled=false,scopeNoted=false,recordedScope:string|undefined;
    for(let pass=1;pass<=checkSettlePasses&&!settled;pass++){
     s=await store.load();t=taskOf(s,id);
     const fp=await fingerprint(t.workspace!);
@@ -73,7 +155,17 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
     }
     s=await store.load();t=taskOf(s,id);
     const current=await fingerprint(t.workspace!);
-    settled=t.checks.every(c=>t.receipts.some(r=>r.id===c.id&&r.fingerprint===current));
+    const scope=await scopeVerdict(store,id,current,s.workspace);
+    if(scope.ran&&recordedScope!==scope.fingerprint){
+     await recordScope(store,id,scope);
+     recordedScope=scope.fingerprint;
+     trail.push({stage:'scope',detail:{code:scope.code,outOfScope:scope.outOfScope}});
+    }else if(!scope.ran&&!scopeNoted){
+     scopeNoted=true;
+     await store.transaction(x=>event(x,'scope-unverified',{id,reason:scope.reason}));
+     trail.push({stage:'scope',detail:{ran:false,reason:scope.reason}});
+    }
+    settled=t.checks.every(c=>t.receipts.some(r=>r.id===c.id&&r.fingerprint===current))&&(!scope.ran||recordedScope===current);
    }
    if(!settled)return finish({outcome:'escalated',stage:'unstable-checks',mutating,
     reason:`Checks never settled: ${mutating.length?mutating.join(', ')+' rewrite the workspace every run, so no receipt can match the tree acceptance compares against':'the workspace keeps changing between check runs'}. Register a check that leaves the tree unchanged, or exclude its generated output from the task workspace.`});
@@ -81,12 +173,27 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    const failing=t.receipts.filter(r=>r.code!==0).map(r=>r.id);
    let blocking:unknown[]=[];
    if(!failing.length){
-    const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,input.lenses??['Spec','Standards','Correctness','Omissions']));
-    const pr=routePending(rev);if(pr)return finish({outcome:'route-pending',route:pr});
-    trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+    const lenses=input.lenses??['Spec','Standards','Correctness','Omissions'];
+    const obtainReview=async(excludeFamilies:string[]=[])=>{
+     const routing=excludeFamilies.length?{...input.routing,excludeFamilies:[...(input.routing?.excludeFamilies??[]),...excludeFamilies]}:input.routing;
+     const rev=await reviewFailover(store,id,trail,routing,next=>d.runReviewer(store,id,undefined,lenses,next));
+     const pending=routePending(rev);
+     if(pending)return pending;
+     trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
+     return undefined;
+    };
+    const first=await obtainReview();if(first)return finish({outcome:'route-pending',route:first});
     s=await store.load();t=taskOf(s,id);
     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
-    const debt=reviewCoverageDebt(s,t);
+    let debt=reviewCoverageDebt(s,t);
+    if(!blocking.length&&debt.length){
+     const firstFamily=t.review?.family;
+     const retry=await obtainReview(firstFamily?[firstFamily]:[]);
+     if(retry)return finish({outcome:'route-pending',route:retry});
+     s=await store.load();t=taskOf(s,id);
+     blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
+     debt=reviewCoverageDebt(s,t);
+    }
     if(!blocking.length&&!debt.length){await accept(store,id);return finish({outcome:'accepted',cycles:t.cycles,author:t.author,reviewFamily:t.review?.family,fingerprint:t.fingerprint});}
     if(!blocking.length)return finish({outcome:'escalated',stage:'review-evidence',reason:'Reviewer left obligations unreviewed; supply the requested host evidence or a corrected independent review',obligations:debt});
    }
@@ -97,8 +204,10 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    }
    const guidance=await repairStrategy(store,id,blocking,failing,d.fetcher);
    if(guidance)trail.push({stage:'jev-strategy',detail:guidance});
+   const scopeOut=failing.includes(scopeCheckId)?await (async()=>{const r=t.receipts.find(r=>r.id===scopeCheckId)!;try{return (JSON.parse(await store.readArtifact(r.artifact)) as {stdout:string}).stdout;}catch{return undefined;}})():undefined;
    await repair(store,id);
-   out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:t.workspace!,brief:repairBrief(blocking,failing,guidance),skills:input.skills,references:input.references}));
+   try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:t.workspace!,brief:repairBrief(blocking,failing,guidance,scopeOut),skills:input.skills,references:input.references}));}
+   catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'repair-worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
    pending=routePending(out);
    if(pending)return (pending as any).action==='host-takeover'?finish({outcome:'escalated',stage:'host-takeover',model:(pending as any).model}):finish({outcome:'route-pending',route:pending});
    trail.push({stage:'repair-worker',detail:{cycle:taskOf(await store.load(),id).cycles}});

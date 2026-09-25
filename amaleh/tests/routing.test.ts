@@ -11,10 +11,12 @@ import { worker, reviewer } from '../scripts/adapters.ts';
 const card=(id:string,created:number,images=false)=>({id,created,context_length:64000,architecture:{input_modalities:images?['text','image']:['text']},supported_parameters:['tools'],pricing:{prompt:'0.000001',completion:'0.000002'},description:'Synthetic test card, not a capability benchmark'});
 const cards=[card('deepseek/old-flash',1),card('deepseek/new-flash',3),card('z-ai/glm-new-flash',4),card('moonshot/kimi-specialist',5,true),card('deepseek/preview-flash',9),card('~deepseek/deepseek-flash-latest',10),card('z-ai/glm-flash-latest',11)];
 const testModels={flash:['z-ai/glm-new-flash','deepseek/new-flash'],deep:['moonshot/kimi-specialist'],jev:'typesafe/jev-1.13',providerCooldownMs:300000,providerFailovers:3,launchAttempts:3,idleTimeoutMs:900000,slowModelWindowMs:604800000,reviewerMaxTurns:60};
+const initialModels=process.env.AMALEH_MODELS;
+const restoreModels=()=>{if(initialModels===undefined)delete process.env.AMALEH_MODELS;else process.env.AMALEH_MODELS=initialModels;};
 async function useModels(t:any,dir:string,overrides:Partial<typeof testModels>={}){
  const path=join(dir,'models.json');await writeFile(path,JSON.stringify({...testModels,...overrides}));
- const old=process.env.AMALEH_MODELS;process.env.AMALEH_MODELS=path;
- t.after(()=>{if(old===undefined)delete process.env.AMALEH_MODELS;else process.env.AMALEH_MODELS=old;});
+ process.env.AMALEH_MODELS=path;
+ t.after(restoreModels);
  return path;
 }
 async function fixture(t:any,overrides:Partial<typeof testModels>={}){
@@ -22,7 +24,7 @@ async function fixture(t:any,overrides:Partial<typeof testModels>={}){
  await useModels(t,dir,overrides);
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-routing-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const store=await c.start(dir,{shape:clearCut,id:'route',host:{kind:'codex',model:'gpt-6-astra'},intent:'Test enforced automatic routes',criteria:['Select suitable author and independent reviewer']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix known amount',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],kind:'code'}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix known amount',phase:'one',deps:[],resources:['a'],criteria:['correct amount'],checks:[],noProbe:'Routing test fixture with no executable checks',kind:'code'}],integrationChecks:[]});
  return {dir,store};
 }
 // Only the catalog endpoint is called now: selection is deterministic rotation, not a Jev question.
@@ -233,7 +235,7 @@ test('concurrent routes advance the rotation instead of all selecting one model'
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-rotation-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const ids=['a','b','c','d'];
  const store=await c.start(dir,{shape:clearCut,id:'rotation',host:{kind:'codex',model:'gpt-6-astra'},intent:'Distribute concurrent routes across eligible families',criteria:['Concurrent dispatch does not fixate on one vendor']});
- await c.plan(store,{tasks:ids.map(id=>({id,title:id,goal:'Fix known amount',phase:'one',deps:[],resources:[id],criteria:['correct amount'],checks:[],kind:'code' as const})),integrationChecks:[]});
+ await c.plan(store,{tasks:ids.map(id=>({id,title:id,goal:'Fix known amount',phase:'one',deps:[],resources:[id],criteria:['correct amount'],checks:[],noProbe:'Routing rotation fixture with no executable checks',kind:'code' as const})),integrationChecks:[]});
  const spaces:Record<string,string>={};
  for(const id of ids){const workspace=join(dir,'w-'+id);await mkdir(workspace,{recursive:true});spaces[id]=workspace;}
  await store.transaction(s=>{s.config.maxWorkers=ids.length;for(const id of ids)c.taskOf(s,id).workspace=spaces[id];});

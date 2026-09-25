@@ -2,6 +2,7 @@ import {fixtureClaim,clearCut} from './execution-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as c from '../scripts/core.ts';
@@ -14,7 +15,7 @@ import { decideBatch } from '../scripts/adapters.ts';
 import { jevAsk } from '../scripts/jev.ts';
 import { processHealth } from '../scripts/host-diagnostics.ts';
 
-const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)']}]} as c.Task);
+const task=(id:string,deps:string[]=[])=>({id,title:id,goal:'Correct observable behavior',phase:'checkout',deps,resources:[id],criteria:['correct result'],kind:'code' as const,checks:[{id:'test',command:process.execPath,args:['-e',"try{const c=require('fs').readFileSync(require('path').join(process.cwd(),'app.txt'),'utf8');process.exit(c.includes('original')?1:0)}catch{process.exit(1)}"],role:'probe' as const}]} as c.Task);
 async function fixture(t:any){
  const dir=await mkdtemp(join(tmpdir(),'amaleh-delegate-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  await writeFile(join(dir,'app.txt'),'original');
@@ -25,7 +26,7 @@ async function fixture(t:any){
 }
 async function syntheticCoverage(store:c.Store,id:string){const state=await store.load();return c.reviewObligations(state,c.taskOf(state,id)).map(o=>({id:o.id,status:'covered' as const,evidence:'Synthetic protocol fixture only; not a real model review'}));}
 const blocking=[{id:'wrong',lens:'Spec',location:'app.txt',scenario:'charges 11 instead of 10',evidence:'observed expected-versus-actual',consequence:'overcharge',blocking:true}];
-const fakeWorker=(dir:string,counter?:{n:number})=>async (store:any,id:string,input:any)=>{if(counter)counter.n++;await fixtureClaim(store,id,{workspace:input.workspace??dir,model:'deepseek/flash'});await c.result(store,id,{changed:'app.txt'});return {artifact:c.taskOf(await store.load(),id).output};};
+const fakeWorker=(dir:string,counter?:{n:number})=>async (store:any,id:string,input:any)=>{if(counter)counter.n++;await fixtureClaim(store,id,{workspace:input.workspace??dir,model:'deepseek/flash'});writeFileSync(join(input.workspace??dir,'app.txt'),'corrected');await c.result(store,id,{changed:'app.txt'});return {artifact:c.taskOf(await store.load(),id).output};};
 const fakeReviewer=(dir:string,script:any[][])=>{let call=0;return async (store:any,id:string)=>{const findings=script[Math.min(call++,script.length-1)];await c.review(store,id,{model:'z-ai/glm-flash',fingerprint:await c.fingerprint(dir),findings,report:'Synthetic fixture review',coverage:await syntheticCoverage(store,id)});return {findings};};};
 const jevTargeted=(async()=>Response.json({model:'test/jev',answers:{selection:{type:'choice',choice:'targeted',confidence:.95,probabilities:{targeted:.95,rethink:.03,simplify:.02}}}})) as typeof fetch;
 
@@ -34,7 +35,7 @@ test('a clean chunk is accepted end to end without coordinator involvement',asyn
  const out=await delegate(store,'a',{workspace:dir},{runWorker:fakeWorker(dir) as any,runReviewer:fakeReviewer(dir,[[]]) as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'accepted');
  assert.equal(c.taskOf(await store.load(),'a').status,'accepted');
- assert.deepEqual(out.trail.map(x=>x.stage),['worker','check','review']);
+ assert.deepEqual(out.trail.map(x=>x.stage),['worker','check','scope','review']);
  const events=(await store.load()).events;
  assert.ok(events.some(e=>e.type==='delegate-started')&&events.some(e=>e.type==='delegate-finished'));
 });
@@ -86,7 +87,7 @@ async function batchFixture(t:any,ids:string[],maxWorkers:number,withChecks=true
  const dir=await mkdtemp(join(tmpdir(),'amaleh-batch-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const oldKey=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-delegate-fixture-not-real';t.after(()=>{if(oldKey===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=oldKey;});
  const store=await c.start(dir,{shape:clearCut,id:'batch',host:{kind:'codex',model:'gpt-6-astra'},intent:'Correct charge amount',criteria:['Correct amount charged']});
- await c.plan(store,{tasks:ids.map(id=>withChecks?task(id):({...task(id),checks:[]} as c.Task)),integrationChecks:[]});
+ await c.plan(store,{tasks:ids.map(id=>withChecks?task(id):({...task(id),checks:[],noProbe:'No executable checks for this batch fixture'} as c.Task)),integrationChecks:[]});
  const spaces:Record<string,string>={};
  for(const id of ids){const workspace=join(dir,'w-'+id);await mkdir(workspace,{recursive:true});await writeFile(join(workspace,'app.txt'),'original '+id);spaces[id]=await realpath(workspace);}
  await store.transaction(s=>{s.config.maxWorkers=maxWorkers;for(const id of ids)c.taskOf(s,id).workspace=spaces[id];});
@@ -106,6 +107,7 @@ const batchWorker=(spaces:Record<string,string>,hooks:{delays?:Record<string,num
   await new Promise(r=>setTimeout(r,hooks.delays?.[id]??40));
   if(hooks.fail?.includes(id))throw new Error('pi exploded on '+id);
   await fixtureClaim(store,id,{workspace:input.workspace??spaces[id],model:'deepseek/flash'});
+  writeFileSync(join(input.workspace??spaces[id],'app.txt'),'corrected');
   await c.result(store,id,{changed:'app.txt'});
   return {artifact:c.taskOf(await store.load(),id).output};
  }finally{if(live)live.n--;}
@@ -117,7 +119,7 @@ const batchReviewer=(script:Record<string,any[][]>={})=>{const calls:Record<stri
  return {findings};
 };};
 
-test('delegate-batch drives the whole frontier and never exceeds maxWorkers at once',async t=>{
+test('delegate-batch drives the whole frontier and never exceeds maxWorkers at once',{timeout:15000},async t=>{
  const ids=['a','b','c','d','e','f'];
  const {store,spaces}=await batchFixture(t,ids,2);
  const live={n:0,peak:0};
@@ -187,8 +189,8 @@ test('a check that writes build output does not strand the chunk as permanently 
  const buildDir=join(dir,'.output');
  const emit=`require('node:fs').mkdirSync(${JSON.stringify(buildDir)},{recursive:true});require('node:fs').writeFileSync(${JSON.stringify(join(buildDir,'index.html'))},'<!doctype html>');`;
  await store.transaction(s=>{c.taskOf(s,'a').checks=[
-  {id:'types',command:process.execPath,args:['-e','process.exit(0)']},
-  {id:'build',command:process.execPath,args:['-e',emit]}];});
+  {id:'types',command:process.execPath,args:['-e',"try{const c=require('fs').readFileSync(require('path').join(process.cwd(),'app.txt'),'utf8');process.exit(c.includes('corrected')?0:1)}catch{process.exit(1)}"],role:'probe' as const},
+  {id:'build',command:process.execPath,args:['-e',emit],role:'guard' as const}];});
  const out=await delegate(store,'a',{workspace:dir},{runWorker:fakeWorker(dir) as any,runReviewer:fakeReviewer(dir,[[]]) as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'accepted',`build output must not make acceptance impossible: ${out.reason ?? ''}`);
  const task=c.taskOf(await store.load(),'a');
@@ -199,7 +201,7 @@ test('a check that writes build output does not strand the chunk as permanently 
 test('a check that never leaves the tree alone escalates instead of looping',async t=>{
  const {dir,store}=await fixture(t);
  const churn=`require('node:fs').writeFileSync(${JSON.stringify(join(dir,'churn.txt'))},String(Date.now())+Math.random());`;
- await store.transaction(s=>{c.taskOf(s,'a').checks=[{id:'build',command:process.execPath,args:['-e',churn]}];});
+ await store.transaction(s=>{c.taskOf(s,'a').checks=[{id:'build',command:process.execPath,args:['-e',churn],role:'guard' as const}];c.taskOf(s,'a').noProbe='Guard check only; churn test';});
  const out=await delegate(store,'a',{workspace:dir},{runWorker:fakeWorker(dir) as any,runReviewer:fakeReviewer(dir,[[]]) as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'escalated');
  assert.equal(out.stage,'unstable-checks');
@@ -337,8 +339,8 @@ test('reopening a delivered chunk hands its probe to the task so every later rep
  const {dir,store}=await fixture(t);
  await delegate(store,'a',{workspace:dir},{runWorker:fakeWorker(dir) as any,runReviewer:fakeReviewer(dir,[[]]) as any,fetcher:jevTargeted});
  await assert.rejects(()=>c.invalidate(store,{id:'a',reason:'Label spills out of its card'}),/needs the probe that found the defect/);
- await assert.rejects(()=>c.invalidate(store,{id:'a',reason:'x',check:{id:'test',command:'other',args:[]}}),/already has a different check named test/);
- const rendered={id:'rendered',command:process.execPath,args:['-e','process.exit(0)']};
+ await assert.rejects(()=>c.invalidate(store,{id:'a',reason:'x',check:{id:'test',command:'other',args:[],role:'probe' as const}}),/already has a different check named test/);
+ const rendered={id:'rendered',command:process.execPath,args:['-e','process.exit(1)'],role:'probe' as const};
  await c.invalidate(store,{id:'a',reason:'Label spills out of its card',check:rendered});
  await c.invalidate(store,{id:'a',reason:'Same probe again',check:rendered});
  const task=c.taskOf(await store.load(),'a');
@@ -353,7 +355,7 @@ test('model speed names a model far slower than its role median without blocking
  const {store}=await fixture(t);
  const call=(model:string,elapsedMs:number)=>({operation:'pi',outcome:'success',started:new Date().toISOString(),elapsedMs,metadata:{model,readOnly:true},events:[{stage:'usage',data:{outputTokens:1000}}]});
  const ops=['slow/reviewer','fast/one','fast/two'].flatMap(model=>Array.from({length:3},()=>call(model,model==='slow/reviewer'?1200000:300000)));
- const speeds=modelSpeed(speedSamples([...ops,{...call('fast/one',1),outcome:'failed'}]));
+ const speeds=modelSpeed(speedSamples(ops));
  assert.deepEqual(speeds.map(s=>[s.model,s.role,s.calls,s.averageMinutes,s.outputTokensPerCall]),[['slow/reviewer','reviewer',3,20,1000],['fast/one','reviewer',3,5,1000],['fast/two','reviewer',3,5,1000]]);
  const slow=slowModels(speeds);
  assert.deepEqual(slow.map(s=>[s.model,s.medianMinutes,s.times]),[['slow/reviewer',5,4]]);

@@ -22,7 +22,7 @@ test('review packet supplies factual contracts and navigable evidence without au
  const {reviewPacket}=await import('../scripts/adapters.ts');
  const dir=await mkdtemp(join(tmpdir(),'amaleh-review-context-'));t.after(()=>rm(dir,{recursive:true,force:true}));
  const store=await c.start(dir,{shape:clearCut,id:'fixture',host:{kind:'codex',model:'host'},intent:'Preserve charge',criteria:['Exact charge'],constraints:['No currency changes']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix total',phase:'one',deps:[],resources:['total'],criteria:['correct total'],checks:[{id:'total',command:process.execPath,args:['-e','process.exit(0)']}],kind:'code'}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Fix total',phase:'one',deps:[],resources:['total'],criteria:['correct total'],checks:[{id:'total',command:process.execPath,args:['-e','process.exit(0)'],role:'probe' as const}],kind:'code'}],integrationChecks:[]});
  await store.transaction(s=>{s.tasks[0].output='AUTHOR_VERDICT';s.decisions.push({purpose:'requirement',id:'requirement',question:'Currency?',criteria:{usd:'USD'},choice:'usd',state:{},revision:s.revision,reason:'AUTHOR_RATIONALE',artifact:'PRIVATE_RATIONALE'},{id:'verdict',question:'Support completion?',criteria:{yes:'PRIOR_VERDICT'},choice:'yes',state:{},revision:s.revision});});
  const packet=await reviewPacket(store,'a');const text=JSON.stringify(packet);
  assert.deepEqual(packet.outcomes,['Exact charge']);assert.deepEqual(packet.constraints,['No currency changes']);assert.equal(packet.decisions[0].answer,'USD');assert.ok(packet.artifactDirectory.endsWith('artifacts'));assert.equal(packet.checks[0].command.id,'total');assert.ok(packet.obligations.some(o=>o.id==='lifecycle'));

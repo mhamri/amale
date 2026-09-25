@@ -14,7 +14,7 @@ async function fixture(t:any){
  const old=process.env.OPENROUTER_API_KEY;process.env.OPENROUTER_API_KEY='sk-jev-fixture-not-real';
  t.after(()=>{if(old===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=old;});
  const store=await c.start(dir,{shape:clearCut,id:'jev',host:{kind:'codex',model:'gpt-6-astra'},intent:'Record worker-side Jev usage',criteria:['In-task choices are recorded against the run']});
- await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Choose a truncation strategy',phase:'one',deps:[],resources:['a'],criteria:['strategy chosen'],checks:[],kind:'code'}],integrationChecks:[]});
+ await c.plan(store,{tasks:[{id:'a',title:'a',goal:'Choose a truncation strategy',phase:'one',deps:[],resources:['a'],criteria:['strategy chosen'],checks:[],noProbe:'Jev test fixture with no executable checks',kind:'code'}],integrationChecks:[]});
  return {dir,store};
 }
 

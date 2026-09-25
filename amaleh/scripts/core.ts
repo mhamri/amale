@@ -6,15 +6,16 @@ import { spawn } from 'node:child_process';
 import { hostname } from 'node:os';
 
 export type Command = { command:string; args:string[] };
-export type Check = Command & { id:string };
+export type IntegrationCheck = Command & { id:string };
+export type Check = IntegrationCheck & { role:'probe'|'guard' };
 export type Finding = { id:string; lens:string; location:string; scenario:string; evidence:string; consequence:string; blocking:boolean; disposition?:'open'|'resolved'|'refuted'; resolution?:string };
 export type ReviewCoverage = { id:string; status:'covered'|'finding'|'unreviewed'|'not-applicable'; evidence:string };
 export type Guidance = { skills?:string[]; references?:string[] };
-export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;coordinatorPid?:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
+export type Task = { id:string; title:string; goal:string; phase:string; deps:string[]; resources:string[]; criteria:string[]; checks:Check[]; kind:'code'|'research'|'plan'; skills?:string[]; references?:string[]; noProbe?:string; status:'ready'|'running'|'review'|'repair'|'accepted'|'blocked'; workspace?:string; activity?:{kind:'check'|'review';owner:{pid:number;coordinatorPid?:number;host:string;operation:string};checkId?:string}; owner?:{pid:number;coordinatorPid?:number;host:string;operation:string}; execution?:{kind:'routed-worker'|'coordinator-exception';authorization:string}; author?:string; family?:string; fingerprint?:string; output?:string; receipts:{id:string;code:number;fingerprint:string;artifact:string}[]; review?:{family:string;fingerprint:string;findings:Finding[];artifact:string;coverage?:ReviewCoverage[]}; cycles:number; depth:'flash'|'deep'|'host'; blocked?:string; integrated?:string };
 export type Decision = { purpose?:'requirement'|'workflow'; id:string; question:string; criteria:Record<string,string>; state:unknown; revision:number; choice?:string; source?:string; confidence?:number; reason?:string; artifact?:string };
-export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'>;
+export type TaskInput = Pick<Task,'id'|'title'|'goal'|'phase'|'deps'|'resources'|'criteria'|'checks'|'kind'|'skills'|'references'> & { noProbe?:string };
 export type ModelPool = { role:string; models:string[]; requiredInputs:string[]; requiresTools:boolean; notes:string };
-export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:Check[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
+export type Run = { schema:1; id:string; workspace:string; host:{kind:string;model:string}; effort?:EffortState; intent:string; criteria:string[]; constraints:string[]; decisions:Decision[]; tasks:Task[]; revision:number; status:'active'|'blocked'|'complete'; blocked?:string; config:{flashRepairCycles:number;deepRepairCycles:number;maxWorkers:number}; modelPools?:ModelPool[]; integrationChecks:IntegrationCheck[]; integrationReceipts:Task['receipts']; acceptance?:{fingerprint:string;claims:string[]}; lineage?:{continues:string;inheritedCriteria:string[];inheritedDecisions:string[]}; events:{at:string;type:string;detail:unknown}[] };
 export type RunSummary = { id:string; status:Run['status']; intent:string; criteria:string[]; tasks:number; revision:number; continues?:string; acceptance?:Run['acceptance'] };
 export type ShapeOption = { id:string; summary:string; gains:string; costs:string };
 export type ShapeInput = { understanding:string; gaps?:string[]; pushback?:string[]; additions?:string[]; mentor?:string[]; options?:ShapeOption[]; recommendation?:string; clearCut?:string; questions?:string[]; affects?:string[]; chosen?:{option:string;quote:string} };
@@ -23,7 +24,14 @@ export type Shaped = { request:number; open:boolean; artifact:string; affects:st
 export function invariant(value:unknown,message:string):asserts value { if(!value) throw new Error(message); }
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 export const idCheck=(id:string)=>invariant(typeof id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(id),'Invalid identifier');
+export const scopeCheckId='scope';
+export const taskCheckId=(id:string)=>{idCheck(id);invariant(id!==scopeCheckId,`Check id '${scopeCheckId}' is reserved for the built-in scope check; rename the registered check`);};
 export function validCommand(c:Command) { invariant(c&&typeof c.command==='string'&&c.command.length>0&&Array.isArray(c.args)&&c.args.every(a=>typeof a==='string'),'Commands require an executable and argument array'); }
+export function validRole(c:Check,taskId?:string) { invariant(c.role==='probe'||c.role==='guard',`Check ${c.id}${taskId?` on task ${taskId}`:''} requires role: 'probe' or 'guard'`); }
+export function validateContract(t:TaskInput) {
+ for(const c of t.checks){taskCheckId(c.id);validRole(c,t.id);}
+ if(t.kind==='code')invariant(t.checks.some(c=>c.role==='probe')||typeof t.noProbe==='string'&&!!t.noProbe.trim(),`Code task ${t.id} needs at least one probe check or noProbe explaining why no executable can detect the defect`);
+}
 export function validateTasks(tasks:TaskInput[]) {
  const ids=new Set<string>(); for(const t of tasks){idCheck(t.id);invariant(!ids.has(t.id),'Duplicate task ID');ids.add(t.id);invariant(t.goal&&t.title&&Array.isArray(t.deps)&&Array.isArray(t.resources)&&Array.isArray(t.criteria)&&t.criteria.length&&Array.isArray(t.checks),'Task needs goal, title, dependencies, resources, criteria and checks');invariant(['code','research','plan'].includes(t.kind),'Invalid task kind'); for(const c of t.checks){idCheck(c.id);validCommand(c);} invariant(new Set(t.checks.map(c=>c.id)).size===t.checks.length,'Duplicate check ID');}
  const active=new Set<string>(),done=new Set<string>(); const visit=(id:string)=>{invariant(!active.has(id),'Dependency cycle');if(done.has(id))return;active.add(id);for(const dep of tasks.find(t=>t.id===id)!.deps){invariant(ids.has(dep),'Missing dependency');visit(dep);}active.delete(id);done.add(id);};for(const id of ids)visit(id);
@@ -155,7 +163,7 @@ export async function start(workspace:string,input:{id:string;host:Run['host'];i
  event(s,'request',{request:1,kind:'intent',text:input.intent} satisfies ShapeRequest);
  if(input.shape!==undefined){const shaped=validateShape(s,input.shape);recordShape(s,shaped,await store.artifact(shaped));}
  await store.save(s);return store;}finally{await release();}}
-export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:Check[];singleChunk?:string}){await store.transaction(s=>{requireShaped(s,'plan');invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
+export async function plan(store:Store,input:{tasks:TaskInput[];integrationChecks:IntegrationCheck[];singleChunk?:string}){await store.transaction(s=>{requireShaped(s,'plan');invariant(Array.isArray(input.tasks)&&Array.isArray(input.integrationChecks),'Tasks and integrationChecks required');const existing=new Map(s.tasks.map(t=>[t.id,t]));const tasks=input.tasks.map(t=>{const old=existing.get(t.id);if(old){invariant(JSON.stringify([old.goal,old.deps,old.criteria,old.checks])===JSON.stringify([t.goal,t.deps,t.criteria,t.checks]),'Existing task contract changed; invalidate/replan explicitly');return old;}return {...t,status:'ready' as const,cycles:0,depth:'flash' as const,receipts:[]};});invariant([...existing.keys()].every(id=>tasks.some(t=>t.id===id)),'Cannot drop task history');validateTasks(tasks);for(const t of input.tasks)if(!existing.has(t.id))validateContract(t);const singleChunk=input.singleChunk?.trim();if(tasks.length===1&&!existing.has(tasks[0].id)&&(s.criteria.length>=3||tasks[0].criteria.length>=4)){invariant(singleChunk,`Single task for ${s.criteria.length} run outcomes and ${tasks[0].criteria.length} task criteria; split into independent chunks or pass singleChunk with a reason`);event(s,'single-chunk',{reason:singleChunk,runCriteria:s.criteria.length,taskCriteria:tasks[0].criteria.length});}input.integrationChecks.forEach(validCommand);s.tasks=tasks;s.integrationChecks=input.integrationChecks;s.integrationReceipts=[];event(s,'planned',{tasks:tasks.map(t=>t.id)});});}
 // Coverage is an explicit reviewer attestation, not proof that all defects were found.
 export function reviewObligations(s:Run,t:Task):{id:string;question:string}[]{return [
  ...t.criteria.map((criterion,i)=>({id:`criterion:${i+1}`,question:`Spec: inspect the actual behavior satisfying task criterion: ${criterion}`})),
@@ -243,14 +251,15 @@ export async function execute(command:Command,cwd:string,onSpawn?:(pid:number)=>
 export async function check(store:Store,id:string|undefined,checkId:string){const s=await store.load(),t=id?taskOf(s,id):undefined;const c=(t?t.checks:s.integrationChecks).find(c=>c.id===checkId);invariant(c,'Unknown check');const cwd=t?.workspace??s.workspace;const operation=id?await acquireActivity(store,id,'check',checkId):undefined;try{const before=await fingerprint(cwd);let receipt:{code:number;stdout:string;stderr:string};try{receipt=await execute(c,cwd,id&&operation?pid=>activitySpawned(store,id,operation,pid):undefined);}catch(error){receipt={code:1,stdout:"",stderr:"Check could not execute: "+(error as Error).message};}const after=await fingerprint(cwd);const artifact=await store.artifact({command:c,cwd,before,after,...receipt});await store.transaction(current=>{const target=id?taskOf(current,id):undefined;invariant(!target||target.workspace===cwd,'Task workspace changed during check');const list=target?target.receipts:current.integrationReceipts;const prior=list.findIndex(r=>r.id===checkId);if(prior>=0)list.splice(prior,1);list.push({id:checkId,code:receipt.code,fingerprint:before,artifact});event(current,'check',{id,checkId,code:receipt.code,artifact});});return {code:receipt.code,artifact,changed:before!==after};}finally{if(id&&operation)await releaseActivity(store,id,operation);}}
 export async function addReviewCheck(store:Store,id:string,check:Check){await store.transaction(s=>{
  const t=taskOf(s,id);invariant(t.status==='review'&&!t.activity,'Review evidence checks require an idle task awaiting review');
- idCheck(check.id);validCommand(check);invariant(!t.checks.some(c=>c.id===check.id),'Duplicate check ID');
+ taskCheckId(check.id);validCommand(check);validRole(check,t.id);invariant(!t.checks.some(c=>c.id===check.id),'Duplicate check ID');
  t.checks.push(check);t.review=undefined;event(s,'review-check-added',{id,check});
 });}
 export async function review(store:Store,id:string,input:{model:string;findings:Finding[];fingerprint:string;report:string;coverage?:ReviewCoverage[]}){const artifact=await store.artifact(input);await store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='review'&&t.workspace,'Task not awaiting review');invariant(input.model&&family(input.model)!==t.family,'Review requires another model family');invariant(input.fingerprint===await fingerprint(t.workspace),'Review evidence is stale');invariant(Array.isArray(input.findings)&&typeof input.report==='string'&&input.report.length>0,'Review report required');for(const f of input.findings)invariant(f.id&&f.lens&&f.location&&f.scenario&&f.evidence&&f.consequence&&typeof f.blocking==='boolean','Finding lacks evidence');if(input.coverage!==undefined)validateReviewCoverage(s,t,input.coverage,input.findings);const findings=input.findings.map(f=>({...f,disposition:'open' as const}));t.review={family:family(input.model),fingerprint:input.fingerprint,findings,artifact,coverage:input.coverage};event(s,'review',{id,artifact});});}
 export async function repair(store:Store,id:string){await store.transaction(s=>{const t=taskOf(s,id);invariant(t.status==='review'&&!t.activity,'Task is not in review or verification remains active');invariant(t.review?.findings.some(f=>f.blocking&&f.disposition==='open')||t.receipts.some(r=>r.code!==0),'No blocking review or failing check');t.cycles++;t.depth=t.cycles>s.config.flashRepairCycles+s.config.deepRepairCycles?'host':t.cycles>s.config.flashRepairCycles?'deep':'flash';t.status='repair';event(s,'repair',{id,cycle:t.cycles,depth:t.depth});});}
 export async function accept(store:Store,id:string){await store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='review'&&t.workspace&&t.output&&t.review&&!t.activity,'Result and independent review required; verification must be idle');invariant(t.deps.every(id=>taskOf(s,id).status==='accepted'&&!!taskOf(s,id).integrated),'Unmet dependencies; reconcile upstream evidence before acceptance');const fp=await fingerprint(t.workspace);invariant(t.review.fingerprint===fp,'Review stale');invariant(!t.review.findings.some(f=>f.blocking&&f.disposition==='open'),'Blocking findings remain');invariant(t.checks.every(c=>t.receipts.some(r=>r.id===c.id&&r.code===0&&r.fingerprint===fp)),'Required checks missing, failed, or stale');invariant(!reviewCoverageDebt(s,t).length,'Review coverage incomplete; obtain missing evidence and a corrected independent report');t.status='accepted';t.fingerprint=fp;event(s,'accepted',{id,fp});});}
 export async function integrated(store:Store,id:string,evidence:string){await store.transaction(async s=>{const t=taskOf(s,id);invariant(t.status==='accepted'&&evidence,'Accepted task and integration evidence required');invariant(t.workspace&&t.fingerprint===await fingerprint(t.workspace),'Accepted workspace changed');t.integrated=await fingerprint(s.workspace);event(s,'integrated',{id,evidence,fingerprint:t.integrated});s.integrationReceipts=[];});}
-export async function finish(store:Store,claims:string[]){await store.transaction(async s=>{invariant(!s.effort?.request,'Host effort pass is unfinished');invariant(s.tasks.length&&s.tasks.every(t=>t.status==='accepted'&&t.integrated),'Incomplete tasks');const fp=await fingerprint(s.workspace);invariant(s.tasks.some(t=>t.integrated===fp),'Integrated content changed after recorded integration');invariant(!s.decisions.some(d=>!d.choice),'Unresolved semantic decision');invariant(s.integrationChecks.every(c=>s.integrationReceipts.some(r=>r.id===c.id&&r.code===0&&r.fingerprint===fp)),'Integration checks missing, failed or stale');invariant(Array.isArray(claims)&&claims.length===s.criteria.length&&claims.every(c=>typeof c==='string'&&c.trim()),'Evidence explanation required for every outcome');s.acceptance={fingerprint:fp,claims};s.status='complete';event(s,'finished',s.acceptance);});}
+export async function finishRun(s:Run,claims:string[]){invariant(!s.effort?.request,'Host effort pass is unfinished');invariant(s.tasks.length&&s.tasks.every(t=>t.status==='accepted'&&t.integrated),'Incomplete tasks');const fp=await fingerprint(s.workspace);invariant(s.tasks.some(t=>t.integrated===fp),'Integrated content changed after recorded integration');invariant(!s.decisions.some(d=>!d.choice),'Unresolved semantic decision');invariant(s.integrationChecks.every(c=>s.integrationReceipts.some(r=>r.id===c.id&&r.code===0&&r.fingerprint===fp)),'Integration checks missing, failed or stale');invariant(Array.isArray(claims)&&claims.length===s.criteria.length&&claims.every(c=>typeof c==='string'&&c.trim()),'Evidence explanation required for every outcome');s.acceptance={fingerprint:fp,claims};s.status='complete';event(s,'finished',s.acceptance);}
+export async function finish(store:Store,claims:string[]){await store.transaction(async s=>await finishRun(s,claims));}
 const workspaceUnavailable=(error:unknown)=>['ENOENT','ENOTDIR','EACCES','EPERM'].includes((error as NodeJS.ErrnoException).code??'');
 function quarantineWorkspace(s:Run,id:string,reason:string){
  const affected=new Set([id]);let changed=true;
@@ -273,7 +282,7 @@ export async function resume(store:Store,host?:Run['host']){
   for(const d of openDelegations(s))if(!d.alive)event(s,'delegate-finished',{id:d.id,outcome:'interrupted'});
   const stale:string[]=[],unavailable:{id:string;reason:string}[]=[];for(const t of s.tasks)if(['review','accepted'].includes(t.status)&&t.workspace){try{const fp=await fingerprint(t.workspace);if(t.status==='accepted'&&t.fingerprint!==fp)stale.push(t.id);}catch(error){if(!workspaceUnavailable(error))throw error;unavailable.push({id:t.id,reason:(error as Error).message});}}
   for(const fault of unavailable)if(['review','accepted'].includes(taskOf(s,fault.id).status))quarantineWorkspace(s,fault.id,fault.reason);
-  for(const id of stale)if(taskOf(s,id).status==='accepted')invalidateTree(s,id,'Accepted workspace changed since verification');
+  for(const id of stale)if(taskOf(s,id).status==='accepted')invalidateTree(s,id,'Accepted workspace changed since verification',undefined,true);
   event(s,'resumed',{});
  });return next(store);
 }
@@ -294,7 +303,7 @@ export async function packet(store:Store,id?:string){
 }
 export async function summarize(workspace:string,id:string):Promise<RunSummary>{const s=await new Store(workspace,id).load();return {id:s.id,status:s.status,intent:s.intent,criteria:s.criteria,tasks:s.tasks.length,revision:s.revision,continues:s.lineage?.continues,acceptance:s.acceptance};}
 
-export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
+export function invalidateTree(s:Run,id:string,reason:string,feedback?:number,isDefect?:boolean){
  invariant(reason,'Invalidation reason required');taskOf(s,id);const affected=new Set([id]);let changed=true;while(changed){changed=false;for(const t of s.tasks)if(!affected.has(t.id)&&t.deps.some(dep=>affected.has(dep))){affected.add(t.id);changed=true;}}
  invariant(!s.tasks.some(t=>affected.has(t.id)&&(t.status==='running'||!!t.activity)),'Affected task is still running; reconcile ownership before invalidation');
  for(const t of s.tasks)if(affected.has(t.id)){
@@ -302,10 +311,11 @@ export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
   if((t.output||t.review)&&feedback===undefined){t.cycles++;t.depth=t.cycles>s.config.flashRepairCycles+s.config.deepRepairCycles?'host':t.cycles>s.config.flashRepairCycles?'deep':'flash';}
   t.status='ready';t.integrated=undefined;t.receipts=[];t.review=undefined;
  }
- s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback});
+ s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback,kind:feedback===undefined?isDefect===false?'contract':'defect':'feedback'});
 }
 
-export async function invalidate(store:Store,input:{id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean}){await store.transaction(s=>{
+type ReopenInput={id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean};
+function validateReopen(s:Run,input:ReopenInput){
  const t=taskOf(s,input.id),noProbe=typeof input.noProbe==='string'?input.noProbe.trim():'';
  invariant(!(input.check&&noProbe),'Pass check or noProbe, not both');
  const fromFeedback=input.feedback===true?feedbackReopen(s,t.id):undefined;
@@ -313,16 +323,26 @@ export async function invalidate(store:Store,input:{id:string;reason:string;chec
  if((t.output||t.review)&&fromFeedback===undefined)invariant(input.check||noProbe,`Reopening ${t.id} needs the probe that found the defect: pass check with the executable that shows it, so every later repair of this task runs it too, or noProbe naming why no executable can show it`);
  const earlierNoProbe=s.events.find(e=>e.type==='reopen-probe'&&(e.detail as {id?:string;noProbe?:string}).id===t.id&&(e.detail as {noProbe?:string}).noProbe);
  invariant(!noProbe||!earlierNoProbe,`${t.id} was already reopened once without a probe ("${(earlierNoProbe?.detail as {noProbe?:string})?.noProbe}"). A second defect the checks cannot see means the checks are missing something: register the probe that shows it as check`);
+ const same=input.check&&t.checks.find(c=>c.id===input.check!.id);
  if(input.check){
-  idCheck(input.check.id);validCommand(input.check);
-  const same=t.checks.find(c=>c.id===input.check!.id);
-  invariant(!same||JSON.stringify([same.command,same.args])===JSON.stringify([input.check.command,input.check.args]),`Task ${t.id} already has a different check named ${input.check.id}`);
-  if(!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args});
+  taskCheckId(input.check.id);validCommand(input.check);validRole(input.check,t.id);
+  invariant(!same||JSON.stringify([same.command,same.args,same.role])===JSON.stringify([input.check.command,input.check.args,input.check.role]),`Task ${t.id} already has a different check named ${input.check.id}`);
  }
- invalidateTree(s,input.id,input.reason,fromFeedback);
+ return {t,noProbe,fromFeedback,same};
+}
+export async function invalidate(store:Store,input:ReopenInput){
+ const before=validateReopen(await store.load(),input);
+ if(input.check?.role==='probe'&&before.t.workspace){
+  let code:number;try{code=(await execute(input.check,before.t.workspace)).code;}catch{code=1;}
+  invariant(code!==0,`Probe check ${input.check.id} already passes on the current checkout (${before.t.workspace}); a probe that passes there cannot detect the defect, so the reopen is refused`);
+ }
+ await store.transaction(s=>{
+ const {t,noProbe,fromFeedback,same}=validateReopen(s,input);
+ if(input.check&&!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args,role:input.check.role});
+ invalidateTree(s,input.id,input.reason,fromFeedback,true);
  if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
 });}
-export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];validateTasks(s.tasks);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
+export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback,false);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];if(input.task.noProbe!==undefined)(t as any).noProbe=input.task.noProbe;validateTasks(s.tasks);validateContract(input.task);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
 
 export type ParallelAction={task:string;action:string;workspace?:string;resources:string[];checks?:Check[];[key:string]:unknown};
 export async function next(store:Store){

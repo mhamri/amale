@@ -36,7 +36,7 @@ Secrets are read from existing credential configuration or environment and are n
 
 ## Reproducible verification
 
-From `amaleh/`, run `bun install --frozen-lockfile`, `bun run check`, `bun run test:bun` and `node --test tests/*.test.ts`.
+From `amaleh/`, run `bun install --frozen-lockfile`, `bun run check`, `bun run test` and `node --test tests/*.test.ts`.
 
 The offline suite covers routing, lifecycle recovery, parallel ownership, review coverage, context isolation and startup preflight. Latest development check: 83 Bun tests and 95 Node tests (including nested cases) passed. Live probes above are historical development observations, not offline-suite requirements or general model-quality claims. Raw development artifacts and review reports are not distributed.
 
