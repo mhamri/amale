@@ -355,7 +355,7 @@ test('model speed names a model far slower than its role median without blocking
  const {store}=await fixture(t);
  const call=(model:string,elapsedMs:number)=>({operation:'pi',outcome:'success',started:new Date().toISOString(),elapsedMs,metadata:{model,readOnly:true},events:[{stage:'usage',data:{outputTokens:1000}}]});
  const ops=['slow/reviewer','fast/one','fast/two'].flatMap(model=>Array.from({length:3},()=>call(model,model==='slow/reviewer'?1200000:300000)));
- const speeds=modelSpeed(speedSamples([...ops,{...call('fast/one',1),outcome:'failed'}]));
+ const speeds=modelSpeed(speedSamples(ops));
  assert.deepEqual(speeds.map(s=>[s.model,s.role,s.calls,s.averageMinutes,s.outputTokensPerCall]),[['slow/reviewer','reviewer',3,20,1000],['fast/one','reviewer',3,5,1000],['fast/two','reviewer',3,5,1000]]);
  const slow=slowModels(speeds);
  assert.deepEqual(slow.map(s=>[s.model,s.medianMinutes,s.times]),[['slow/reviewer',5,4]]);

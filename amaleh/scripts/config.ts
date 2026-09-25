@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { invariant } from './core.ts';
 
-export type ModelConfig = { flash:string[]; deep:string[]; jev:string; providerCooldownMs:number; providerFailovers:number; launchAttempts:number; idleTimeoutMs:number; slowModelWindowMs:number; reviewerMaxTurns:number };
+export type ModelConfig = { flash:string[]; deep:string[]; jev:string; providerCooldownMs:number; providerFailovers:number; launchAttempts:number; idleTimeoutMs:number; workerTimeoutMs:number; reviewerTimeoutMs:number; slowModelWindowMs:number; reviewerMaxTurns:number };
 
 export const configPath=()=>resolve(process.env.AMALEH_MODELS??join(dirname(fileURLToPath(import.meta.url)),'..','models.json'));
 export const isAlias=(model:string)=>/^~|[/:_-]latest(?:$|[/:_-])/i.test(model);
@@ -18,6 +18,9 @@ function whole(value:unknown,field:string,path:string,min:number,max:number){
  invariant(Number.isInteger(value)&&(value as number)>=min&&(value as number)<=max,`${field} in ${path} must be a whole number between ${min} and ${max}`);
  return value as number;
 }
+function optionalWhole(value:unknown,field:string,path:string,min:number,max:number,fallback:number){
+ return value===undefined?fallback:whole(value,field,path,min,max);
+}
 
 export async function loadModelConfig(path=configPath()):Promise<ModelConfig>{
  let text:string;
@@ -30,6 +33,8 @@ export async function loadModelConfig(path=configPath()):Promise<ModelConfig>{
   providerFailovers:whole(parsed.providerFailovers,'providerFailovers',path,1,10),
   launchAttempts:whole(parsed.launchAttempts,'launchAttempts',path,1,5),
   idleTimeoutMs:whole(parsed.idleTimeoutMs,'idleTimeoutMs',path,0,7200000),
+  workerTimeoutMs:optionalWhole(parsed.workerTimeoutMs,'workerTimeoutMs',path,0,86400000,3000000),
+  reviewerTimeoutMs:optionalWhole(parsed.reviewerTimeoutMs,'reviewerTimeoutMs',path,0,86400000,2400000),
   slowModelWindowMs:whole(parsed.slowModelWindowMs,'slowModelWindowMs',path,0,2592000000),
   reviewerMaxTurns:whole(parsed.reviewerMaxTurns,'reviewerMaxTurns',path,5,500)};
 }
