@@ -45,6 +45,18 @@ test('piRun appends a failed speed sample when the call fails',async t=>{
  assert.equal(samples[0].role,'worker');
 });
 
+test('a reviewer call is stopped by its own wall-clock limit and sampled as a reviewer failure',async t=>{
+ const chatter=JSON.stringify({type:'tool_execution_start',toolName:'read',args:{path:'x'}})+'\n';
+ const {dir,input}=await fakePi(t,`setInterval(()=>process.stdout.write(${JSON.stringify(chatter)}),200);`,{reviewerTimeoutMs:1500});
+ await assert.rejects(()=>piRun({...input,readOnly:true}),/time limit/i);
+ const report=await diagnostics(input.diagnosticRoot);
+ assert.ok(report.operations[0].events.some((e:any)=>e.stage==='call-timeout'),'the trace must name the wall-clock timeout');
+ const samples=await readSpeedSamples(dir) as any[];
+ assert.equal(samples.length,1);
+ assert.equal(samples[0].failed,true);
+ assert.equal(samples[0].role,'reviewer');
+});
+
 test('a worker call that keeps talking past the wall-clock limit is stopped and recorded as failed',async t=>{
  const chatter=JSON.stringify({type:'tool_execution_start',toolName:'read',args:{path:'x'}})+'\n';
  const {dir,input}=await fakePi(t,`setInterval(()=>process.stdout.write(${JSON.stringify(chatter)}),200);`,{workerTimeoutMs:1500});

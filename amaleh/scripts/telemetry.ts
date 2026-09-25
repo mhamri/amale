@@ -26,24 +26,25 @@ export async function trace(root:string|undefined,operation:string,metadata:unkn
  await write('started');return {id,write,end:(outcome,data)=>write('finished',{outcome,...(data&&typeof data==='object'?data:{detail:data})})};
 }
 export type SpeedRole='worker'|'reviewer';
-export type SpeedSample={at:string;model:string;role:SpeedRole;ms:number;outputTokens:number};
-export type ModelSpeed={model:string;role:SpeedRole;calls:number;averageMinutes:number;longestMinutes:number;outputTokensPerCall:number;outputTokensPerSecond:number};
+export type SpeedSample={at:string;model:string;role:SpeedRole;ms:number;outputTokens:number;failed?:boolean};
+export type ModelSpeed={model:string;role:SpeedRole;calls:number;failures:number;averageMinutes:number;longestMinutes:number;outputTokensPerCall:number;outputTokensPerSecond:number};
 export type SlowModel=ModelSpeed&{medianMinutes:number;times:number};
 const round1=(n:number)=>Math.round(n*10)/10;
 const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b),mid=sorted.length>>1;return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;};
 type Operation={operation:string;outcome:string;started:string;elapsedMs:number;metadata:any;events:{stage:string;data:any}[]};
 export function speedSamples(operations:Operation[]):SpeedSample[]{
- return operations.filter(o=>o.operation==='pi'&&o.outcome==='success'&&typeof o.metadata?.model==='string').map(o=>({at:o.started,model:o.metadata.model,role:o.metadata.readOnly?'reviewer':'worker',ms:o.elapsedMs,
-  outputTokens:o.events.filter(e=>e.stage==='usage').reduce((sum,e)=>sum+(Number(e.data?.outputTokens)||0),0)}));
+ return operations.filter(o=>o.operation==='pi'&&(o.outcome==='success'||o.outcome==='failed')&&typeof o.metadata?.model==='string').map(o=>({at:o.started,model:o.metadata.model,role:o.metadata.readOnly?'reviewer':'worker',ms:o.elapsedMs,
+  outputTokens:o.events.filter(e=>e.stage==='usage').reduce((sum,e)=>sum+(Number(e.data?.outputTokens)||0),0),
+  ...(o.outcome==='failed'?{failed:true}:{})}));
 }
 export function modelSpeed(samples:SpeedSample[]):ModelSpeed[]{
- const groups=new Map<string,{model:string;role:SpeedRole;ms:number[];tokens:number}>();
- for(const s of samples){const key=s.model+'|'+s.role,group=groups.get(key)??{model:s.model,role:s.role,ms:[],tokens:0};group.ms.push(s.ms);group.tokens+=s.outputTokens;groups.set(key,group);}
- return [...groups.values()].map(g=>{const total=g.ms.reduce((a,b)=>a+b,0);return {model:g.model,role:g.role,calls:g.ms.length,averageMinutes:round1(total/g.ms.length/60000),longestMinutes:round1(Math.max(...g.ms)/60000),outputTokensPerCall:Math.round(g.tokens/g.ms.length),outputTokensPerSecond:round1(g.tokens/Math.max(total/1000,1))};}).sort((a,b)=>a.role.localeCompare(b.role)||b.averageMinutes-a.averageMinutes);
+ const groups=new Map<string,{model:string;role:SpeedRole;ms:number[];tokens:number;failures:number}>();
+ for(const s of samples){const key=s.model+'|'+s.role,group=groups.get(key)??{model:s.model,role:s.role,ms:[],tokens:0,failures:0};group.ms.push(s.ms);group.tokens+=s.outputTokens;if(s.failed)group.failures++;groups.set(key,group);}
+ return [...groups.values()].map(g=>{const total=g.ms.reduce((a,b)=>a+b,0);return {model:g.model,role:g.role,calls:g.ms.length,failures:g.failures,averageMinutes:round1(total/g.ms.length/60000),longestMinutes:round1(Math.max(...g.ms)/60000),outputTokensPerCall:Math.round(g.tokens/g.ms.length),outputTokensPerSecond:round1(g.tokens/Math.max(total/1000,1))};}).sort((a,b)=>a.role.localeCompare(b.role)||b.averageMinutes-a.averageMinutes);
 }
 // See references/runtime.md#diagnostic-traces
 export const speedLedger=(amalehDir:string)=>join(amalehDir,'model-speed.jsonl');
-const validSample=(s:any):s is SpeedSample=>s&&typeof s.at==='string'&&typeof s.model==='string'&&(s.role==='worker'||s.role==='reviewer')&&Number.isFinite(s.ms)&&Number.isFinite(s.outputTokens);
+const validSample=(s:any):s is SpeedSample=>s&&typeof s.at==='string'&&typeof s.model==='string'&&(s.role==='worker'||s.role==='reviewer')&&Number.isFinite(s.ms)&&Number.isFinite(s.outputTokens)&&(s.failed===undefined||typeof s.failed==='boolean');
 export async function recordSpeed(amalehDir:string,sample:SpeedSample){await readSpeedSamples(amalehDir);await appendFile(speedLedger(amalehDir),JSON.stringify(sample)+'\n');}
 export async function readSpeedSamples(amalehDir:string):Promise<SpeedSample[]>{
  let text:string;

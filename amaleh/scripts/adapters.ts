@@ -86,6 +86,7 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
   const config=await loadModelConfig();
   const attempts=input.attempts??config.launchAttempts;
   const idleTimeoutMs=input.idleTimeoutMs??config.idleTimeoutMs;
+  const callTimeoutMs=input.readOnly?config.reviewerTimeoutMs:config.workerTimeoutMs;
   invariant(Number.isInteger(attempts)&&attempts>=1&&attempts<=5,'Invalid pi attempt count');
   invariant(input.prompt.length<=promptLimit,`Prompt is ${input.prompt.length} characters; the command line cannot carry more than ${promptLimit}. Hand large material to the model as a file path it reads, rather than inlining it.`);
   const pi=await piCommand();await mkdir(input.sessionDir,{recursive:true});const key=await credential();
@@ -142,8 +143,17 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
     },Math.min(30000,idleTimeoutMs));
     idleTimer.unref?.();
    }
+   let callTimer:ReturnType<typeof setTimeout>|undefined;
+   if(callTimeoutMs>0){
+    callTimer=setTimeout(()=>{
+     providerError=`pi call exceeded the wall-clock time limit of ${Math.round(callTimeoutMs/1000)}s and was stopped; inspect diagnostic trace ${telemetry.id}.`;
+     record('call-timeout',{timeoutMs:callTimeoutMs,pid:child.pid});
+     void killTree(child);
+    },callTimeoutMs);
+    callTimer.unref?.();
+   }
    child.on('error',error=>{spawnError=error;});
-   child.on('close',(code,signal)=>{clearInterval(idleTimer);void (async()=>{
+   child.on('close',(code,signal)=>{clearInterval(idleTimer);clearTimeout(callTimer);void (async()=>{
     if(buffer.trim())parse(buffer.replace(/\r$/,''));
     await ownership;await writes;
     await telemetry.write('process-exit',{code,signal,stderr,protocolError,providerError,ended,actualModel:actual});
@@ -178,7 +188,7 @@ export async function piRun(input:{workspace:string;model:string;prompt:string;s
   await telemetry.end('success',{model:output.model});
   if(input.speedDir)await recordSpeed(input.speedDir,{at:new Date(started).toISOString(),model:input.model,role:input.readOnly?'reviewer':'worker',ms:Date.now()-started,outputTokens}).catch(()=>{});
   return output;
- }catch(error){await telemetry.end('failed',{message:(error as Error).message});throw error;}
+ }catch(error){await telemetry.end('failed',{message:(error as Error).message});if(input.speedDir)await recordSpeed(input.speedDir,{at:new Date(started).toISOString(),model:input.model,role:input.readOnly?'reviewer':'worker',ms:Date.now()-started,outputTokens,failed:true}).catch(()=>{});throw error;}
 }
 const guidanceRoots=()=>[join(homedir(),'.claude','skills'),join(process.env.CODEX_HOME??join(homedir(),'.codex'),'skills')];
 async function guidanceSource(workspace:string,entry:string){
