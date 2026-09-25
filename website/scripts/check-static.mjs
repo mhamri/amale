@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { consentRegions } from '../src/lib/consent.ts';
+import { gtmNoscriptIframe, trackingHeadScripts } from '../src/lib/tracking.ts';
 
 const publicDir = fileURLToPath(new URL('../.output/public/', import.meta.url));
 const stylePath = fileURLToPath(new URL('../src/style.css', import.meta.url));
@@ -107,6 +109,52 @@ function resolveLinkTarget(link, pageDir, basePath) {
   return { url: new URL(decoded, pageBase) };
 }
 
+function assertTracking(html, where) {
+  const occurrences = (needle) => html.split(needle).length - 1;
+  const head = html.slice(html.search(/<head\b/i), html.indexOf('</head>'));
+  const bodyTag = html.search(/<body\b/i);
+  const afterBody = html.slice(html.indexOf('>', bodyTag) + 1);
+  const headScripts = [...head.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+
+  assert.equal(headScripts[0], trackingHeadScripts[0],
+    `${where} must set the Consent Mode defaults from src/lib/consent.ts in the first <head> script`);
+  assert.equal(headScripts[1], trackingHeadScripts[1],
+    `${where} must load the verbatim GTM loader in the second <head> script, right after the consent defaults`);
+  assert.equal(occurrences('https://www.googletagmanager.com/gtm.js?id='), 1,
+    `${where} must load the GTM container script exactly once`);
+  const firstAsset = head.search(/<link\b[^>]*rel="(?:stylesheet|modulepreload)"/i);
+  assert.ok(firstAsset === -1 || head.indexOf("'GTM-T8QCHM2H'") < firstAsset,
+    `${where} must place the GTM script before any stylesheet or module preload`);
+  assert.ok(afterBody.startsWith(`<noscript>${gtmNoscriptIframe}</noscript>`),
+    `${where} must put the GTM noscript iframe as the first thing after <body>`);
+  assert.equal(occurrences('ns.html?id=GTM-T8QCHM2H'), 1,
+    `${where} must carry the GTM noscript iframe exactly once`);
+  assert.ok(!html.includes('ads-twitter.com') && !/twq\(/.test(html),
+    `${where} must not load the X base code; GTM container tag 4 loads it`);
+}
+
+const requiredConsentRegions = [
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE',
+  'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+  'GF', 'GP', 'MQ', 'RE', 'YT', 'MF', 'IS', 'LI', 'NO', 'GB', 'CH',
+];
+
+function checkConsentRegions() {
+  const missing = requiredConsentRegions.filter((region) => !consentRegions.includes(region));
+  assert.deepEqual(missing, [], `src/lib/consent.ts consentRegions must deny consent by default in ${missing.join(', ')}`);
+  for (const region of requiredConsentRegions) {
+    assert.ok(trackingHeadScripts[0].includes(JSON.stringify(region)),
+      `The Consent Mode defaults script must list region ${region}`);
+  }
+}
+
+async function htmlFilesUnder(dir) {
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+    .map((entry) => resolve(entry.parentPath, entry.name));
+}
+
 async function checkPage({ file, page, label }) {
   const html = await readPage(file);
 
@@ -134,6 +182,8 @@ async function checkPage({ file, page, label }) {
     `${label}: ${file} must have unique element ids`);
 
   assert.match(html, /name="description"/, `${label}: ${file} must declare a meta description`);
+
+  assertTracking(html, `${label}: ${file}`);
 
   const pageDir = dirname(page) + '';
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
@@ -827,6 +877,10 @@ const pages = await Promise.all(routes.map(async route => ({
 
 await Promise.all(routes.map(route => attempt(() => checkPage(route))));
 await attempt(checkOutputSanity);
+await attempt(checkConsentRegions);
+for (const file of await htmlFilesUnder(publicDir)) {
+  await attempt(async () => assertTracking(await readFile(file, 'utf8'), file.slice(publicDir.length)));
+}
 await attempt(checkDesignTokens);
 const softRatios = (await attempt(checkSoftBadges)) ?? [];
 await attempt(checkContrast);
