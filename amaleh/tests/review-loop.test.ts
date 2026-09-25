@@ -128,7 +128,7 @@ test('reviewer routing excludes an additional family so the retry differs from t
  const blocked=await selectModel(store,'a','reviewer',dir,{excludeFamilies:['deepseek','kimi']},gateway());
  assert.equal(blocked.action,'route-blocked','excluding every independent family must not launch the author');
 });
-test('the reviewer prompt defines exactly which findings are blocking',async t=>{
+async function capturedReviewerPrompt(t:any){
  const {dir,store}=await routingFixture(t);await awaitingReview(store,dir);
  const outside=await mkdtemp(join(tmpdir(),'amaleh-review-prompt-'));t.after(()=>rm(outside,{recursive:true,force:true}));
  const old={fetch:globalThis.fetch,entry:process.env.AMALEH_PI_ENTRY,node:process.env.AMALEH_NODE};
@@ -143,10 +143,19 @@ console.log(JSON.stringify({type:'message_end',message:{role:'assistant',model:p
 console.log(JSON.stringify({type:'agent_end'}));`);
  process.env.AMALEH_PI_ENTRY=entry;process.env.AMALEH_NODE=process.execPath;globalThis.fetch=gateway();
  await reviewer(store,'a',undefined,['Spec']);
- const prompt=await readFile(promptPath,'utf8');
+ return readFile(promptPath,'utf8');
+}
+test('the reviewer prompt defines exactly which findings are blocking',async t=>{
+ const prompt=await capturedReviewerPrompt(t);
  assert.ok(prompt.includes(blockingDefinition),'the reviewer prompt must carry the blocking definition');
  assert.match(prompt,/regression of existing behaviour/i);
  assert.match(prompt,/failed task criterion/i);
  assert.match(prompt,/false statement in documentation/i);
  assert.match(prompt,/preference/i);
+});
+test('the reviewer prompt asks for every blocking defect in one pass',async t=>{
+ const prompt=await capturedReviewerPrompt(t);
+ assert.match(prompt,/every blocking defect/i);
+ assert.match(prompt,/(one|this|a single) pass/i);
+ assert.doesNotMatch(prompt,/stop (at|after) the first/i);
 });
