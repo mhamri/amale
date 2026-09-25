@@ -2,13 +2,14 @@
   "flash": [
     "~deepseek/deepseek-flash-latest",
     "~z-ai/glm-flash-latest",
-    "xiaomi/mimo-v2.5",
-    "upstage/solar-pro4"
+    "xiaomi/mimo-v2.6-flash",
+    "upstage/solar-pro4",
+    "stealth/space-bunny-alpha"
   ],
   "deep": [
     "moonshotai/kimi-k3"
   ],
-  "jev": "typesafe/jev-1.13",
+  "jev": "~typesafe/jev-latest",
   "providerCooldownMs": 300000,
   "providerFailovers": 3,
   "launchAttempts": 3,
