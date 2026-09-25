@@ -41,7 +41,7 @@ Run `npm ci`, `npm run check`, `npm run build`, and `npm run test:static` from `
 
 Every page loads two third-party tracking scripts from `website/src/entry-server.tsx`, the shared HTML shell that renders all routes.
 
-**Google Tag Manager.** The container GTM-T8QCHM2H injects a GTM head script as the first script in `<head>`, before any stylesheet or module preload, and a GTM noscript iframe as the first element after the opening `<body>` tag. Both appear exactly once on every prerendered page.
+**Google Tag Manager.** The shell loads container `GTM-T8QCHM2H` with a GTM head script as the first script in `<head>`, before any stylesheet or module preload, and a GTM noscript iframe as the first element after the opening `<body>` tag. Both appear exactly once on every prerendered page.
 
 **X (Twitter) conversion tracking.** The X base code for pixel `rfusf` loads the `uwt.js` loader, sets `twq.integration='gtm-ad-manager'`, and calls `twq('config','rfusf')`. The X base code appears exactly once inside `<head>` on every prerendered page.
 
