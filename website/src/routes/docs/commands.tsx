@@ -77,7 +77,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             start
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Creates a new run with a host, model, intent, acceptance criteria and constraints. Refuses if an existing run substantially repeats the same intent unless <span class="font-mono text-xs text-base-content">continues</span> or <span class="font-mono text-xs text-base-content">unrelated</span> is supplied. Pass the intent's <span class="font-mono text-xs text-base-content">shape</span>; without it, planning waits until the intent is shaped.
+            Creates a new run with a host, model, intent, acceptance criteria and constraints. Refuses if an existing run substantially repeats the same intent unless <span class="font-mono text-xs text-base-content">continues</span> or <span class="font-mono text-xs text-base-content">unrelated</span> is supplied. Pass the intent's <span class="font-mono text-xs text-base-content">shape</span>; without it, planning waits until the intent is shaped. In a Git checkout with a remote, it fetches the remote, resolves its default branch from the remote HEAD, and refuses unless HEAD contains the fetched tip, naming the branch and the Git commands that fix it; <span class="font-mono text-xs text-base-content">base.userInstruction</span>, quoting the user, is the only override. A workspace outside Git, or with no remote, records <span class="font-mono text-xs text-base-content">base-unverified</span> and proceeds.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -90,6 +90,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
   "constraints": ["accepted restriction"],
   "continues": "<optional prior run id>",
   "unrelated": "<optional reason when word overlap is coincidental>",
+  "base": { "userInstruction": "<optional quote from the user naming another base>" },
   "shape": { "understanding": "what is asked and what it is for", "clearCut": "why there is only one sensible reading" }
 }`}</code></pre>
           </figure>
@@ -261,7 +262,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             amend
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Changes an existing task contract while retaining identity and escalation ancestry. Invalidates affected descendants. Do not create a replacement ID merely to reset repair history. Add <span class="font-mono text-xs text-base-content">"feedback": true</span> when the change delivers shaped user feedback naming this task; that reopen spends no repair cycle.
+            Changes an existing task contract while retaining identity and escalation ancestry. Invalidates affected descendants. Do not create a replacement ID merely to reset repair history. Add <span class="font-mono text-xs text-base-content">"feedback": true</span> when the change delivers shaped user feedback naming this task; that reopen spends no repair cycle. An amendment is recorded as a contract reopen, while <span class="font-mono text-xs text-base-content">invalidate</span> records a defect reopen; only defect reopens count in the reopen health warning and <span class="font-mono text-xs text-base-content">metrics.reopenedChunks</span>.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -329,7 +330,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             delegate
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Delegates a whole chunk to the runtime. Outcomes: <span class="font-mono text-xs text-base-content">accepted</span> (chunk done, integrate next), <span class="font-mono text-xs text-base-content">escalated</span> (repair-exhausted / host-takeover / review-evidence — your turn), <span class="font-mono text-xs text-base-content">route-pending</span> (resolve the named prerequisite), <span class="font-mono text-xs text-base-content">failed</span> (infrastructure error; task state preserved).
+            Delegates a whole chunk to the runtime. Outcomes: <span class="font-mono text-xs text-base-content">accepted</span> (chunk done, integrate next), <span class="font-mono text-xs text-base-content">escalated</span> (repair-exhausted / host-takeover / review-evidence — your turn), <span class="font-mono text-xs text-base-content">route-pending</span> (resolve the named prerequisite), <span class="font-mono text-xs text-base-content">failed</span> (infrastructure error; task state preserved). A reviewer call that fails for any reason other than a workspace escape or a settled funding or authorization failure is replaced by a fresh review on another model, bounded by <span class="font-mono text-xs text-base-content">providerFailovers</span>; when that budget runs out the chunk fails and the task stays in review with its worker output.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -489,7 +490,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             reviewer
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Invokes a fresh read-only pi review. Uses the review coverage contract with entries for id, status and evidence.
+            Invokes a fresh read-only pi review. Uses the review coverage contract with entries for id, status and evidence. The prompt asks for every blocking defect the reviewer can find in one pass, grouping lenses that share a root defect into one finding.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -590,7 +591,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             finish
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Closes a run after all tasks are integrated, required checks pass and Jev claim-support decisions are resolved. Claims are host attestations, not cryptographic proof. Refuses while health reports delegation warnings; <span class="font-mono text-xs text-base-content">acknowledgeWarnings</span> overrides and records a durable event.
+            Closes a run after all tasks are integrated, required checks pass and Jev claim-support decisions are resolved. Claims are host attestations, not cryptographic proof. Refuses while health reports delegation warnings; <span class="font-mono text-xs text-base-content">acknowledgeWarnings</span> overrides and records a durable event. It also fetches the remote default branch and refuses while merging it into HEAD would conflict, naming the conflicting files.
           </p>
           <figure class="mt-4 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
             <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">
@@ -920,7 +921,7 @@ node <skill>/scripts/run.ts <operation> <workspace> <run-id> [input.json]`}</cod
             health
           </h3>
           <p class="mt-3 text-sm leading-relaxed text-dim">
-            Standalone health check. Measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host-action ceremony and model-family distribution — and emits warnings. <span class="font-mono text-xs text-base-content">finish</span> reads the same warnings and refuses on them. It also reports each model's speed per role and names any model at least twice as slow as the median for its role; a slow model never blocks <span class="font-mono text-xs text-base-content">finish</span>. No input required.
+            Standalone health check. Measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host-action ceremony and model-family distribution — and emits warnings. <span class="font-mono text-xs text-base-content">finish</span> reads the same warnings and refuses on them. It also reports each model's speed per role — calls, failures, average and longest minutes, with failed and timed-out calls' elapsed time counted — and names any model at least twice as slow as the median for its role; a slow model never blocks <span class="font-mono text-xs text-base-content">finish</span>. No input required.
           </p>
         </section>
 
