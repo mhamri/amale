@@ -94,12 +94,17 @@ export function storedConsentChoice(): ConsentChoice | undefined {
   }
 }
 
-export function setConsentChoice(choice: ConsentChoice): void {
+function tryStoreConsentChoice(choice: ConsentChoice): boolean {
   try {
     localStorage.setItem(consentStorageKey, choice);
+    return true;
   } catch {
-    // Storage blocked: the choice still applies to this page view through gtag below.
+    return false;
   }
+}
+
+export function setConsentChoice(choice: ConsentChoice): void {
+  tryStoreConsentChoice(choice);
   window.gtag?.('consent', 'update', consentSignalsSetTo(choice));
 }
 
