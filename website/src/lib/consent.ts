@@ -107,9 +107,10 @@ function tryStoreConsentChoice(choice: ConsentChoice): boolean {
 }
 
 export function setConsentChoice(choice: ConsentChoice): void {
+  const newlyGranted = choice === 'granted' && storedConsentChoice() !== 'granted';
   tryStoreConsentChoice(choice);
   window.gtag?.('consent', 'update', consentSignalsSetTo(choice));
-  if (choice === 'granted') window.dataLayer?.push({ event: consentGrantedEvent });
+  if (newlyGranted) window.dataLayer?.push({ event: consentGrantedEvent });
 }
 
 const storedChoiceUpdate = consentSignals.map((signal) => `${signal}:choice`).join(',');
