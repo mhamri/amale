@@ -50,6 +50,15 @@ test('reviewer failover stops at the configured budget and leaves the task in re
  assert.equal(c.taskOf(await store.load(),'a').status,'review','the finished worker output is kept for the next delegation');
 });
 
+test('an out-of-credits reviewer failure is not replaced by another review',async t=>{
+ const {dir,store}=await fixture(t);
+ const calls:number[]=[];
+ const credits='402: {"message":"This request requires more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 29119. To increase, visit https://openrouter.ai/settings/credits and add more credits","code":402}';
+ const out=await delegate(store,'a',{workspace:dir},{runWorker:syntheticWorker(dir) as any,runReviewer:reviews(dir,[credits,credits,credits],calls) as any});
+ assert.equal(out.outcome,'failed');
+ assert.equal(calls.length,1,'another model cannot fix an empty account');
+});
+
 test('a worker call that fails without a verdict is not failed over by this rule',async t=>{
  const {dir,store}=await fixture(t);
  let workerCalls=0;

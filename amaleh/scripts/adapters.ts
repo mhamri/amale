@@ -69,7 +69,7 @@ export async function catalog(store?:Store,fetcher:typeof fetch=fetch){const dat
 
 // Retrying a funding or authorization failure burns money and never succeeds, so
 // those are matched first and never treated as transient.
-const settledProvider=/credits? (are )?exhausted|insufficient (credit|balance|fund)|top ?up|quota exceeded|billing|unauthorized|invalid api key|lacks access|no endpoints found/i;
+const settledProvider=/credits? (are )?exhausted|requires more credits|insufficient (credit|balance|fund)|top ?up|quota exceeded|billing|unauthorized|invalid api key|lacks access|no endpoints found/i;
 const codedFailure=/\b(408|409|429|500|502|503|504|529)\b/;
 const transientWording=/rate.?limit|temporarily|overload|unavailable|timed? ?out|Provider returned error|Internal Server Error/i;
 const transientWithoutCode=/network connection lost|connection (reset|closed)|socket hang ?up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|retry shortly|try again (shortly|later)|could not verify available credits|provider returned an empty response|stream ended without finish_reason|model stopped before completing the response/i;
