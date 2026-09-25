@@ -4,6 +4,7 @@ import { MetaProvider } from '@solidjs/meta';
 import { Suspense } from 'solid-js';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ConsentBanner from './components/ConsentBanner';
 import { Drifter, Glow, GridDots, LightRays, Reveal, Rings } from './components/decor';
 import './style.css';
 
@@ -28,6 +29,7 @@ export default function App() {
           <Header />
           <Suspense>{props.children}</Suspense>
           <Footer />
+          <ConsentBanner />
           <Reveal />
         </MetaProvider>
       )}

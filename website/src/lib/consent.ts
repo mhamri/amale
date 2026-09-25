@@ -11,10 +11,96 @@ export const consentStorageKey = 'amaleh-consent';
 
 export const consentSignals = ['ad_storage', 'ad_user_data', 'ad_personalization', 'analytics_storage'] as const;
 
+export const consentTimeZones = [
+  'Europe/Vienna',
+  'Europe/Brussels',
+  'Europe/Sofia',
+  'Europe/Zagreb',
+  'Europe/Nicosia',
+  'Asia/Nicosia',
+  'Asia/Famagusta',
+  'Europe/Prague',
+  'Europe/Copenhagen',
+  'Europe/Tallinn',
+  'Europe/Helsinki',
+  'Europe/Mariehamn',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Busingen',
+  'Europe/Athens',
+  'Europe/Budapest',
+  'Europe/Dublin',
+  'Europe/Rome',
+  'Europe/Riga',
+  'Europe/Vilnius',
+  'Europe/Luxembourg',
+  'Europe/Malta',
+  'Europe/Amsterdam',
+  'Europe/Warsaw',
+  'Europe/Lisbon',
+  'Atlantic/Azores',
+  'Atlantic/Madeira',
+  'Europe/Bucharest',
+  'Europe/Bratislava',
+  'Europe/Ljubljana',
+  'Europe/Madrid',
+  'Africa/Ceuta',
+  'Atlantic/Canary',
+  'Europe/Stockholm',
+  'Atlantic/Reykjavik',
+  'Europe/Oslo',
+  'Arctic/Longyearbyen',
+  'Europe/Vaduz',
+  'Europe/London',
+  'Europe/Belfast',
+  'Europe/Guernsey',
+  'Europe/Jersey',
+  'Europe/Isle_of_Man',
+  'Europe/Gibraltar',
+  'Europe/Zurich',
+  'America/Cayenne',
+  'America/Guadeloupe',
+  'America/Martinique',
+  'Indian/Reunion',
+  'Indian/Mayotte',
+  'America/Marigot',
+] as const;
+
+export function inConsentTimeZone(): boolean {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return consentTimeZones.includes(zone as (typeof consentTimeZones)[number]);
+}
+
 export type ConsentChoice = 'granted' | 'denied';
 
-export function consentSignalsSetTo(choice: ConsentChoice): Record<(typeof consentSignals)[number], ConsentChoice> {
-  return Object.fromEntries(consentSignals.map((signal) => [signal, choice])) as Record<(typeof consentSignals)[number], ConsentChoice>;
+type ConsentSignals = Record<(typeof consentSignals)[number], ConsentChoice>;
+
+export function consentSignalsSetTo(choice: ConsentChoice): ConsentSignals {
+  return Object.fromEntries(consentSignals.map((signal) => [signal, choice])) as ConsentSignals;
+}
+
+declare global {
+  interface Window {
+    gtag?: (command: 'consent', action: 'update', signals: ConsentSignals) => void;
+  }
+}
+
+export function storedConsentChoice(): ConsentChoice | undefined {
+  try {
+    const stored = localStorage.getItem(consentStorageKey);
+    return stored === 'granted' || stored === 'denied' ? stored : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function setConsentChoice(choice: ConsentChoice): void {
+  try {
+    localStorage.setItem(consentStorageKey, choice);
+  } catch {
+    // Storage blocked: the choice still applies to this page view through gtag below.
+  }
+  window.gtag?.('consent', 'update', consentSignalsSetTo(choice));
 }
 
 const storedChoiceUpdate = consentSignals.map((signal) => `${signal}:choice`).join(',');
