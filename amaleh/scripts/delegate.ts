@@ -80,8 +80,6 @@ async function recordScope(store:Store,id:string,verdict:ScopeVerdict){
 // earlier one, and acceptance compares receipts against the current tree. Re-run
 // until every receipt matches the tree the checks leave behind.
 export const checkSettlePasses=3;
-// The failed call leaves nothing to repair: restore the status the task held and
-// route again, so the next attempt is not mistaken for a repair cycle.
 async function recordFailover(store:Store,id:string,stage:'worker'|'reviewer',trail:Trail,heldStatus:Task['status'],attempt:number,reason:string){
  await store.transaction(s=>{const t=taskOf(s,id);t.status=heldStatus;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt,reason});});
  trail.push({stage:'provider-failover',detail:{stage,attempt,reason}});
@@ -102,14 +100,7 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
   }
  }
 }
-// A reviewer is read-only, so a call that returns no verdict has changed nothing:
-// replacing it costs one review, while abandoning the chunk throws away a worker
-// output that already passed every check. Only a workspace escape or a settled
-// funding/authorization failure is terminal, because neither can be routed around.
 const reviewFailureIsTerminal=(error:unknown)=>error instanceof WorkspaceEscape||settledProviderFailure((error as Error).message);
-// Routing expresses model avoidance as excluded families. The consumed route names
-// the model whose call failed, so its family is what the replacement must skip; a
-// failure before any route was consumed leaves the routing untouched.
 async function consumedReviewFamily(store:Store,id:string,from:number){
  const s=await store.load();
  const consumed=s.events.slice(from).filter(e=>e.type==='route-used'&&(e.detail as {taskId?:string}).taskId===id&&(e.detail as {purpose?:string}).purpose==='reviewer');
