@@ -4,8 +4,8 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, type Check, type Task } from './core.ts';
-import { worker, reviewer, requestJson, choiceAnswer, transientProvider, taskDiff, WorkspaceEscape } from './adapters.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, family, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, type Check, type Task } from './core.ts';
+import { worker, reviewer, requestJson, choiceAnswer, transientProvider, settledProviderFailure, taskDiff, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
 export { scopeCheckId };
@@ -80,6 +80,12 @@ async function recordScope(store:Store,id:string,verdict:ScopeVerdict){
 // earlier one, and acceptance compares receipts against the current tree. Re-run
 // until every receipt matches the tree the checks leave behind.
 export const checkSettlePasses=3;
+// The failed call leaves nothing to repair: restore the status the task held and
+// route again, so the next attempt is not mistaken for a repair cycle.
+async function recordFailover(store:Store,id:string,stage:'worker'|'reviewer',trail:Trail,heldStatus:Task['status'],attempt:number,reason:string){
+ await store.transaction(s=>{const t=taskOf(s,id);t.status=heldStatus;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt,reason});});
+ trail.push({stage:'provider-failover',detail:{stage,attempt,reason}});
+}
 // A provider outage is not a defect in the task, so it must not consume a repair
 // cycle: restore the status the task held and route again, which now skips the
 // model recorded unavailable.
@@ -92,8 +98,36 @@ async function failover<T>(store:Store,id:string,stage:'worker'|'reviewer',trail
    const reason=(error as Error).message;
    if(error instanceof WorkspaceEscape)throw error;
    if(n>=budget||!transientProvider(reason))throw error;
-   await store.transaction(s=>{const t=taskOf(s,id);t.status=before;t.blocked=undefined;t.owner=undefined;t.activity=undefined;event(s,'provider-failover',{id,stage,attempt:n,reason});});
-   trail.push({stage:'provider-failover',detail:{stage,attempt:n,reason}});
+   await recordFailover(store,id,stage,trail,before,n,reason);
+  }
+ }
+}
+// A reviewer is read-only, so a call that returns no verdict has changed nothing:
+// replacing it costs one review, while abandoning the chunk throws away a worker
+// output that already passed every check. Only a workspace escape or a settled
+// funding/authorization failure is terminal, because neither can be routed around.
+const reviewFailureIsTerminal=(error:unknown)=>error instanceof WorkspaceEscape||settledProviderFailure((error as Error).message);
+// Routing expresses model avoidance as excluded families. The consumed route names
+// the model whose call failed, so its family is what the replacement must skip; a
+// failure before any route was consumed leaves the routing untouched.
+async function consumedReviewFamily(store:Store,id:string,from:number){
+ const s=await store.load();
+ const consumed=s.events.slice(from).filter(e=>e.type==='route-used'&&(e.detail as {taskId?:string}).taskId===id&&(e.detail as {purpose?:string}).purpose==='reviewer');
+ const model=(consumed.at(-1)?.detail as {model?:string}|undefined)?.model;
+ return model?family(model):undefined;
+}
+async function reviewFailover<T>(store:Store,id:string,trail:Trail,routing:RoutingRequest|undefined,attempt:(routing:RoutingRequest|undefined)=>Promise<T>):Promise<T>{
+ const budget=(await loadModelConfig()).providerFailovers;
+ let current=routing;
+ for(let n=1;;n++){
+  const state=await store.load(),heldStatus=taskOf(state,id).status,cursor=state.events.length;
+  try{return await attempt(current);}
+  catch(error){
+   const reason=(error as Error).message;
+   if(reviewFailureIsTerminal(error)||n>=budget)throw error;
+   const failed=await consumedReviewFamily(store,id,cursor);
+   if(failed&&!current?.excludeFamilies?.includes(failed))current={...(current??{}),excludeFamilies:[...(current?.excludeFamilies??[]),failed]};
+   await recordFailover(store,id,'reviewer',trail,heldStatus,n,reason);
   }
  }
 }
@@ -151,7 +185,7 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
     const lenses=input.lenses??['Spec','Standards','Correctness','Omissions'];
     const obtainReview=async(excludeFamilies:string[]=[])=>{
      const routing=excludeFamilies.length?{...input.routing,excludeFamilies:[...(input.routing?.excludeFamilies??[]),...excludeFamilies]}:input.routing;
-     const rev=await failover(store,id,'reviewer',trail,async()=>d.runReviewer(store,id,undefined,lenses,routing));
+     const rev=await reviewFailover(store,id,trail,routing,next=>d.runReviewer(store,id,undefined,lenses,next));
      const pending=routePending(rev);
      if(pending)return pending;
      trail.push({stage:'review',detail:{findings:(rev as {findings?:unknown[]}).findings?.length??0}});
