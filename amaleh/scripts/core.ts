@@ -282,7 +282,7 @@ export async function resume(store:Store,host?:Run['host']){
   for(const d of openDelegations(s))if(!d.alive)event(s,'delegate-finished',{id:d.id,outcome:'interrupted'});
   const stale:string[]=[],unavailable:{id:string;reason:string}[]=[];for(const t of s.tasks)if(['review','accepted'].includes(t.status)&&t.workspace){try{const fp=await fingerprint(t.workspace);if(t.status==='accepted'&&t.fingerprint!==fp)stale.push(t.id);}catch(error){if(!workspaceUnavailable(error))throw error;unavailable.push({id:t.id,reason:(error as Error).message});}}
   for(const fault of unavailable)if(['review','accepted'].includes(taskOf(s,fault.id).status))quarantineWorkspace(s,fault.id,fault.reason);
-  for(const id of stale)if(taskOf(s,id).status==='accepted')invalidateTree(s,id,'Accepted workspace changed since verification');
+  for(const id of stale)if(taskOf(s,id).status==='accepted')invalidateTree(s,id,'Accepted workspace changed since verification',undefined,true);
   event(s,'resumed',{});
  });return next(store);
 }
@@ -303,7 +303,7 @@ export async function packet(store:Store,id?:string){
 }
 export async function summarize(workspace:string,id:string):Promise<RunSummary>{const s=await new Store(workspace,id).load();return {id:s.id,status:s.status,intent:s.intent,criteria:s.criteria,tasks:s.tasks.length,revision:s.revision,continues:s.lineage?.continues,acceptance:s.acceptance};}
 
-export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
+export function invalidateTree(s:Run,id:string,reason:string,feedback?:number,isDefect?:boolean){
  invariant(reason,'Invalidation reason required');taskOf(s,id);const affected=new Set([id]);let changed=true;while(changed){changed=false;for(const t of s.tasks)if(!affected.has(t.id)&&t.deps.some(dep=>affected.has(dep))){affected.add(t.id);changed=true;}}
  invariant(!s.tasks.some(t=>affected.has(t.id)&&(t.status==='running'||!!t.activity)),'Affected task is still running; reconcile ownership before invalidation');
  for(const t of s.tasks)if(affected.has(t.id)){
@@ -311,7 +311,7 @@ export function invalidateTree(s:Run,id:string,reason:string,feedback?:number){
   if((t.output||t.review)&&feedback===undefined){t.cycles++;t.depth=t.cycles>s.config.flashRepairCycles+s.config.deepRepairCycles?'host':t.cycles>s.config.flashRepairCycles?'deep':'flash';}
   t.status='ready';t.integrated=undefined;t.receipts=[];t.review=undefined;
  }
- s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback});
+ s.integrationReceipts=[];event(s,'invalidated',{id,reason,affected:[...affected],feedback,kind:feedback===undefined?isDefect===false?'contract':'defect':'feedback'});
 }
 
 type ReopenInput={id:string;reason:string;check?:Check;noProbe?:string;feedback?:boolean};
@@ -339,10 +339,10 @@ export async function invalidate(store:Store,input:ReopenInput){
  await store.transaction(s=>{
  const {t,noProbe,fromFeedback,same}=validateReopen(s,input);
  if(input.check&&!same)t.checks.push({id:input.check.id,command:input.check.command,args:input.check.args,role:input.check.role});
- invalidateTree(s,input.id,input.reason,fromFeedback);
+ invalidateTree(s,input.id,input.reason,fromFeedback,true);
  if(input.check||noProbe)event(s,'reopen-probe',{id:t.id,check:input.check,noProbe:noProbe||undefined});
 });}
-export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];if(input.task.noProbe!==undefined)(t as any).noProbe=input.task.noProbe;validateTasks(s.tasks);validateContract(input.task);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
+export async function amend(store:Store,input:{id:string;reason:string;task:TaskInput;feedback?:boolean}){await store.transaction(s=>{invariant(input.task.id===input.id,'Amend retains task identity');const fromFeedback=input.feedback===true?feedbackReopen(s,input.id):undefined;if(fromFeedback===undefined)requireShaped(s,'amend');invalidateTree(s,input.id,input.reason,fromFeedback,false);const t=taskOf(s,input.id);for(const key of ['title','goal','phase','deps','resources','criteria','checks','kind'] as const)(t as any)[key]=input.task[key];if(input.task.noProbe!==undefined)(t as any).noProbe=input.task.noProbe;validateTasks(s.tasks);validateContract(input.task);event(s,'contract-amended',{id:input.id,reason:input.reason});});}
 
 export type ParallelAction={task:string;action:string;workspace?:string;resources:string[];checks?:Check[];[key:string]:unknown};
 export async function next(store:Store){
