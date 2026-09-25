@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { consentRegions } from '../src/lib/consent.ts';
 import { gtmNoscriptIframe, trackingHeadScripts } from '../src/lib/tracking.ts';
 
 const publicDir = fileURLToPath(new URL('../.output/public/', import.meta.url));
@@ -130,6 +131,28 @@ function assertTracking(html, where) {
     `${where} must carry the GTM noscript iframe exactly once`);
   assert.ok(!html.includes('ads-twitter.com') && !/twq\(/.test(html),
     `${where} must not load the X base code; GTM container tag 4 loads it`);
+}
+
+const requiredConsentRegions = [
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE',
+  'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+  'GF', 'GP', 'MQ', 'RE', 'YT', 'MF', 'IS', 'LI', 'NO', 'GB', 'CH',
+];
+
+function checkConsentRegions() {
+  const missing = requiredConsentRegions.filter((region) => !consentRegions.includes(region));
+  assert.deepEqual(missing, [], `src/lib/consent.ts consentRegions must deny consent by default in ${missing.join(', ')}`);
+  for (const region of requiredConsentRegions) {
+    assert.ok(trackingHeadScripts[0].includes(JSON.stringify(region)),
+      `The Consent Mode defaults script must list region ${region}`);
+  }
+}
+
+async function htmlFilesUnder(dir) {
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+    .map((entry) => resolve(entry.parentPath, entry.name));
 }
 
 async function checkPage({ file, page, label }) {
@@ -854,7 +877,10 @@ const pages = await Promise.all(routes.map(async route => ({
 
 await Promise.all(routes.map(route => attempt(() => checkPage(route))));
 await attempt(checkOutputSanity);
-await attempt(async () => assertTracking(await readPage('workflow.html'), '/workflow.html'));
+await attempt(checkConsentRegions);
+for (const file of await htmlFilesUnder(publicDir)) {
+  await attempt(async () => assertTracking(await readFile(file, 'utf8'), file.slice(publicDir.length)));
+}
 await attempt(checkDesignTokens);
 const softRatios = (await attempt(checkSoftBadges)) ?? [];
 await attempt(checkContrast);
