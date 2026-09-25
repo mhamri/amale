@@ -47,7 +47,8 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  const revisionAllowance=revisionBudget*tasks+retryBudget*retries;
  const loopSteps=['cli:worker','cli:reviewer','cli:repair','cli:accept'];
  const manualSteps=runtime.operations.filter(o=>loopSteps.includes(o.operation)).length;
- const reopened=s.events.filter(e=>e.type==='invalidated').length;
+ // Runs saved before kind existed counted every invalidated event; they keep that meaning.
+ const reopened=s.events.filter(e=>e.type==='invalidated'&&((e.detail as any).kind??'defect')==='defect').length;
  const config=await loadModelConfig().catch(()=>undefined),windowMs=config?.slowModelWindowMs??0;
  const costs=spend(runtime.operations),estimatedTotal=costs.byModel.reduce((total,r)=>total+r.estimatedCost,0);
  const deepSpend=costs.byModel.filter(r=>config?.deep.includes(r.key)),deepCost=deepSpend.reduce((total,r)=>total+r.estimatedCost,0),deepShare=estimatedTotal?deepCost/estimatedTotal:0;
