@@ -1,6 +1,3 @@
-// Fresh-base gate: every run starts from the freshly fetched remote default branch
-// and finishes mergeable with it, so work is never cut from or integrated onto a
-// stale local base (the PR #10 conflict).
 import {execFile} from 'node:child_process';
 import {realpath} from 'node:fs/promises';
 import * as core from './core.ts';
@@ -40,9 +37,6 @@ async function resolvedDefault(workspace:string):Promise<Resolved>{
 }
 const label=(r:{remote:string;branch:string})=>`${r.remote}/${r.branch}`;
 
-// start: refuse a checkout whose HEAD does not contain the freshly fetched remote
-// default branch. The refusal names the branch and the git commands that fix it.
-// base.userInstruction quoting the user overrides the refusal.
 export async function verifyStartBase(workspace:string,instruction?:BaseInstruction):Promise<BaseCheck>{
  const userInstruction=instruction?.userInstruction?.trim();
  if(userInstruction)return {status:'override',reason:'Base branch explicitly set by the user',userInstruction};
@@ -53,12 +47,10 @@ export async function verifyStartBase(workspace:string,instruction?:BaseInstruct
  if(fetch.code!==0)throw new Error(`git fetch ${name} failed: ${fetch.stderr.trim()}`);
  const tip=(await run(r.dir,['rev-parse','FETCH_HEAD'])).stdout.trim()||r.tip;
  const contains=await run(r.dir,['merge-base','--is-ancestor',tip,'HEAD']);
- if(contains.code!==0)throw new Error(`HEAD does not contain the freshly fetched default branch ${name}; run [git fetch ${r.remote}] and [git rebase ${name}] (or [git merge ${name}]) so HEAD contains ${name} before starting a run`);
+ if(contains.code!==0)throw new Error(`HEAD does not contain the freshly fetched default branch ${name}. Start new work on a branch made from it with [git switch -c <branch> ${name}], or bring it into this branch with [git merge ${name}]. Pass base.userInstruction quoting the user only when the user asked for a different base`);
  return {status:'verified',remote:r.remote,branch:r.branch,tip};
 }
 
-// finish: refuse while merging the freshly fetched remote default branch into HEAD
-// would conflict, naming the conflicting files.
 export async function verifyFinishBase(workspace:string):Promise<BaseCheck>{
  const r=await resolvedDefault(workspace);
  if('skip'in r)return {status:'unverified',reason:r.skip};
