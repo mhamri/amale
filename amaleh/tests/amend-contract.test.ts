@@ -41,16 +41,15 @@ test('an invalidate that reports a defect is still counted',async t=>{
  assert.equal(await reopened(store),1);
 });
 
-test('invalidated events saved before kind existed keep their meaning',async t=>{
+test('in a run saved before kind existed, an amend is recognised by its contract-amended event',async t=>{
  const store=await delivered(t);
  await c.amend(store,{id:'a',reason:'The scope rules changed; the delivered work had no defect',task:task('a',['app.txt'])});
  await c.invalidate(store,{id:'a',reason:'The delivered output is wrong',noProbe:'Visual defect with no executable measure in this fixture'});
- const s=await store.load();
  const names=(await readdir(store.root)).filter(n=>/^revision-\d{9}\.json$/.test(n)).sort();
  const latest=join(store.root,names.at(-1)!);
  const state=JSON.parse(await readFile(latest,'utf8'));
  for(const e of state.events)if(e.type==='invalidated')delete e.detail.kind;
  await writeFile(latest,JSON.stringify(state,null,2));
- assert.equal(await reopened(store),2);
+ assert.equal(await reopened(store),1,'only the invalidate is a defect reopen');
  assert.equal(c.taskOf(await store.load(),'a').status,'ready','the reopened task still goes back for work');
 });
