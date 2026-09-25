@@ -25,6 +25,14 @@ export async function hostActions(store:Store){
  for(const file of files.filter(f=>/^[a-f0-9-]+\.json$/.test(f))){try{const row=JSON.parse(await readFile(join(directory,file),'utf8'));invariant(row?.schema===1&&typeof row.id==='string'&&typeof row.actionId==='string'&&typeof row.sessionId==='string'&&typeof row.at==='string'&&kinds.includes(row.kind)&&phases.includes(row.phase),'Invalid ledger record');records.push(row);}catch{unreadable.push(file);}}
  records.sort((a,b)=>a.at.localeCompare(b.at)||a.id.localeCompare(b.id));return {records,unreadable};
 }
+type ReopenEvent={type:string;detail:unknown};
+// Runs saved before `kind` existed: amend always wrote contract-amended as the very next event.
+const reopenKind=(event:ReopenEvent,following?:ReopenEvent)=>{
+ const detail=event.detail as {id?:string;kind?:string;feedback?:number};
+ if(detail.kind)return detail.kind;
+ if(detail.feedback!==undefined)return 'feedback';
+ return following?.type==='contract-amended'&&(following.detail as {id?:string}).id===detail.id?'contract':'defect';
+};
 // Process health: measurable anti-patterns that reveal the coordinator doing
 // the work itself instead of delegating, or model usage fixating on one family.
 export async function processHealth(store:Store):Promise<{available:false;reason:string}|{available:true;slowModels:string[];metrics:Record<string,unknown>;warnings:string[]}> {
@@ -47,8 +55,7 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  const revisionAllowance=revisionBudget*tasks+retryBudget*retries;
  const loopSteps=['cli:worker','cli:reviewer','cli:repair','cli:accept'];
  const manualSteps=runtime.operations.filter(o=>loopSteps.includes(o.operation)).length;
- // Runs saved before kind existed counted every invalidated event; they keep that meaning.
- const reopened=s.events.filter(e=>e.type==='invalidated'&&((e.detail as any).kind??'defect')==='defect').length;
+ const reopened=s.events.filter((e,i)=>e.type==='invalidated'&&reopenKind(e,s.events[i+1])==='defect').length;
  const config=await loadModelConfig().catch(()=>undefined),windowMs=config?.slowModelWindowMs??0;
  const costs=spend(runtime.operations),estimatedTotal=costs.byModel.reduce((total,r)=>total+r.estimatedCost,0);
  const deepSpend=costs.byModel.filter(r=>config?.deep.includes(r.key)),deepCost=deepSpend.reduce((total,r)=>total+r.estimatedCost,0),deepShare=estimatedTotal?deepCost/estimatedTotal:0;
