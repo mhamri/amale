@@ -1,6 +1,6 @@
 import HeroCanvas from "./HeroCanvas";
-import { SPONSOR_URL } from "../../lib/links";
 import { asset } from "../../lib/paths";
+import { SponsorButton } from "../ProjectActions";
 
 export default function Problem() {
   return (
@@ -20,14 +20,7 @@ export default function Problem() {
             >
               Get started
             </a>
-            <a
-              class="btn btn-outline border-line text-base-content hover:bg-base-200"
-              href={SPONSOR_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Sponsor
-            </a>
+            <SponsorButton />
           </div>
         </div>
       </div>
