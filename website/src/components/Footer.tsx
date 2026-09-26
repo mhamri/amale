@@ -1,4 +1,7 @@
+import { createSignal, onMount, Show } from 'solid-js';
 import { asset } from '../lib/paths';
+import { inConsentTimeZone } from '../lib/consent';
+import { setConsentBannerOpen } from './ConsentBanner';
 import { Glow, GridDots } from './decor';
 
 const siteLinks = [
@@ -13,6 +16,10 @@ const projectLinks = [
 ];
 
 export default function Footer() {
+  const [showConsentSettings, setShowConsentSettings] = createSignal(false);
+
+  onMount(() => setShowConsentSettings(inConsentTimeZone()));
+
   return (
     <footer class="relative isolate overflow-hidden border-t border-line bg-base-200/50">
       <div class="decor-field" aria-hidden="true" data-reveal>
@@ -62,12 +69,24 @@ export default function Footer() {
         </div>
         <div class="mt-10 flex flex-col gap-2 border-t border-line pt-6 text-xs text-dim sm:flex-row sm:items-center sm:justify-between">
           <p>ʿamalah (Ah-mah-leh) — Persian for workers / laborers.</p>
-          <p>
-            Source and issues on{' '}
-            <a class="link-hover link text-base-content" href="https://github.com/mhamri/amaleh" target="_blank" rel="noopener noreferrer">
-              GitHub
-            </a>
-          </p>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <p>
+              Source and issues on{' '}
+              <a class="link-hover link text-base-content" href="https://github.com/mhamri/amaleh" target="_blank" rel="noopener noreferrer">
+                GitHub
+              </a>
+            </p>
+            <Show when={showConsentSettings()}>
+              <button
+                type="button"
+                class="link link-hover text-dim"
+                data-consent-settings
+                onClick={() => setConsentBannerOpen(true)}
+              >
+                Cookie settings
+              </button>
+            </Show>
+          </div>
         </div>
       </div>
     </footer>

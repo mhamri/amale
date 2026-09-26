@@ -220,6 +220,58 @@ try {
   for (const route of routes) {
     const page = await openPage(browser);
     try {
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error') errors.push(message.text());
+      });
+      await page.emulateTimezone('Europe/Berlin');
+      await page.setViewport({ width: 320, height: 900 });
+      await page.goto(origin + route, { waitUntil: 'networkidle0' });
+      await new Promise((settled) => setTimeout(settled, 250));
+
+      const banner = await withinStep(
+        page.evaluate(() => {
+          const element = document.querySelector('[data-consent-banner]');
+          if (!element) return { present: false, visible: false };
+          const rect = element.getBoundingClientRect();
+          return {
+            present: true,
+            visible: rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden',
+          };
+        }),
+        `${route} consent banner inspection`,
+      );
+      if (!banner.present || !banner.visible) {
+        failures.push(
+          `${route} at 320px with timezone Europe/Berlin: [data-consent-banner] must be present and visible`,
+        );
+      }
+
+      const layout = await withinStep(
+        page.evaluate(inspectLayout),
+        `${route} at 320px with the consent banner layout inspection`,
+      );
+      if (layout.horizontalOverflow) {
+        failures.push(
+          `${route} at 320px with timezone Europe/Berlin and the consent banner visible scrolls horizontally: ` +
+            `scrollWidth ${layout.scrollWidth} against clientWidth ${layout.clientWidth}`,
+        );
+      }
+      for (const error of errors) {
+        failures.push(`${route} at 320px with the consent banner visible logged an error: ${error}`);
+      }
+      checkedPages += 1;
+    } catch (error) {
+      failures.push(`${route} at 320px with timezone Europe/Berlin could not be inspected: ${error.message}`);
+    } finally {
+      await page.close().catch(() => {});
+    }
+  }
+
+  for (const route of routes) {
+    const page = await openPage(browser);
+    try {
       await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
       await page.setViewport({ width: 1440, height: 900 });
       await page.goto(origin + route, { waitUntil: 'networkidle0' });
@@ -291,5 +343,6 @@ console.log(
   `Rendered inspection passed: ${routes.length} routes at ${widths.join('/')} CSS pixels ` +
     `(${checkedPages} page loads); no horizontal overflow, exactly one h1 per route, no console or page errors, ` +
     'no SVG label escaping its viewBox or straddling a card edge, no animation under prefers-reduced-motion, ' +
-    'and every route still readable with JavaScript disabled.',
+    'every route still readable with JavaScript disabled, and the consent banner visible at 320 CSS pixels ' +
+    'with timezone Europe/Berlin on every route without overflow or errors.',
 );
