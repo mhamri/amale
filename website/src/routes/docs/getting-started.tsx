@@ -33,21 +33,21 @@ const firstRun = [
 ];
 
 export default function DocsGettingStarted() {
-  const path = 'docs/getting-started/';
+  const crumb = { name: 'Getting started', path: 'docs/getting-started/' };
   const title = 'Getting started — Amaleh documentation';
   const description =
     'Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run.';
   return (
     <>
       <PageMeta
-        path={path}
+        path={crumb.path}
         title={title}
         description={description}
-        structuredData={articleGraph(path, title, description)}
+        structuredData={articleGraph({ crumb, headline: title, description })}
       />
       <DocsLayout
         current="getting-started"
-        title="Getting started"
+        title={crumb.name}
         lead="From a stable checkout to a first delegated run: what the machine needs, how the skill is installed, where credentials live, and the operations that start and resume a run."
         sections={sections}
       >

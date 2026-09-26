@@ -1,17 +1,18 @@
 // See website/SEO.md — verifies the built output carries the metadata, structured data and sitemap the site promises.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SHARE_IMAGE } from '../src/lib/brand.ts';
+import { SITE_URL } from '../src/lib/links.ts';
 import {
   CASE_STUDY_PATH,
-  CONTENT_ROUTES,
   EVIDENCE_PATH,
+  HOME_PATH,
   SHARE_IMAGE_URL,
   SITE_NAME,
   TWITTER_HANDLE,
   canonicalUrl,
 } from '../src/lib/seo.ts';
-import { SITE_URL } from '../src/lib/links.ts';
 
 const publicDir = fileURLToPath(new URL('../.output/public/', import.meta.url));
 
@@ -59,21 +60,27 @@ function jsonLd(html, label) {
 }
 
 const types = (nodes) => new Set(nodes.flatMap((node) => [node['@type']].flat()));
+const nodeOfType = (nodes, type) => nodes.find((node) => [node['@type']].flat().includes(type));
+const isNoindex = (html) => /\bnoindex\b/i.test(meta(html, 'name', 'robots') ?? '');
 
-function pageHtml(path) {
-  return readFileSync(join(publicDir, path, 'index.html'), 'utf8');
+function builtPages() {
+  return readdirSync(publicDir, { withFileTypes: true, recursive: true })
+    .filter((entry) => entry.isFile() && entry.name === 'index.html')
+    .map((entry) => {
+      const directory = relative(publicDir, entry.parentPath).split(sep).join('/');
+      const route = directory ? `${directory}/` : '';
+      return { route, label: `/${route}`, html: readFileSync(join(entry.parentPath, entry.name), 'utf8') };
+    });
 }
 
-for (const route of CONTENT_ROUTES) {
-  const file = join(publicDir, route, 'index.html');
-  const label = `/${route}`;
-  if (!existsSync(file)) {
-    fail(`${label}: missing from the build output`);
-    continue;
-  }
-  const html = readFileSync(file, 'utf8');
-  const url = canonicalUrl(route);
+const pages = builtPages();
+const indexable = pages.filter((page) => !isNoindex(page.html));
+const hidden = pages.filter((page) => isNoindex(page.html));
+const breadcrumbNames = new Map();
 
+if (!indexable.some((page) => page.route === HOME_PATH)) fail('the home page is missing from the build output or is noindex');
+
+function checkShareTags(html, label, url) {
   if (link(html, 'canonical') !== url) fail(`${label}: canonical is ${link(html, 'canonical')}, expected ${url}`);
   if (meta(html, 'property', 'og:url') !== url) fail(`${label}: og:url is ${meta(html, 'property', 'og:url')}`);
   if (meta(html, 'property', 'og:site_name') !== SITE_NAME) {
@@ -84,7 +91,7 @@ for (const route of CONTENT_ROUTES) {
   }
   for (const property of ['og:image:width', 'og:image:height']) {
     const value = meta(html, 'property', property);
-    if (!/^\d+$/.test(value ?? '') || Number(value) <= 0) fail(`${label}: ${property} is ${value}`);
+    if (value !== String(SHARE_IMAGE.size)) fail(`${label}: ${property} is ${value}, expected ${SHARE_IMAGE.size}`);
   }
   if (!meta(html, 'property', 'og:image:alt')) fail(`${label}: og:image:alt missing`);
   if (meta(html, 'name', 'twitter:card') !== 'summary') {
@@ -93,43 +100,67 @@ for (const route of CONTENT_ROUTES) {
   for (const name of ['twitter:site', 'twitter:creator']) {
     if (meta(html, 'name', name) !== TWITTER_HANDLE) fail(`${label}: ${name} is ${meta(html, 'name', name)}`);
   }
+}
 
-  const nodes = jsonLd(html, label);
+function checkHomeGraph(nodes, label) {
   const found = types(nodes);
-  if (route === '') {
-    for (const type of ['WebSite', 'Person']) if (!found.has(type)) fail(`${label}: JSON-LD has no ${type}`);
-    if (!found.has('SoftwareApplication') && !found.has('SoftwareSourceCode')) {
-      fail(`${label}: JSON-LD has no SoftwareApplication or SoftwareSourceCode`);
-    }
-  } else {
-    const article = nodes.find((node) => [node['@type']].flat().includes('TechArticle'));
-    if (!article) {
-      fail(`${label}: JSON-LD has no TechArticle`);
-    } else {
-      const title = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1];
-      if (article.headline !== title) fail(`${label}: TechArticle headline ${article.headline} is not the page title ${title}`);
-      if (article.description !== meta(html, 'name', 'description')) {
-        fail(`${label}: TechArticle description is not the page meta description`);
-      }
-    }
-    const breadcrumb = nodes.find((node) => [node['@type']].flat().includes('BreadcrumbList'));
-    if (!breadcrumb) {
-      fail(`${label}: JSON-LD has no BreadcrumbList`);
-    } else {
-      const items = breadcrumb.itemListElement ?? [];
-      const last = items[items.length - 1];
-      const lastUrl = typeof last?.item === 'string' ? last.item : last?.item?.['@id'];
-      if (items.length === 0 || lastUrl !== url) fail(`${label}: BreadcrumbList does not end at ${url}`);
-    }
+  for (const type of ['WebSite', 'Person']) if (!found.has(type)) fail(`${label}: JSON-LD has no ${type}`);
+  if (!found.has('SoftwareApplication') && !found.has('SoftwareSourceCode')) {
+    fail(`${label}: JSON-LD has no SoftwareApplication or SoftwareSourceCode`);
   }
 }
 
-const evidenceFile = join(publicDir, EVIDENCE_PATH, 'index.html');
-if (existsSync(evidenceFile)) {
-  const html = readFileSync(evidenceFile, 'utf8');
-  if (!/noindex/i.test(meta(html, 'name', 'robots') ?? '')) fail(`/${EVIDENCE_PATH}: redirect page is not noindex`);
-  if (link(html, 'canonical') !== canonicalUrl(CASE_STUDY_PATH)) {
-    fail(`/${EVIDENCE_PATH}: canonical is ${link(html, 'canonical')}, expected ${canonicalUrl(CASE_STUDY_PATH)}`);
+function checkArticleGraph(nodes, html, label, url) {
+  const article = nodeOfType(nodes, 'TechArticle');
+  if (!article) {
+    fail(`${label}: JSON-LD has no TechArticle`);
+  } else {
+    const title = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1];
+    if (article.headline !== title) fail(`${label}: TechArticle headline ${article.headline} is not the page title ${title}`);
+    if (article.description !== meta(html, 'name', 'description')) {
+      fail(`${label}: TechArticle description is not the page meta description`);
+    }
+  }
+  const breadcrumb = nodeOfType(nodes, 'BreadcrumbList');
+  if (!breadcrumb) {
+    fail(`${label}: JSON-LD has no BreadcrumbList`);
+    return;
+  }
+  const items = breadcrumb.itemListElement ?? [];
+  for (const item of items) {
+    const itemUrl = typeof item.item === 'string' ? item.item : item.item?.['@id'];
+    if (!breadcrumbNames.has(itemUrl)) breadcrumbNames.set(itemUrl, new Set());
+    breadcrumbNames.get(itemUrl).add(item.name);
+  }
+  const last = items[items.length - 1];
+  const lastUrl = typeof last?.item === 'string' ? last.item : last?.item?.['@id'];
+  if (items.length === 0 || lastUrl !== url) fail(`${label}: BreadcrumbList does not end at ${url}`);
+}
+
+for (const { route, label, html } of indexable) {
+  const url = canonicalUrl(route);
+  checkShareTags(html, label, url);
+  const nodes = jsonLd(html, label);
+  if (route === HOME_PATH) checkHomeGraph(nodes, label);
+  else checkArticleGraph(nodes, html, label, url);
+}
+
+for (const [url, names] of breadcrumbNames) {
+  if (names.size > 1) fail(`breadcrumb ${url} is named differently on different pages: ${[...names].join(', ')}`);
+}
+
+const indexableUrls = new Set(indexable.map((page) => canonicalUrl(page.route)));
+for (const { label, html } of hidden) {
+  const canonical = link(html, 'canonical');
+  if (!indexableUrls.has(canonical)) fail(`${label}: noindex page's canonical ${canonical} is not an indexable page`);
+}
+
+const evidence = pages.find((page) => page.route === EVIDENCE_PATH);
+if (!evidence) fail(`/${EVIDENCE_PATH}: redirect page missing from the build output`);
+else {
+  if (!isNoindex(evidence.html)) fail(`/${EVIDENCE_PATH}: redirect page is not noindex`);
+  if (link(evidence.html, 'canonical') !== canonicalUrl(CASE_STUDY_PATH)) {
+    fail(`/${EVIDENCE_PATH}: canonical is ${link(evidence.html, 'canonical')}, expected ${canonicalUrl(CASE_STUDY_PATH)}`);
   }
 }
 
@@ -137,33 +168,24 @@ const sitemapFile = join(publicDir, 'sitemap.xml');
 if (!existsSync(sitemapFile)) {
   fail('sitemap.xml missing from the build output');
 } else {
-  const sitemap = readFileSync(sitemapFile, 'utf8');
-  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-  for (const route of CONTENT_ROUTES) {
-    if (!locs.includes(canonicalUrl(route))) fail(`sitemap.xml misses ${canonicalUrl(route)}`);
+  const locs = new Set([...readFileSync(sitemapFile, 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]));
+  for (const url of indexableUrls) if (!locs.has(url)) fail(`sitemap.xml misses ${url}`);
+  for (const loc of locs) {
+    if (!indexableUrls.has(loc)) fail(`sitemap.xml lists ${loc}, which is not an indexable built page`);
+    if (!loc.startsWith(SITE_URL)) fail(`sitemap.xml has a loc outside ${SITE_URL}: ${loc}`);
   }
-  if (locs.some((loc) => loc.includes(EVIDENCE_PATH))) fail('sitemap.xml lists the /evidence/ redirect');
-  const extra = locs.filter((loc) => !CONTENT_ROUTES.some((route) => canonicalUrl(route) === loc));
-  if (extra.length > 0) fail(`sitemap.xml lists routes outside the content set: ${extra.join(', ')}`);
-  if (locs.some((loc) => !loc.startsWith(SITE_URL))) fail(`sitemap.xml has a loc outside ${SITE_URL}`);
 }
 
-const shareFile = join(publicDir, 'brand/amaleh-share.png');
-if (existsSync(shareFile)) {
+const shareFile = join(publicDir, SHARE_IMAGE.publicPath);
+if (!existsSync(shareFile)) {
+  fail(`${SHARE_IMAGE.publicPath} missing from the build output`);
+} else {
   const png = readFileSync(shareFile);
-  const width = png.readUInt32BE(16);
-  const height = png.readUInt32BE(20);
-  for (const route of CONTENT_ROUTES) {
-    const html = pageHtml(route);
-    const declared = [meta(html, 'property', 'og:image:width'), meta(html, 'property', 'og:image:height')];
-    if (declared[0] !== String(width) || declared[1] !== String(height)) {
-      fail(`/${route}: og:image:width/height ${declared.join('x')} do not match brand/amaleh-share.png ${width}x${height}`);
-    }
+  const [width, height] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+  if (width !== SHARE_IMAGE.size || height !== SHARE_IMAGE.size) {
+    fail(`${SHARE_IMAGE.publicPath} is ${width}x${height}, but src/lib/brand.ts declares ${SHARE_IMAGE.size}x${SHARE_IMAGE.size}`);
   }
 }
-
-const builtHtml = readdirSync(publicDir, { recursive: true }).filter((name) => name.endsWith('.html'));
-if (builtHtml.length === 0) fail('the build output contains no HTML');
 
 if (failures.length > 0) {
   console.error(`SEO verification failed with ${failures.length} problem(s):\n  - ${failures.join('\n  - ')}`);
@@ -171,9 +193,9 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `SEO verification passed: ${CONTENT_ROUTES.length} content routes carry canonical, og:url, og:site_name, ` +
+  `SEO verification passed: ${indexable.length} indexable built pages carry canonical, og:url, og:site_name, ` +
     `og:image with width, height and alt, twitter:card summary and ${TWITTER_HANDLE}; the home page carries ` +
-    'WebSite, Person and SoftwareSourceCode; every documentation and case-study route carries a TechArticle and a ' +
-    'BreadcrumbList ending at its canonical URL; /evidence/ is noindex and canonical to /case-study/; and ' +
-    `sitemap.xml lists every content route at ${SITE_URL} and nothing else.`,
+    'WebSite, Person and SoftwareSourceCode; every other indexable page carries a TechArticle and a BreadcrumbList ' +
+    `ending at its canonical URL, with one name per breadcrumb URL; ${hidden.length} noindex page(s) point their ` +
+    `canonical at an indexable page; and sitemap.xml lists exactly the indexable pages at ${SITE_URL}.`,
 );

@@ -8,7 +8,8 @@ import JevAsciiMark from '../components/case-study/JevAsciiMark';
 const title = 'Case study — Amaleh';
 const description =
   'How Amaleh built this site: every claim the landing page makes, proven with measured figures from the run records that built it.';
-const graph = articleGraph(CASE_STUDY_PATH, title, description);
+const crumb = { name: 'Case study', path: CASE_STUDY_PATH };
+const graph = articleGraph({ crumb, headline: title, description });
 
 const claims = [
   {

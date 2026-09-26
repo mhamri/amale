@@ -31,21 +31,21 @@ const parallelFields = [
 ];
 
 export default function DocsWorkflow() {
-  const path = 'docs/workflow/';
+  const crumb = { name: 'Workflow', path: 'docs/workflow/' };
   const title = 'Workflow — Amaleh documentation';
   const description =
     'How an Amaleh run moves from discovery and planning through delegated parallel execution to verified delivery.';
   return (
     <>
       <PageMeta
-        path={path}
+        path={crumb.path}
         title={title}
         description={description}
-        structuredData={articleGraph(path, title, description)}
+        structuredData={articleGraph({ crumb, headline: title, description })}
       />
       <DocsLayout
         current="workflow"
-        title="Workflow"
+        title={crumb.name}
         lead="A run is one loop: discover and specify, decompose into deliverable tasks, delegate each chunk to an isolated workspace, and accept only what survives checks, independent review and integration evidence."
         sections={sections}
       >
