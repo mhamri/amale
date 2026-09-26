@@ -11,7 +11,7 @@ import { HOME_PATH, homeGraph } from '../lib/seo';
 const title = 'Amaleh — coordinated workers, verified delivery';
 const description =
   'Amaleh is a self-contained workflow skill for Codex and Claude. It plans, delegates implementation to cheap Flash models, reviews independently and verifies delivery, then resumes from disk.';
-const graph = homeGraph();
+const graph = homeGraph(description);
 
 export default function Home() {
   return (

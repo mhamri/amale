@@ -2,22 +2,11 @@
 // node scripts/generate-brand-images.mjs.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync, inflateSync } from 'node:zlib';
+import { BRAND_IMAGES, BRAND_MASTER_SOURCE_PATH } from '../src/lib/brand.ts';
 
-const MASTER = new URL('../brand/amaleh-logo-transparent.png', import.meta.url);
-const OUT_DIR = new URL('../public/brand/', import.meta.url);
+const MASTER = new URL(`../${BRAND_MASTER_SOURCE_PATH}`, import.meta.url);
+const PUBLIC_DIR = new URL('../public/', import.meta.url);
 const ALPHA_FLOOR = 8;
-const PAGE_BG = [0x0f, 0x12, 0x16];
-const LOGO_LIMIT = 40 * 1024;
-const SHARE_LIMIT = 300 * 1024;
-
-const OUTPUTS = [
-  { name: 'amaleh-mark.png', size: 30, limit: LOGO_LIMIT },
-  { name: 'amaleh-mark@2x.png', size: 60, limit: LOGO_LIMIT },
-  { name: 'favicon-32.png', size: 32, limit: LOGO_LIMIT },
-  { name: 'favicon-16.png', size: 16, limit: LOGO_LIMIT },
-  { name: 'apple-touch-icon.png', size: 180, background: PAGE_BG, fill: 0.85, limit: LOGO_LIMIT },
-  { name: 'amaleh-share.png', size: 600, background: PAGE_BG, fill: 0.6, limit: SHARE_LIMIT },
-];
 
 function readPng(path) {
   const buf = readFileSync(path);
@@ -260,27 +249,28 @@ const master = readPng(MASTER);
 const box = visibleBox(master);
 const square = cropSquare(master, box);
 
-mkdirSync(OUT_DIR, { recursive: true });
 const failures = [];
 const written = [];
 
-for (const spec of OUTPUTS) {
+for (const spec of BRAND_IMAGES) {
   let image;
-  if (spec.background) {
-    const logoSize = spec.fill ? Math.round(spec.size * spec.fill) : spec.size;
+  if (spec.backdrop) {
+    const logoSize = Math.round(spec.size * spec.backdrop.markFraction);
     const logo = resample(square, logoSize, logoSize);
-    image = canvasOf(spec.size, spec.background);
+    image = canvasOf(spec.size, spec.backdrop.color);
     const offset = Math.round((spec.size - logoSize) / 2);
     flatten(image, logo, offset, offset);
   } else {
     image = resample(square, spec.size, spec.size);
   }
   const png = encodePng(image);
-  if (png.length > spec.limit) {
-    failures.push(`${spec.name} is ${png.length} bytes, over its ${spec.limit} byte limit`);
+  if (png.length > spec.maxBytes) {
+    failures.push(`${spec.publicPath} is ${png.length} bytes, over its ${spec.maxBytes} byte limit`);
   }
-  writeFileSync(new URL(spec.name, OUT_DIR), png);
-  written.push(`${spec.name} ${image.width}x${image.height} ${png.length} B`);
+  const target = new URL(spec.publicPath, PUBLIC_DIR);
+  mkdirSync(new URL('./', target), { recursive: true });
+  writeFileSync(target, png);
+  written.push(`${spec.publicPath} ${image.width}x${image.height} ${png.length} B`);
 }
 
 if (failures.length) {

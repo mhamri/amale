@@ -109,6 +109,13 @@ black — and encodes each PNG with zlib level 9 and per-row filter selection.
 The files in `public/brand/` are that script's output and are committed with
 it; regenerate them whenever the master changes.
 
+`src/lib/brand.ts` is the only place the master's path and each derivative's
+path, pixel size, byte limit and backdrop are written. The generator draws
+from it, `Brand.tsx` and `entry-server.tsx` reference its entries, `PageMeta`
+declares the share image size from it, and `check-static.mjs` and
+`check-seo.mjs` read their limits and sizes from it. Adding or resizing a brand
+image is one edit there followed by a regeneration. The entries today:
+
 | File under `public/` | Size | Used for | Limit |
 | --- | --- | --- | --- |
 | `brand/amaleh-mark.png` | 30 x 30 | header and footer lockup, 1x | 40 KB |
@@ -123,8 +130,9 @@ and the share image are opaque on the `#0f1216` page background, with the
 mark drawn at 85% of the apple-touch icon and 60% of the share square so each
 carries a margin. No page may reference any other copy:
 `scripts/check-static.mjs` fails when a page references `mark.svg`, when the
-master ships or is referenced, or when a referenced brand image is over its
-limit.
+master ships or is referenced, when a page references a file under `brand/`
+that `src/lib/brand.ts` does not register, or when a referenced brand image is
+over its limit.
 
 ## Typography
 

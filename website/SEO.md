@@ -1,10 +1,10 @@
 # Amaleh website search and share metadata
 
-This document is a binding contract for what every route publishes to crawlers
+This document is a binding contract for what every page publishes to crawlers
 and to share cards. `npm run test:seo` (`website/scripts/check-seo.mjs`) reads
 the built output under `website/.output/public/` and fails the build when a
-route is missing or wrong on any rule below. It runs in
-`.github/workflows/pages.yml` after `npm run test:static`.
+page breaks any rule below. It runs in `.github/workflows/pages.yml` after
+`npm run test:static`.
 
 ## The production address
 
@@ -19,93 +19,111 @@ crawler must never index a staging origin.
 - `canonicalUrl(path)` joins `SITE_URL` with the route path relative to the
   base, so `canonicalUrl('docs/workflow/')` is
   `https://mhamri.github.io/amaleh/docs/workflow/`.
-- `SHARE_IMAGE_URL` is `SITE_URL` plus `brand/amaleh-share.png`.
-- `CONTENT_ROUTES` is the ordered list of every indexable route. The sitemap
-  and `check-seo.mjs` both read it, so a route cannot be added to one and
-  forgotten in the other.
+- `SHARE_IMAGE_URL` is `SITE_URL` plus the `publicPath` of `SHARE_IMAGE` in
+  `website/src/lib/brand.ts`.
 
-`links.ts` also holds the author's profile URLs — `GITHUB_PROFILE_URL`,
-`LINKEDIN_URL` and `X_URL`. Each is written there once and read from there by
-both consumers: the home `Person` in `src/lib/seo.ts` and the connection links
-in `src/components/landing/Author.tsx`. That landing component is outside this
-feature's route work but inside `website/`, so the change is scoped to the
-repository path, not to the files the feature was specified against: a second
-set of the same three literals in `Author.tsx` could drift from the `Person`
-data Google reads, and `sameAs` is only useful while the two agree.
+The author's profile URLs — `GITHUB_PROFILE_URL`, `LINKEDIN_URL` and `X_URL` —
+live once in `website/src/lib/links.ts`. The home `Person` in
+`src/lib/seo.ts` and the connection links in
+`src/components/landing/Author.tsx` both read them there, so the `sameAs`
+data Google reads always matches the profiles the page links to.
 
-## What each route must carry
+## Which pages are indexable
 
-Every content route — `/`, `/docs/`, `/docs/getting-started/`,
-`/docs/workflow/`, `/docs/review-and-recovery/`, `/docs/commands/` and
-`/case-study/` — renders `PageMeta`. It emits, through `@solidjs/meta`:
+The build output decides, not a hand-kept list. Every prerendered
+`index.html` is a page. A page whose `meta[name=robots]` contains `noindex` is
+hidden; every other page is indexable and must carry everything below. A new
+route is therefore checked and listed in the sitemap the moment it is
+prerendered, and a route that forgets its metadata fails the build instead of
+slipping past it.
+
+## What each indexable page must carry
+
+Every indexable page renders `PageMeta`, which emits through `@solidjs/meta`:
 
 | Tag | Value |
 | --- | --- |
-| `<title>` | the route's own title |
-| `meta[name=description]` | the route's own description |
+| `<title>` | the page's own title |
+| `meta[name=description]` | the page's own description |
 | `link[rel=canonical]` | `canonicalUrl(path)` |
-| `meta[property=og:title]` | the route title |
-| `meta[property=og:description]` | the route description |
+| `meta[property=og:title]` | the page title |
+| `meta[property=og:description]` | the page description |
 | `meta[property=og:type]` | `website` |
 | `meta[property=og:url]` | `canonicalUrl(path)` |
 | `meta[property=og:site_name]` | `Amaleh` |
 | `meta[property=og:image]` | `SHARE_IMAGE_URL` |
-| `meta[property=og:image:width]` / `:height` | the share image's real pixels |
+| `meta[property=og:image:width]` / `:height` | `SHARE_IMAGE.size` from `src/lib/brand.ts` |
 | `meta[property=og:image:alt]` | a description of the share image |
 | `meta[name=twitter:card]` | `summary` |
 | `meta[name=twitter:site]` / `:creator` | `@MHosseinAmri` |
 
-`/evidence/` is a redirect page, not content. It renders `PageMeta` with
-`noindex` and `canonicalPath={CASE_STUDY_PATH}`, so it carries
-`meta[name=robots]` containing `noindex` and a canonical pointing at
-`/case-study/`. It never appears in the sitemap. There is no `robots.txt`:
-crawlers ignore one below the domain root, so the noindex tag is the rule that
-actually holds.
+A hidden page's canonical must point at an indexable page. `/evidence/` is the
+one hidden page: a redirect that renders `PageMeta` with `noindex` and
+`canonicalPath={CASE_STUDY_PATH}`, so its canonical is `/case-study/`. There is
+no `robots.txt`: crawlers ignore one below the domain root, so the noindex tag
+is the rule that actually holds.
 
 ### The share image
 
-`brand/amaleh-share.png` is a square produced by
-`website/scripts/generate-brand-images.mjs`. `PageMeta` declares a 600 by 600
-fallback; `website/scripts/postbuild.mjs` reads the PNG's IHDR header and
-rewrites `og:image:width` and `og:image:height` on every built page to the
-file's real pixels, so the declared size cannot drift from the asset.
+`SHARE_IMAGE` in `website/src/lib/brand.ts` is the only place the share image's
+path and pixel size are written. `website/scripts/generate-brand-images.mjs`
+draws the square at that size, `PageMeta` declares that size in
+`og:image:width` and `og:image:height`, and `check-seo.mjs` fails when the
+shipped PNG's pixels differ from it. Nothing rewrites built HTML after
+rendering.
 
 ## Structured data
 
 `website/src/components/StructuredData.tsx` is the only JSON-LD renderer. It
 takes a `Graph` typed with `schema-dts` and serialises it with every `<`
-escaped as `\u003c`, so page copy can never close the script element. The
+escaped as the JSON escape `\u003c`, so page copy can never close the script element. The
 builders live in `website/src/lib/seo.ts`:
 
-- `homeGraph()` returns one `@graph` with a `WebSite` named Amaleh at
-  `SITE_URL`, a free `SoftwareSourceCode` whose `codeRepository` is the
-  repository (no licence claim, because the repository has no `LICENSE` file),
-  and a `Person` for Mohammad Hossein Amri whose `sameAs` lists his GitHub,
-  LinkedIn and X profiles from `links.ts`.
-- `articleGraph(path, headline, description)` returns a `TechArticle` and a
-  `BreadcrumbList` whose last item is `canonicalUrl(path)`.
+- `homeGraph(description)` returns one `@graph` with a `WebSite` named Amaleh
+  at `SITE_URL`, a free `SoftwareSourceCode` whose `codeRepository` is the
+  repository and whose description is the home page's own (no licence claim,
+  because the repository has no `LICENSE` file), and a `Person` for Mohammad
+  Hossein Amri whose `sameAs` lists his GitHub, LinkedIn and X profiles.
+- `articleGraph({ crumb, headline, description })` returns a `TechArticle` and
+  a `BreadcrumbList` whose last item is `canonicalUrl(crumb.path)`.
 
 Only facts already on the site are allowed: no ratings, no prices beyond
 `isAccessibleForFree`, no dates and no claims the pages do not make.
 
+### Breadcrumbs
+
+A crumb is a `{ name, path }` pair, and a URL has one name on every page. The
+section crumbs are `HOME_CRUMB` (`Home`, the site root) and `DOCS_CRUMB`
+(`Documentation`, `/docs/`). A page's trail is every section whose path is
+a prefix of the page's path, followed by the page itself; a page that is itself a
+section always carries the section's name, so `/docs/` reads `Documentation`
+on its own page and on every page beneath it. `check-seo.mjs` fails when one
+URL carries two names.
+
 ### Adding structured data to a new route
 
-1. Add the route path to `CONTENT_ROUTES` in `website/src/lib/seo.ts`.
-2. In the route component, name the route's `title` and `description` once as
-   constants.
-3. Render `<PageMeta path={path} title={title} description={description} />`.
-4. For a documentation-style page, pass
-   `structuredData={articleGraph(path, title, description)}` so the
-   `TechArticle` headline and description are the page's own. Add a new
-   builder in `website/src/lib/seo.ts` for any other shape.
-5. Run `npm run build` and `npm run test:seo`.
+1. In the route component, name the page's `title`, `description` and `crumb`
+   (`{ name, path }`) once as constants. A documentation page below `/docs/`
+   passes `crumb.name` to `DocsLayout` as its visible title too. The
+   documentation index is the one exception: its crumb is `DOCS_CRUMB`
+   (`Documentation`, the section name every docs breadcrumb shares) while its
+   visible `DocsLayout` title is `Overview`, the label the docs sidebar uses
+   for that page.
+2. Render `<PageMeta path={crumb.path} title={title} description={description}
+   structuredData={articleGraph({ crumb, headline: title, description })} />`.
+   Add a new builder in `website/src/lib/seo.ts` for any other shape.
+3. If the route opens a new section with pages beneath it, add its crumb to
+   `SECTION_CRUMBS` in `website/src/lib/seo.ts`.
+4. Run `npm run build` and `npm run test:seo`.
 
 ## The sitemap
 
 `npm run build` runs `website/scripts/postbuild.mjs`, which writes
-`website/.output/public/sitemap.xml`. It lists every route in `CONTENT_ROUTES`
-as an absolute `SITE_URL` address and nothing else — no `/evidence/`, no
-`lastmod`, because the site has no measured per-route dates to publish.
+`website/.output/public/sitemap.xml` from the build output: one absolute
+`SITE_URL` address for every indexable page and nothing else — no hidden page,
+no `lastmod`, because the site has no measured per-page dates to publish.
+`check-seo.mjs` fails when the sitemap and the set of indexable pages differ in
+either direction.
 
 The sitemap must be submitted once in Google Search Console for the
 `mhamri.github.io/amaleh/` property. It is a one-time action, not part of the

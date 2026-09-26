@@ -22,21 +22,21 @@ const sections: DocsSection[] = [
 ];
 
 export default function DocsCommands() {
-  const path = 'docs/commands/';
+  const crumb = { name: 'Command reference', path: 'docs/commands/' };
   const title = 'Command reference — Amaleh documentation';
   const description =
     'Every CLI operation, its purpose and its input shape, drawn from the shipped runtime reference.';
   return (
     <>
       <PageMeta
-        path={path}
+        path={crumb.path}
         title={title}
         description={description}
-        structuredData={articleGraph(path, title, description)}
+        structuredData={articleGraph({ crumb, headline: title, description })}
       />
       <DocsLayout
         current="commands"
-        title="Command reference"
+        title={crumb.name}
         lead="Every CLI operation available through the Amaleh runtime, grouped by purpose. Each entry states what the operation does and the input shape it expects, drawn from the shipped runtime reference files."
         sections={sections}
       >

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BRAND_IMAGES, BRAND_MASTER_SOURCE_PATH } from '../src/lib/brand.ts';
 import { consentRegions } from '../src/lib/consent.ts';
 import { gtmNoscriptIframe, trackingHeadScripts } from '../src/lib/tracking.ts';
 
@@ -821,10 +822,9 @@ async function checkOutputSanity() {
   }
 }
 
-const MASTER_NAME = 'amaleh-logo-transparent.png';
-const MASTER_BYTES = 1226587;
-const LOGO_LIMIT = 40 * 1024;
-const SHARE_LIMIT = 300 * 1024;
+const MASTER_FILE = fileURLToPath(new URL(`../${BRAND_MASTER_SOURCE_PATH}`, import.meta.url));
+const MASTER_NAME = basename(MASTER_FILE);
+const BRAND_LIMITS = new Map(BRAND_IMAGES.map((image) => [image.publicPath, image.maxBytes]));
 
 function referencedUrls(html) {
   const urls = [];
@@ -858,6 +858,7 @@ function brandTarget(url, base) {
  */
 async function checkBrandAssets() {
   const offenders = [];
+  const masterBytes = (await stat(MASTER_FILE)).size;
   for (const file of await htmlFilesUnder(publicDir)) {
     const where = file.slice(publicDir.length);
     const html = await readFile(file, 'utf8');
@@ -866,7 +867,11 @@ async function checkBrandAssets() {
       if (url.includes(MASTER_NAME)) offenders.push(`${where} references the master logo ${url}`);
       const brand = brandTarget(url, base);
       if (!brand) continue;
-      const limit = brand.rel === 'brand/amaleh-share.png' ? SHARE_LIMIT : LOGO_LIMIT;
+      const limit = BRAND_LIMITS.get(brand.rel);
+      if (limit === undefined) {
+        offenders.push(`${where}: ${url} is not a brand image registered in src/lib/brand.ts`);
+        continue;
+      }
       let info = null;
       try { info = await stat(brand.target); } catch { info = null; }
       if (!info) offenders.push(`${where}: brand image ${url} is missing from the build output`);
@@ -881,7 +886,7 @@ async function checkBrandAssets() {
     const where = file.slice(publicDir.length);
     if (entry.name === 'mark.svg') offenders.push(`the build ships mark.svg at ${where}`);
     if (entry.name === MASTER_NAME) offenders.push(`the build ships the master logo at ${where}`);
-    if ((await stat(file)).size === MASTER_BYTES) offenders.push(`the build ships the master logo (${MASTER_BYTES} bytes) at ${where}`);
+    if ((await stat(file)).size === masterBytes) offenders.push(`the build ships the master logo (${masterBytes} bytes) at ${where}`);
   }
   assert.equal(offenders.length, 0,
     `Brand asset verification failed with ${offenders.length} problem(s):\n  - ${offenders.join('\n  - ')}`);

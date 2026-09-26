@@ -3,7 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import ModelTopology from '../../components/diagrams/ModelTopology';
 import { asset } from '../../lib/paths';
-import { DOCS_PATH, articleGraph } from '../../lib/seo';
+import { DOCS_CRUMB, articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'problem', label: 'The problem Amaleh solves' },
@@ -52,10 +52,10 @@ export default function DocsOverview() {
   return (
     <>
       <PageMeta
-        path={DOCS_PATH}
+        path={DOCS_CRUMB.path}
         title={title}
         description={description}
-        structuredData={articleGraph(DOCS_PATH, title, description)}
+        structuredData={articleGraph({ crumb: DOCS_CRUMB, headline: title, description })}
       />
       <DocsLayout
         current="overview"
