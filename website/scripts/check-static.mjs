@@ -821,6 +821,72 @@ async function checkOutputSanity() {
   }
 }
 
+const MASTER_NAME = 'amaleh-logo-transparent.png';
+const MASTER_BYTES = 1226587;
+const LOGO_LIMIT = 40 * 1024;
+const SHARE_LIMIT = 300 * 1024;
+
+function referencedUrls(html) {
+  const urls = [];
+  for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)) urls.push(m[1]);
+  for (const m of html.matchAll(/\bsrcset="([^"]+)"/g)) {
+    for (const candidate of m[1].split(',')) {
+      const url = candidate.trim().split(/\s+/)[0];
+      if (url) urls.push(url);
+    }
+  }
+  return urls;
+}
+
+function brandTarget(url, base) {
+  if (/^(https?:|mailto:|data:|tel:|javascript:)/i.test(url) || url.startsWith('#')) return null;
+  let path = decodeURIComponent(url.split(/[?#]/)[0]);
+  if (path.startsWith(base)) path = path.slice(base.length);
+  path = path.replace(/^\/+/, '');
+  const target = resolve(publicDir, path);
+  if (!target.startsWith(publicDir)) return null;
+  const rel = target.slice(publicDir.length).replaceAll('\\', '/');
+  return rel.startsWith('brand/') ? { target, rel } : null;
+}
+
+/*
+ * The master logo is a repository file, not a site asset: only the resized
+ * copies in public/brand/ may ship, and each of those is capped so no route
+ * pulls a megabyte of logo into the critical path. The master is caught by
+ * its name and by its exact byte length, so moving it under another name
+ * still fails.
+ */
+async function checkBrandAssets() {
+  const offenders = [];
+  for (const file of await htmlFilesUnder(publicDir)) {
+    const where = file.slice(publicDir.length);
+    const html = await readFile(file, 'utf8');
+    if (html.includes('mark.svg')) offenders.push(`${where} references mark.svg, which is deleted`);
+    for (const url of referencedUrls(html)) {
+      if (url.includes(MASTER_NAME)) offenders.push(`${where} references the master logo ${url}`);
+      const brand = brandTarget(url, base);
+      if (!brand) continue;
+      const limit = brand.rel === 'brand/amaleh-share.png' ? SHARE_LIMIT : LOGO_LIMIT;
+      let info = null;
+      try { info = await stat(brand.target); } catch { info = null; }
+      if (!info) offenders.push(`${where}: brand image ${url} is missing from the build output`);
+      else if (info.size > limit) {
+        offenders.push(`${where}: brand image ${url} is ${info.size} bytes, over its ${limit} byte limit`);
+      }
+    }
+  }
+  for (const entry of await readdir(publicDir, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile()) continue;
+    const file = resolve(entry.parentPath, entry.name);
+    const where = file.slice(publicDir.length);
+    if (entry.name === 'mark.svg') offenders.push(`the build ships mark.svg at ${where}`);
+    if (entry.name === MASTER_NAME) offenders.push(`the build ships the master logo at ${where}`);
+    if ((await stat(file)).size === MASTER_BYTES) offenders.push(`the build ships the master logo (${MASTER_BYTES} bytes) at ${where}`);
+  }
+  assert.equal(offenders.length, 0,
+    `Brand asset verification failed with ${offenders.length} problem(s):\n  - ${offenders.join('\n  - ')}`);
+}
+
 async function checkContrast() {
   const css = await readCSS();
   const vars = extractCSSVariables(css);
@@ -877,6 +943,7 @@ const pages = await Promise.all(routes.map(async route => ({
 
 await Promise.all(routes.map(route => attempt(() => checkPage(route))));
 await attempt(checkOutputSanity);
+await attempt(checkBrandAssets);
 await attempt(checkConsentRegions);
 for (const file of await htmlFilesUnder(publicDir)) {
   await attempt(async () => assertTracking(await readFile(file, 'utf8'), file.slice(publicDir.length)));
@@ -899,4 +966,4 @@ for (const route of pages) {
 assert.equal(failures.length, 0,
   `Static verification failed with ${failures.length} problem(s):\n  - ${failures.join('\n  - ')}`);
 
-console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, a hue-coded hairline edge on every soft chip, no colourless chip on a card surface, no monospace chip naming something a reader cannot type, no unpinned heading-and-chip row, no prose card grid past two columns, every container at max-w-7xl and a diagram figure on every documentation route.`);
+console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, no mark.svg or master logo in the build and every brand image inside its size limit, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, a hue-coded hairline edge on every soft chip, no colourless chip on a card surface, no monospace chip naming something a reader cannot type, no unpinned heading-and-chip row, no prose card grid past two columns, every container at max-w-7xl and a diagram figure on every documentation route.`);
