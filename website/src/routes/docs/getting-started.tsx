@@ -3,6 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import InstallSequence from '../../components/diagrams/InstallSequence';
 import { asset } from '../../lib/paths';
+import { articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'prerequisites', label: 'Prerequisites' },
@@ -32,11 +33,17 @@ const firstRun = [
 ];
 
 export default function DocsGettingStarted() {
+  const path = 'docs/getting-started/';
+  const title = 'Getting started — Amaleh documentation';
+  const description =
+    'Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run.';
   return (
     <>
       <PageMeta
-        title="Getting started — Amaleh documentation"
-        description="Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run."
+        path={path}
+        title={title}
+        description={description}
+        structuredData={articleGraph(path, title, description)}
       />
       <DocsLayout
         current="getting-started"

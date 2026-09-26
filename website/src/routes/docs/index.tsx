@@ -3,6 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import ModelTopology from '../../components/diagrams/ModelTopology';
 import { asset } from '../../lib/paths';
+import { DOCS_PATH, articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'problem', label: 'The problem Amaleh solves' },
@@ -45,11 +46,16 @@ const escalation = [
 ];
 
 export default function DocsOverview() {
+  const title = 'Overview — Amaleh documentation';
+  const description =
+    'Why Amaleh exists, and how the coordinator, workers, reviewer and Jev divide the work of a delegated run.';
   return (
     <>
       <PageMeta
-        title="Overview — Amaleh documentation"
-        description="Why Amaleh exists, and how the coordinator, workers, reviewer and Jev divide the work of a delegated run."
+        path={DOCS_PATH}
+        title={title}
+        description={description}
+        structuredData={articleGraph(DOCS_PATH, title, description)}
       />
       <DocsLayout
         current="overview"

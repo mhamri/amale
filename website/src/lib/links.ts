@@ -9,3 +9,11 @@ export const REPOSITORY_URL = 'https://github.com/mhamri/amaleh';
 
 /** Where a reader can fund the work. */
 export const SPONSOR_URL = 'https://github.com/sponsors/mhamri';
+
+// See website/SEO.md — the production origin every canonical, share and sitemap URL is built from.
+export const SITE_URL = 'https://mhamri.github.io/amaleh/';
+
+// See website/SEO.md — the author's profiles, shared by the landing page and the home Person data.
+export const GITHUB_PROFILE_URL = 'https://github.com/mhamri';
+export const LINKEDIN_URL = 'https://www.linkedin.com/in/mhamri/';
+export const X_URL = 'https://x.com/MHosseinAmri';

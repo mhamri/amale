@@ -2,6 +2,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import OperationMap from '../../components/diagrams/OperationMap';
 import { asset } from '../../lib/paths';
+import { articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'invocation', label: 'Invocation shape' },
@@ -21,11 +22,17 @@ const sections: DocsSection[] = [
 ];
 
 export default function DocsCommands() {
+  const path = 'docs/commands/';
+  const title = 'Command reference — Amaleh documentation';
+  const description =
+    'Every CLI operation, its purpose and its input shape, drawn from the shipped runtime reference.';
   return (
     <>
       <PageMeta
-        title="Command reference — Amaleh documentation"
-        description="Every CLI operation, its purpose and its input shape, drawn from the shipped runtime reference."
+        path={path}
+        title={title}
+        description={description}
+        structuredData={articleGraph(path, title, description)}
       />
       <DocsLayout
         current="commands"
