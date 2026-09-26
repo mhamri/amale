@@ -17,8 +17,8 @@ const h2 = 'scroll-mt-24 font-display text-display font-semibold tracking-tight'
 const source = 'badge badge-soft badge-info font-mono text-xs font-normal';
 
 const outcomes = [
-  ['accepted', 'The chunk passed its checks and review. Integrate next.'],
-  ['escalated', 'Repair exhausted, host takeover or review evidence needed — the coordinator’s turn to diagnose or supply evidence.'],
+  ['accepted', 'The chunk passed its checks and review, or, for host work, its checks alone. Integrate next.'],
+  ['escalated', 'Repair exhausted, host takeover, failed host checks, a scope question or review evidence needed — the coordinator’s turn to diagnose, answer or supply evidence.'],
   ['route-pending', 'A named prerequisite must be resolved before dispatch.'],
   ['failed', 'An infrastructure error; task state is preserved.'],
 ];

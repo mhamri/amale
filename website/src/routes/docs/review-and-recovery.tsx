@@ -19,7 +19,7 @@ const source = 'badge badge-soft badge-info font-mono text-xs font-normal';
 const repairStages = [
   ['Flash repair', 'Two ordinary repair cycles by routed Flash workers.'],
   ['Kimi repair', 'One deeper diagnosis-and-repair cycle once the Flash allowance is exhausted.'],
-  ['Host takeover', 'The actual invoking model diagnoses and changes strategy.'],
+  ['Host takeover', 'The actual invoking model diagnoses and repairs. This is the last step: no model reviews host work, and delegate accepts it once its checks pass.'],
 ];
 
 const coverageStatuses = [
@@ -57,7 +57,7 @@ export default function DocsReviewAndRecovery() {
           </div>
           <div class="mt-4 space-y-4 text-base leading-relaxed">
             <p>
-              Review is fresh and cross-family by construction: DeepSeek writes and GLM reviews, GLM writes and DeepSeek reviews. A different provider hosting the same model family is not independence, and review candidates always exclude the author’s family; Kimi or host work gets a capable different family.
+              Review is fresh and cross-family by construction: DeepSeek writes and GLM reviews, GLM writes and DeepSeek reviews. A different provider hosting the same model family is not independence, and review candidates always exclude the author’s family; Kimi work gets a capable different family. Host work gets no model review, because a reviewer that rejects it can only send it back to the host.
             </p>
             <p>
               The reviewer receives fresh read-only context — intent, criteria, standards, the actual changed files, relevant callers and check receipts — and never the author’s reasoning or proposed verdict. It may trace affected consumers beyond the diff.
@@ -143,6 +143,12 @@ export default function DocsReviewAndRecovery() {
           </div>
           <div class="mt-6 space-y-4 text-base leading-relaxed">
             <p>
+              Contract problems spend no repair cycles. When a worker changes files outside its task’s resources, <span class="font-mono text-sm text-base-content">delegate</span> returns a <span class="font-mono text-sm text-base-content">scope-question</span> instead of starting a repair. Widening the resources with <span class="font-mono text-sm text-base-content">amend</span> keeps the worker’s output and verifies it again with no new worker run; delegating again reverts the paths through a repair, which does spend a cycle. An <span class="font-mono text-sm text-base-content">amend</span> spends a cycle only when a check other than scope is failing or a blocking finding is open.
+            </p>
+            <p>
+              Host work is final. What the invoking model writes under <span class="font-mono text-sm text-base-content">host-exception</span> is accepted once its checks and scope pass, with no model review; a failing check sends it back to the host as <span class="font-mono text-sm text-base-content">host-checks-failed</span> without spending a cycle. The host re-reads its own diff against the task criteria and every reopen reason before recording the result.
+            </p>
+            <p>
               Repairs are re-reviewed over the repair delta and affected behavior, reusing conclusions only while inputs remain valid. At integration, new interactions and invalidated conclusions are reviewed rather than automatically re-running every lens.
             </p>
             <p>
@@ -190,7 +196,7 @@ export default function DocsReviewAndRecovery() {
             Use <span class="font-mono text-sm text-base-content">diagnose</span> before retrying unexplained failures. It returns current state, pending work, operation timelines, failures, unfinished operations and usage totals, and works even when initialization failed before a valid snapshot existed.
           </p>
           <p class="mt-4 text-base leading-relaxed">
-            Its <span class="font-mono text-sm text-base-content">health</span> section measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host-action ceremony and model-family distribution — and emits warnings naming anti-patterns such as coordinator micro-decisions, manual stepping through the worker→review→repair loop, or one task carrying the whole feature. <span class="font-mono text-sm text-base-content">finish</span> reads the same warnings and refuses on them.
+            Its <span class="font-mono text-sm text-base-content">health</span> section measures delegation quality — coordinator-authored decisions per task, worker-side Jev calls, delegate versus manual dispatches, host takeovers per task, host-action ceremony and model-family distribution — and emits warnings naming anti-patterns such as coordinator micro-decisions, manual stepping through the worker→review→repair loop, or one task carrying the whole feature. <span class="font-mono text-sm text-base-content">finish</span> reads the same warnings and refuses on them.
           </p>
           <p class="mt-4 text-base leading-relaxed">
             <span class="font-mono text-sm text-base-content">host-action</span> records an immutable, local host observation even before run initialization or after an API failure. Kinds are decision, worker, review, edit, check, integration, permission and other; phases are planned, permission-granted, permission-denied, started, completed, failed and skipped. A retry uses a fresh action id, and summaries must never contain credentials. <span class="font-mono text-sm text-base-content">diagnose</span> includes this ledger — the records are host attestations, not proof of tool execution.

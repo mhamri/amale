@@ -108,12 +108,14 @@ function renderHealth(value: unknown): string {
   if (v.available !== true) return report('Delegation health — unavailable', [['Reason', text(v.reason)]]);
   const metrics = record(v.metrics), warnings = Array.isArray(v.warnings) ? v.warnings.map(text) : [];
   const families = Object.entries(record(metrics.workerFamilies)).map(([family, count]) => `${family}:${text(count)}`);
+  const takeovers = Object.entries(record(metrics.hostTakeoversByTask)).map(([task, count]) => `${task}:${text(count)}`);
   const body = report(`Delegation health — ${warnings.length ? `${warnings.length} warning(s)` : 'no warnings'}`, [
     ['Tasks', text(metrics.tasks)],
     ['Coordinator decisions', `${text(metrics.coordinatorDecisions)} (${text(metrics.coordinatorDecisionsPerTask)} per task)`],
     ['Worker Jev calls', text(metrics.workerJevCalls)],
     ['Delegations', text(metrics.delegations)],
     ['Worker dispatches', text(metrics.workerDispatches)],
+    ['Host takeovers', takeovers.length ? `${text(metrics.hostTakeovers)} (${takeovers.join(', ')})` : text(metrics.hostTakeovers)],
     ['Host action records', `${text(metrics.hostActionRecords)} (${text(metrics.hostActionsPerTask)} per task)`],
     ['Revisions', `${text(metrics.revisions)} of ${text(metrics.revisionAllowance)} allowed`],
     ['Retries', text(metrics.retries)],

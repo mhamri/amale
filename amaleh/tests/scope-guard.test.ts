@@ -1,7 +1,7 @@
 import {fixtureClaim,clearCut} from './execution-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, realpath, readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -30,7 +30,7 @@ const worker=(workspace:string,steps:(()=>Promise<void>)[])=>{let call=0;return 
 };};
 const reviewer=async(store:any,id:string)=>{await c.review(store,id,{model:'z-ai/glm-flash',fingerprint:await c.fingerprint(c.taskOf(await store.load(),id).workspace!),findings:[],report:'Synthetic fixture review',coverage:await syntheticCoverage(store,id)});return {findings:[]};};
 
-test('a worker change outside the resource globs fails the scope check and drives a repair',async t=>{
+test('a worker change outside the resource globs asks the coordinator first, and delegating again reverts it through a repair',async t=>{
  const resources=['src/**'];const {workspace,store}=await scopeFixture(t,resources);
  await mkdir(join(workspace,'src'),{recursive:true});
  let call=0;const briefs:string[]=[];
@@ -42,17 +42,92 @@ test('a worker change outside the resource globs fails the scope check and drive
   await c.result(store,id,{changed:'files'});
   return {artifact:c.taskOf(await store.load(),id).output};
  };
+ const asked=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ assert.equal(asked.outcome,'escalated');
+ assert.equal(asked.stage,'scope-question');
+ assert.deepEqual(asked.outOfScope,['rogue.txt']);
+ assert.equal(call,1,'no repair worker runs before the coordinator answers');
+ assert.equal(c.taskOf(await store.load(),'a').cycles,0,'a scope question spends no repair cycle');
+ const pending=await c.next(store);
+ assert.equal(pending.action,'scope-question');
+ assert.deepEqual((pending as any).outOfScope,['rogue.txt']);
  const out=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'accepted');
  const state=await store.load(),task=c.taskOf(state,'a');
- assert.equal(task.cycles,1,'the scope failure must consume a repair cycle');
+ assert.equal(task.cycles,1,'delegating again without widening the resources is a revert, and the revert is a repair');
  const violations=state.events.filter(e=>e.type==='check'&&(e.detail as any).checkId===scopeCheckId&&(e.detail as any).code!==0);
  assert.equal(violations.length,1,'exactly one failing scope receipt is recorded');
  const artifact=JSON.parse(await store.readArtifact((violations[0]!.detail as any).artifact));
  assert.match(artifact.stdout,/rogue\.txt/,'the scope receipt output names the out-of-scope path');
  assert.equal(task.receipts.find(r=>r.id===scopeCheckId)!.code,0,'the scope check re-runs after the repair and passes once the path is reverted');
- assert.equal(out.trail.filter(x=>x.stage==='scope').length,2,'the scope check re-runs after every repair like the registered checks');
+ const stages=out.trail.map(x=>x.stage);
+ assert.ok(stages.indexOf('scope',stages.indexOf('repair-worker'))>0,'the scope check re-runs after every repair like the registered checks');
  assert.match(briefs[1],/rogue\.txt/,'the repair brief names the out-of-scope path');
+});
+
+test('widening the resources after a scope question re-verifies the same output with no new worker run and no repair cycle',async t=>{
+ const contract={id:'a',title:'a',goal:'Write the source the task owns',phase:'one',deps:[],resources:['src/**'],criteria:['source updated'],kind:'code' as const,noProbe:'Synthetic fixture: the scope verdict, not a check, is under test',checks:[{id:'test',command:process.execPath,args:['-e','process.exit(0)'],role:'guard' as const}]};
+ const {workspace,store}=await scopeFixture(t,contract.resources);
+ let workers=0;
+ const inner=async(store:any,id:string,input:any)=>{
+  workers++;
+  await mkdir(join(workspace,'src'),{recursive:true});await mkdir(join(workspace,'docs'),{recursive:true});
+  await writeFile(join(workspace,'src','in.ts'),'in scope');await writeFile(join(workspace,'docs','note.md'),'belongs to the task');
+  await fixtureClaim(store,id,{workspace:input.workspace??workspace,model:'deepseek/flash'});
+  await c.result(store,id,{changed:'files'});
+  return {artifact:c.taskOf(await store.load(),id).output};
+ };
+ const asked=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ assert.equal(asked.stage,'scope-question');
+ assert.deepEqual(asked.outOfScope,['docs/note.md']);
+ const output=c.taskOf(await store.load(),'a').output;
+ await c.amend(store,{id:'a',reason:'The note documents this task, so the task owns docs/',task:{...contract,resources:['src/**','docs/**']}});
+ const amended=c.taskOf(await store.load(),'a');
+ assert.equal(amended.status,'review','the finished output waits for verification again');
+ assert.equal(amended.output,output);
+ assert.equal(amended.cycles,0);
+ const out=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ assert.equal(out.outcome,'accepted');
+ assert.equal(workers,1,'the kept output is verified, not rebuilt');
+ assert.equal(c.taskOf(await store.load(),'a').cycles,0);
+});
+
+test('a path already asked about is not asked again: a repair that keeps it is a failed repair, and only a new path is a new question',{timeout:30000},async t=>{
+ const {workspace,store}=await scopeFixture(t,['src/**']);
+ await mkdir(join(workspace,'src'),{recursive:true});
+ let call=0;
+ const inner=async(store:any,id:string,input:any)=>{
+  call++;
+  await writeFile(join(workspace,'src','in.ts'),'attempt '+call);
+  await writeFile(join(workspace,'rogue.txt'),'still out of scope');
+  if(call===3)await writeFile(join(workspace,'second.txt'),'a new out-of-scope path');
+  const depth=c.taskOf(await store.load(),id).depth;
+  await fixtureClaim(store,id,{workspace:input.workspace??workspace,model:depth==='deep'?'moonshot/kimi':'deepseek/flash'});
+  await c.result(store,id,{changed:'files'});
+  return {artifact:c.taskOf(await store.load(),id).output};
+ };
+ const first=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ assert.equal(first.stage,'scope-question');
+ const second=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ assert.equal(second.stage,'scope-question','the third run adds second.txt, which nobody was asked about');
+ assert.deepEqual(second.outOfScope,['rogue.txt','second.txt']);
+ assert.equal(call,3);
+ const state=await store.load();
+ assert.equal(c.taskOf(state,'a').cycles,2,'the two repairs that kept rogue.txt each spent a cycle');
+ assert.equal(state.events.filter(e=>e.type==='scope-question').length,2);
+});
+
+test('the scope question is saved in the same state revision as the failing scope receipt',async t=>{
+ const {workspace,store}=await scopeFixture(t,['src/**']);
+ const inner=worker(workspace,[async()=>{await writeFile(join(workspace,'rogue.txt'),'out of scope');}]);
+ await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
+ const names=(await readdir(store.root)).filter(n=>/^revision-\d{9}\.json$/.test(n)).sort();
+ for(const name of names){
+  const state=JSON.parse(await readFile(join(store.root,name),'utf8')) as c.Run;
+  const failing=state.tasks.some(task=>task.receipts.some(r=>r.id===scopeCheckId&&r.code!==0));
+  if(failing){assert.ok(state.events.some(e=>e.type==='scope-question'),`${name} holds a failing scope receipt without its question`);return;}
+ }
+ assert.fail('no revision recorded the failing scope receipt');
 });
 
 test('a worker change fully inside the resource globs passes the scope check and reaches review unchanged',async t=>{
@@ -100,8 +175,10 @@ test('untracked files are scope-checked like tracked changes, and an exact-path 
   return {artifact:c.taskOf(await store.load(),id).output};};
  const out=await delegate(store,'a',{workspace},{runWorker:inner as any,runReviewer:reviewer as any,fetcher:jevTargeted});
  assert.equal(out.outcome,'escalated','untracked out-of-scope files fail the scope check like tracked changes');
+ assert.equal(out.stage,'scope-question');
+ assert.deepEqual(out.outOfScope,['src/stray.ts']);
  const state=await store.load(),task=c.taskOf(state,'a');
- assert.ok(task.cycles>0);
+ assert.equal(task.cycles,0);
  const artifact=JSON.parse(await store.readArtifact(task.receipts.find(r=>r.id===scopeCheckId)!.artifact));
  assert.match(artifact.stdout,/src\/stray\.ts/);
  assert.ok(!artifact.stdout.includes('src/keep.ts'),'in-scope paths are not listed as violations');

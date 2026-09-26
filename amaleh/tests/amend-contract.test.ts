@@ -28,11 +28,27 @@ async function delivered(t:any){
 }
 const reopened=async(store:c.Store)=>{const health=await processHealth(store);assert.ok(health.available);return health.metrics.reopenedChunks;};
 
-test('an amend that only changes the contract is not counted as a defect reopen',async t=>{
+test('an amend that only changes the contract is not counted as a defect reopen and spends no repair cycle',async t=>{
  const store=await delivered(t);
  await c.amend(store,{id:'a',reason:'The scope rules changed; the delivered work had no defect',task:task('a',['app.txt'])});
  assert.equal(await reopened(store),0);
- assert.equal(c.taskOf(await store.load(),'a').status,'ready','the amended contract still sends the task back for work');
+ const amended=c.taskOf(await store.load(),'a');
+ assert.equal(amended.status,'ready','the amended contract still sends the task back for work');
+ assert.equal(amended.cycles,0);
+});
+
+test('an amend while a registered check fails spends one repair cycle, because the next worker run is a repair',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'amaleh-amend-failing-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const store=await c.start(dir,{shape:clearCut,id:'failing',host:{kind:'codex',model:'gpt-6-astra'},intent:'Charge only real repairs',criteria:['a repair attempt spends a cycle']});
+ const failing={...task('a'),checks:[{id:'test',command:process.execPath,args:['-e','process.exit(1)'],role:'guard' as const}]};
+ await c.plan(store,{tasks:[failing],integrationChecks:[]});
+ await fixtureClaim(store,'a',{workspace:dir,model:'deepseek/flash'});
+ await c.result(store,'a',{changed:'app.txt'});
+ await c.check(store,'a','test');
+ await c.amend(store,{id:'a',reason:'The goal was stated wrongly',task:{...failing,goal:'Apply the corrected rule'}});
+ const amended=c.taskOf(await store.load(),'a');
+ assert.equal(amended.cycles,1);
+ assert.equal(amended.status,'ready');
 });
 
 test('an invalidate that reports a defect is still counted',async t=>{
