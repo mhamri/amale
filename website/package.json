@@ -10,6 +10,7 @@
     "build:all": "node scripts/build.mjs",
     "check": "tsc --noEmit",
     "test:static": "node scripts/check-static.mjs",
+    "test:seo": "node scripts/check-seo.mjs",
     "test:rendered": "node scripts/check-rendered.mjs",
     "preview": "node scripts/preview.mjs"
   },
@@ -29,6 +30,7 @@
     "@types/node": "26.6.2",
     "daisyui": "5.7.42",
     "nitro": "3.0.260903-beta",
+    "schema-dts": "2.0.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.0"

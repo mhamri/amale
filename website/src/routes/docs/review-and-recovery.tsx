@@ -3,6 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import ReviewLoop from '../../components/diagrams/ReviewLoop';
 import { asset } from '../../lib/paths';
+import { articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'independent-review', label: 'Independent cross-family review' },
@@ -29,15 +30,21 @@ const coverageStatuses = [
 ];
 
 export default function DocsReviewAndRecovery() {
+  const crumb = { name: 'Review and recovery', path: 'docs/review-and-recovery/' };
+  const title = 'Review and recovery — Amaleh documentation';
+  const description =
+    'Cross-family independent review with structured coverage, the Flash to Kimi to host repair escalation, durable resume, and the diagnose, host-action and diagnostic-export operations.';
   return (
     <>
       <PageMeta
-        title="Review and recovery — Amaleh documentation"
-        description="Cross-family independent review with structured coverage, the Flash to Kimi to host repair escalation, durable resume, and the diagnose, host-action and diagnostic-export operations."
+        path={crumb.path}
+        title={title}
+        description={description}
+        structuredData={articleGraph({ crumb, headline: title, description })}
       />
       <DocsLayout
         current="review-and-recovery"
-        title="Review and recovery"
+        title={crumb.name}
         lead="What keeps a delegated run honest: a reviewer from a different model family with structured coverage, bounded repair escalation, and state that survives a cleared chat, an exhausted provider or a compacted host."
         sections={sections}
       >

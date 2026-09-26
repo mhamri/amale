@@ -3,6 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import InstallSequence from '../../components/diagrams/InstallSequence';
 import { asset } from '../../lib/paths';
+import { articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'prerequisites', label: 'Prerequisites' },
@@ -32,15 +33,21 @@ const firstRun = [
 ];
 
 export default function DocsGettingStarted() {
+  const crumb = { name: 'Getting started', path: 'docs/getting-started/' };
+  const title = 'Getting started — Amaleh documentation';
+  const description =
+    'Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run.';
   return (
     <>
       <PageMeta
-        title="Getting started — Amaleh documentation"
-        description="Prerequisites, installation, OpenRouter and pi credentials, and the commands for a first Amaleh run."
+        path={crumb.path}
+        title={title}
+        description={description}
+        structuredData={articleGraph({ crumb, headline: title, description })}
       />
       <DocsLayout
         current="getting-started"
-        title="Getting started"
+        title={crumb.name}
         lead="From a stable checkout to a first delegated run: what the machine needs, how the skill is installed, where credentials live, and the operations that start and resume a run."
         sections={sections}
       >

@@ -47,6 +47,7 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npm run test:static
+      - run: npm run test:seo
       - name: Upload rendered site
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5.0.0

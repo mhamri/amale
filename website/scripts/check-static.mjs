@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BRAND_IMAGES, BRAND_MASTER_SOURCE_PATH } from '../src/lib/brand.ts';
 import { consentRegions } from '../src/lib/consent.ts';
+import { REPOSITORY_URL, SPONSOR_URL } from '../src/lib/links.ts';
 import { gtmNoscriptIframe, trackingHeadScripts } from '../src/lib/tracking.ts';
 
 const publicDir = fileURLToPath(new URL('../.output/public/', import.meta.url));
@@ -821,6 +823,189 @@ async function checkOutputSanity() {
   }
 }
 
+const MASTER_FILE = fileURLToPath(new URL(`../${BRAND_MASTER_SOURCE_PATH}`, import.meta.url));
+const MASTER_NAME = basename(MASTER_FILE);
+const BRAND_LIMITS = new Map(BRAND_IMAGES.map((image) => [image.publicPath, image.maxBytes]));
+
+function referencedUrls(html) {
+  const urls = [];
+  for (const m of html.matchAll(/\b(?:src|href)="([^"]+)"/g)) urls.push(m[1]);
+  for (const m of html.matchAll(/\bsrcset="([^"]+)"/g)) {
+    for (const candidate of m[1].split(',')) {
+      const url = candidate.trim().split(/\s+/)[0];
+      if (url) urls.push(url);
+    }
+  }
+  return urls;
+}
+
+function brandTarget(url, base) {
+  if (/^(https?:|mailto:|data:|tel:|javascript:)/i.test(url) || url.startsWith('#')) return null;
+  let path = decodeURIComponent(url.split(/[?#]/)[0]);
+  if (path.startsWith(base)) path = path.slice(base.length);
+  path = path.replace(/^\/+/, '');
+  const target = resolve(publicDir, path);
+  if (!target.startsWith(publicDir)) return null;
+  const rel = target.slice(publicDir.length).replaceAll('\\', '/');
+  return rel.startsWith('brand/') ? { target, rel } : null;
+}
+
+/*
+ * The master logo is a repository file, not a site asset: only the resized
+ * copies in public/brand/ may ship, and each of those is capped so no route
+ * pulls a megabyte of logo into the critical path. The master is caught by
+ * its name and by its exact byte length, so moving it under another name
+ * still fails.
+ */
+async function checkBrandAssets() {
+  const offenders = [];
+  const masterBytes = (await stat(MASTER_FILE)).size;
+  for (const file of await htmlFilesUnder(publicDir)) {
+    const where = file.slice(publicDir.length);
+    const html = await readFile(file, 'utf8');
+    if (html.includes('mark.svg')) offenders.push(`${where} references mark.svg, which is deleted`);
+    for (const url of referencedUrls(html)) {
+      if (url.includes(MASTER_NAME)) offenders.push(`${where} references the master logo ${url}`);
+      const brand = brandTarget(url, base);
+      if (!brand) continue;
+      const limit = BRAND_LIMITS.get(brand.rel);
+      if (limit === undefined) {
+        offenders.push(`${where}: ${url} is not a brand image registered in src/lib/brand.ts`);
+        continue;
+      }
+      let info = null;
+      try { info = await stat(brand.target); } catch { info = null; }
+      if (!info) offenders.push(`${where}: brand image ${url} is missing from the build output`);
+      else if (info.size > limit) {
+        offenders.push(`${where}: brand image ${url} is ${info.size} bytes, over its ${limit} byte limit`);
+      }
+    }
+  }
+  for (const entry of await readdir(publicDir, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile()) continue;
+    const file = resolve(entry.parentPath, entry.name);
+    const where = file.slice(publicDir.length);
+    if (entry.name === 'mark.svg') offenders.push(`the build ships mark.svg at ${where}`);
+    if (entry.name === MASTER_NAME) offenders.push(`the build ships the master logo at ${where}`);
+    if ((await stat(file)).size === masterBytes) offenders.push(`the build ships the master logo (${masterBytes} bytes) at ${where}`);
+  }
+  assert.equal(offenders.length, 0,
+    `Brand asset verification failed with ${offenders.length} problem(s):\n  - ${offenders.join('\n  - ')}`);
+}
+
+// See website/DESIGN-SYSTEM.md — the Sponsor and Star button patterns.
+const HEART_FILL = '#db61a2';
+
+function anchorBlocks(html) {
+  const blocks = [];
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const href = /\bhref="([^"]*)"/i.exec(m[1])?.[1];
+    if (href !== undefined) blocks.push({ attributes: m[1], inner: m[2], href });
+  }
+  return blocks;
+}
+
+function anchorText(inner) {
+  return inner.replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ').replace(/<[^>]+>/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function iconBeforeLabel(inner, label) {
+  const svgAt = inner.search(/<svg\b/i);
+  const labelAt = inner.search(new RegExp(`>[^<]*${label}`, 'i'));
+  return svgAt >= 0 && labelAt > svgAt && /<svg\b[^>]*aria-hidden="true"/i.test(inner);
+}
+
+function svgBlock(inner) {
+  return /<svg\b[^>]*>[\s\S]*?<\/svg>/i.exec(inner)?.[0] ?? '';
+}
+
+function sameURL(a, b) {
+  return a.replace(/\/$/, '') === b.replace(/\/$/, '');
+}
+
+function isExternal(attributes) {
+  return /target="_blank"/i.test(attributes) && /rel="noopener noreferrer"/i.test(attributes);
+}
+
+async function checkButtons() {
+  const offenders = [];
+  const vars = extractCSSVariables(await readCSS());
+  const heartRatio = contrastRatio(HEART_FILL, vars['color-base-100']);
+  assert.ok(heartRatio >= 3,
+    `The Sponsor heart ${HEART_FILL} on base-100 ${vars['color-base-100']} is ${heartRatio.toFixed(2)}:1, below the 3:1 non-text floor`);
+  const design = await readDesign();
+  if (!design.toLowerCase().includes(HEART_FILL)) {
+    offenders.push(`DESIGN-SYSTEM.md does not record the Sponsor heart colour ${HEART_FILL}`);
+  }
+  if (!design.includes(`${heartRatio.toFixed(2)}:1`)) {
+    offenders.push(`DESIGN-SYSTEM.md does not record the measured heart contrast ${heartRatio.toFixed(2)}:1 on base-100`);
+  }
+
+  const srcDir = fileURLToPath(new URL('../src/', import.meta.url));
+  for (const entry of await readdir(srcDir, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile() || !/\.(?:ts|tsx)$/.test(entry.name)) continue;
+    const file = resolve(entry.parentPath, entry.name);
+    const where = file.slice(srcDir.length).replaceAll('\\', '/');
+    const source = await readFile(file, 'utf8');
+    if (where !== 'lib/links.ts' && source.includes('github.com/sponsors')) {
+      offenders.push(`${where} writes the sponsor URL itself; it comes from SPONSOR_URL in src/lib/links.ts`);
+    }
+    if (source.includes('SPONSOR_URL') && where !== 'lib/links.ts' && where !== 'components/ProjectActions.tsx') {
+      offenders.push(`${where} uses SPONSOR_URL; only src/components/ProjectActions.tsx may render the Sponsor button`);
+    }
+  }
+
+  const prerendered = (await htmlFilesUnder(publicDir)).filter((file) => file.endsWith('index.html'));
+  for (const file of prerendered) {
+    const where = file.slice(publicDir.length).replaceAll('\\', '/');
+    const html = await readFile(file, 'utf8');
+
+    for (const anchor of anchorBlocks(html)) {
+      if (!sameURL(anchor.href, SPONSOR_URL)) continue;
+      if (!iconBeforeLabel(anchor.inner, 'Sponsor')) {
+        offenders.push(`${where}: a Sponsor button has no heart icon before its label`);
+      } else if (!svgBlock(anchor.inner).toLowerCase().includes(HEART_FILL)) {
+        offenders.push(`${where}: the Sponsor heart is not filled ${HEART_FILL}`);
+      }
+      if (!isExternal(anchor.attributes)) offenders.push(`${where}: the Sponsor button is not an external link`);
+    }
+
+    const header = /<header\b[\s\S]*?<\/header>/i.exec(html)?.[0] ?? '';
+    const headerAnchors = anchorBlocks(header);
+    const stars = headerAnchors.filter((a) => sameURL(a.href, REPOSITORY_URL) && /star/i.test(anchorText(a.inner)));
+    if (!stars.some((a) => isExternal(a.attributes) && iconBeforeLabel(a.inner, 'Star') && /currentColor/i.test(svgBlock(a.inner)))) {
+      offenders.push(`${where}: the header has no external Star on GitHub button with a star icon before its label`);
+    }
+    const plainGitHub = headerAnchors.filter((a) => sameURL(a.href, REPOSITORY_URL) && /^github$/i.test(anchorText(a.inner)));
+    if (plainGitHub.length) {
+      offenders.push(`${where}: the header still carries a plain "GitHub" link; it must read Star on GitHub`);
+    }
+  }
+
+  const home = await readPage('index.html');
+  const main = /<main\b[\s\S]*<\/main>/i.exec(home)?.[0] ?? '';
+  const hero = /<section\b[\s\S]*?<\/section>/i.exec(main)?.[0] ?? '';
+  const heroButtons = [...hero.matchAll(/<a\b[^>]*class="[^"]*\bbtn\b[^"]*"/gi)].length;
+  if (heroButtons !== 2) {
+    offenders.push(`the hero carries ${heroButtons} buttons; the hero rule allows exactly Get started and Sponsor`);
+  }
+  if (anchorBlocks(hero).some((a) => sameURL(a.href, REPOSITORY_URL))) {
+    offenders.push('the hero carries a repository link; the hero rule allows only Get started and Sponsor');
+  }
+  const finalCall = /<section\b[^>]*id="final-cta"[\s\S]*?<\/section>/i.exec(home)?.[0] ?? '';
+  const finalAnchors = anchorBlocks(finalCall);
+  if (!finalAnchors.some((a) => sameURL(a.href, SPONSOR_URL))) {
+    offenders.push('the final call to action lost its Sponsor button');
+  }
+  if (!finalAnchors.some((a) => sameURL(a.href, REPOSITORY_URL) && /star/i.test(anchorText(a.inner))
+    && isExternal(a.attributes) && iconBeforeLabel(a.inner, 'Star'))) {
+    offenders.push('the final call to action has no external Star on GitHub button with a star icon before its label');
+  }
+
+  assert.equal(offenders.length, 0,
+    `Button verification failed with ${offenders.length} problem(s):\n  - ${offenders.join('\n  - ')}`);
+}
+
 async function checkContrast() {
   const css = await readCSS();
   const vars = extractCSSVariables(css);
@@ -877,6 +1062,8 @@ const pages = await Promise.all(routes.map(async route => ({
 
 await Promise.all(routes.map(route => attempt(() => checkPage(route))));
 await attempt(checkOutputSanity);
+await attempt(checkBrandAssets);
+await attempt(checkButtons);
 await attempt(checkConsentRegions);
 for (const file of await htmlFilesUnder(publicDir)) {
   await attempt(async () => assertTracking(await readFile(file, 'utf8'), file.slice(publicDir.length)));
@@ -899,4 +1086,4 @@ for (const route of pages) {
 assert.equal(failures.length, 0,
   `Static verification failed with ${failures.length} problem(s):\n  - ${failures.join('\n  - ')}`);
 
-console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, a hue-coded hairline edge on every soft chip, no colourless chip on a card surface, no monospace chip naming something a reader cannot type, no unpinned heading-and-chip row, no prose card grid past two columns, every container at max-w-7xl and a diagram figure on every documentation route.`);
+console.log(`Static verification passed: ${routes.length} fully rendered routes (${routes.map(r => r.label).join(', ')}); headings, titles, brand, metadata, unique ids, contained links and assets, resolvable targets and anchors, .nojekyll, no private/build files, no mark.svg or master logo in the build and every brand image inside its size limit, Sponsor hearts and Star on GitHub buttons per DESIGN-SYSTEM.md, WCAG AA text contrast at Pages base ${base}, night-ledger tokens declared, soft badges ${softRatios.join(', ')}, a hue-coded hairline edge on every soft chip, no colourless chip on a card surface, no monospace chip naming something a reader cannot type, no unpinned heading-and-chip row, no prose card grid past two columns, every container at max-w-7xl and a diagram figure on every documentation route.`);

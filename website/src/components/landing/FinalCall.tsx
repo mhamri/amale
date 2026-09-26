@@ -1,6 +1,7 @@
 import { asset } from '../../lib/paths';
-import { REPOSITORY_URL, SPONSOR_URL } from '../../lib/links';
+import { REPOSITORY_URL } from '../../lib/links';
 import { Drifter, Glow, LightRays } from '../decor';
+import { SponsorButton, StarButton } from '../ProjectActions';
 
 export default function FinalCall() {
   return (
@@ -26,14 +27,8 @@ export default function FinalCall() {
           <a class="btn btn-primary font-semibold rounded-field" href={asset('docs/getting-started/')}>
             Get started
           </a>
-          <a
-            class="btn btn-outline border-line text-base-content hover:bg-base-200 rounded-field"
-            href={SPONSOR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Sponsor
-          </a>
+          <SponsorButton />
+          <StarButton />
         </div>
         <figure class="mt-8 overflow-hidden rounded-box border border-line bg-base-200 shadow-rest">
           <div class="flex items-center justify-between border-b border-line px-4 py-2.5 font-mono text-xs text-dim">

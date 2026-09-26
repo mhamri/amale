@@ -3,6 +3,7 @@ import { asset } from '../lib/paths';
 import { inConsentTimeZone } from '../lib/consent';
 import { setConsentBannerOpen } from './ConsentBanner';
 import { Glow, GridDots } from './decor';
+import Brand from './Brand';
 
 const siteLinks = [
   { label: 'Overview', href: asset('') },
@@ -29,10 +30,7 @@ export default function Footer() {
       <div class="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
         <div class="footer gap-10 sm:footer-horizontal">
           <aside class="max-w-sm">
-            <a href={asset('')} class="flex items-center gap-2.5 rounded-field" aria-label="Amaleh home">
-              <img src={asset('mark.svg')} width="30" height="30" alt="" class="size-[30px]" />
-              <span class="font-display text-xl font-semibold tracking-tight">amaleh</span>
-            </a>
+            <Brand />
             <p class="mt-3 text-sm leading-relaxed text-dim">
               A coding workflow for Codex and Claude that plans, builds, reviews and verifies — and
               picks up exactly where it left off.
