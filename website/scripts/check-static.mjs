@@ -893,13 +893,7 @@ async function checkBrandAssets() {
     `Brand asset verification failed with ${offenders.length} problem(s):\n  - ${offenders.join('\n  - ')}`);
 }
 
-/*
- * The Sponsor and Star buttons live once in src/components/ProjectActions.tsx
- * and take their hrefs from src/lib/links.ts, so the built markup is where the
- * rule is checked: a Sponsor link without its pink heart, a header without an
- * external Star on GitHub button, or a plain "GitHub" link back in the header
- * each fail here rather than ship quietly.
- */
+// See website/DESIGN-SYSTEM.md — the Sponsor and Star button patterns.
 const HEART_FILL = '#db61a2';
 
 function anchorBlocks(html) {
