@@ -32,7 +32,7 @@ const samples: Record<string, unknown> = {
     available: true,
     metrics: {
       tasks: 2, coordinatorDecisions: 1, coordinatorDecisionsPerTask: 0.5, workerJevCalls: 3,
-      delegations: 2, workerDispatches: 2, hostActionRecords: 3, hostActionsPerTask: 1.5,
+      delegations: 2, workerDispatches: 2, hostTakeovers: 3, hostTakeoversByTask: { seo: 3 }, hostActionRecords: 3, hostActionsPerTask: 1.5,
       revisions: 12, revisionAllowance: 40, retries: 1, workerFamilies: { deepseek: 1, zai: 1 },
     },
     warnings: [],
@@ -76,6 +76,10 @@ test('a person at a terminal gets a headline and aligned rows for every listed o
     assert.ok(columns.length > 0, `${operation} needs detail rows`);
     assert.equal(new Set(columns).size, 1, `${operation} rows are not aligned: ${JSON.stringify(columns)}`);
   }
+});
+
+test('health names how often the host took a task over, per task', () => {
+  assert.match(renderHuman('health', samples.health), /Host takeovers +3 \(seo:3\)/);
 });
 
 test('an operation without a renderer pretty-prints the same JSON detail', () => {

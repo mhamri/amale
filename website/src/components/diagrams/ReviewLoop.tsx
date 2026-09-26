@@ -200,7 +200,7 @@ export default function ReviewLoop() {
         <svg
           viewBox="0 0 288 216"
           role="img"
-          aria-label="Review and repair loop: worker, checks, independent cross-family review, accept, repair escalation from flash to Kimi to host takeover, checkpoint on disk, resume"
+          aria-label="Review and repair loop: worker, checks, independent cross-family review, accept, repair escalation from flash to Kimi to a final host takeover accepted on its checks, checkpoint on disk, resume"
           class="size-full sm:hidden"
           preserveAspectRatio="xMidYMid meet"
         >
@@ -230,7 +230,7 @@ export default function ReviewLoop() {
           </Box>
           <Box x={152} y={116} w={128} h={42} step={5} tone="primary">
             <T x={162} y={140} s={11} f="fill-base-content" b>host</T>
-            <T x={162} y={151} s={8}>takes over</T>
+            <T x={162} y={151} s={8}>final · checks only</T>
           </Box>
           <Box x={152} y={170} w={128} h={36} step={7} tone="accent">
             <T x={162} y={190} s={10.5} f="fill-accent" b>resume</T>
@@ -249,14 +249,17 @@ export default function ReviewLoop() {
           <Head points="216,62 212,55 220,55" />
           <Flow d="M 216 104 V 112" />
           <Head points="216,116 212,109 220,109" />
-          <Flow d="M 280 137 H 284 V 212 H 4 V 29 H 6" />
+          <Flow d="M 280 29 H 284 V 83" />
+          <Flow d="M 280 83 H 284 V 212 H 4 V 29 H 6" />
           <Head points="8,29 2,25 2,33" />
+          <Flow d="M 152 150 H 146 V 188 H 140" tone="secondary" />
+          <Head points="136,188 142,184 142,192" tone="secondary" />
         </svg>
 
         <svg
           viewBox="0 0 800 450"
           role="img"
-          aria-label="Review and repair loop: worker checks and an independent reviewer from a different model family gate acceptance; blocking findings escalate repair from flash to Kimi to the host; a checkpointed run resumes from disk"
+          aria-label="Review and repair loop: worker checks and an independent reviewer from a different model family gate acceptance; blocking findings escalate repair from flash to Kimi, whose repairs rerun the worker, and then to the host, whose fix is final and accepted on its checks; a checkpointed run resumes from disk"
           class="hidden size-full sm:block"
           preserveAspectRatio="xMidYMid meet"
         >
@@ -290,7 +293,7 @@ export default function ReviewLoop() {
           </Box>
           <Box x={660} y={368} w={120} h={56} step={5} tone="primary">
             <T x={672} y={394} s={11.5} f="fill-base-content" b mono>host takeover</T>
-            <T x={672} y={412} s={9.5}>takes over</T>
+            <T x={672} y={412} s={9.5}>final · checks only</T>
           </Box>
           <Box x={240} y={300} w={180} h={96} step={7} tone="dim">
             <T x={254} y={346} s={12} f="fill-base-content" b mono>.amaleh run state</T>
@@ -316,9 +319,12 @@ export default function ReviewLoop() {
           <Head points="720,284 716,277 724,277" />
           <Flow d="M 720 340 V 362" />
           <Head points="720,368 716,361 724,361" />
-          <Flow d="M 720 424 V 438 H 8 V 88 H 12" />
+          <Flow d="M 660 246 H 440 V 312" />
+          <Flow d="M 660 312 H 440 V 438 H 8 V 88 H 12" />
           <Head points="18,88 11,84 11,92" />
-          <T x={400} y={432} s={10} mid>changed strategy — the worker reruns</T>
+          <T x={300} y={432} s={10} mid>flash and Kimi repairs rerun the worker</T>
+          <Flow d="M 780 396 H 792 V 88 H 786" tone="secondary" />
+          <Head points="780,88 788,84 788,92" tone="secondary" />
           <Flow d="M 240 348 H 174" tone="accent" />
           <Head points="168,348 176,344 176,352" tone="accent" />
           <T x={204} y={338} s={9} mid>invoke again</T>
@@ -329,7 +335,8 @@ export default function ReviewLoop() {
       <figcaption class="border-t border-line px-4 py-3 text-sm text-dim">
         The review and repair loop: the worker's checks and an independent reviewer from a different
         model family gate acceptance; blocking findings escalate repair through flash, then Kimi,
-        then the host, and the checkpointed run resumes from disk on the next invocation.
+        then the host, whose fix is final and accepted on its checks alone, and the checkpointed run
+        resumes from disk on the next invocation.
       </figcaption>
     </figure>
   );

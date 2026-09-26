@@ -46,6 +46,9 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  const workerJev=s.events.filter(e=>e.type==='worker-jev');
  const delegations=s.events.filter(e=>e.type==='delegate-started');
  const claims=s.events.filter(e=>e.type==='claimed');
+ const hostTakeovers=s.events.filter(e=>e.type==='host-exception-used');
+ const hostTakeoversByTask:Record<string,number>={};
+ for(const e of hostTakeovers){const task=String((e.detail as {id?:string}).id);hostTakeoversByTask[task]=(hostTakeoversByTask[task]??0)+1;}
  const families:Record<string,number>={};
  for(const e of claims){const model=(e.detail as any)?.model;if(typeof model==='string'){const f=model.split('/')[0];families[f]=(families[f]??0)+1;}}
  const dominant=Object.entries(families).sort((a,b)=>b[1]-a[1])[0];
@@ -73,7 +76,7 @@ export async function processHealth(store:Store):Promise<{available:false;reason
  if(tasks===1&&s.criteria.length>=3&&!s.events.some(e=>e.type==='single-chunk'))warnings.push(`One task carries ${s.criteria.length} run outcomes: nothing can run in parallel. Split the work into independent chunks, or record a single-chunk reason.`);
  if(deepShare>deepSpendShareLimit&&estimatedTotal>=1)warnings.push(`${deepSpend.map(r=>r.key).join(', ')} took ${Math.round(deepShare*100)}% of the $${estimatedTotal.toFixed(2)} estimated spend across ${deepSpend.reduce((n,r)=>n+r.calls,0)} call(s). Deep repairs come from repeated reopens and failed repairs: find the check each chunk is missing instead of paying the deep model to guess.`);
  const slowNotes=slow.map(m=>`${m.model} as ${m.role} averages ${m.averageMinutes} min per call over ${m.calls} calls, ${m.times}× the ${m.medianMinutes} min median for that role: ${m.outputTokensPerSecond} output tokens per second and ${m.outputTokensPerCall} output tokens per call.${skipNote(m.role)}`);
- return {available:true,slowModels:slowNotes,metrics:{modelSpeed:speeds,tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,manualLoopSteps:manualSteps,reopenedChunks:reopened,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals,spend:costs},warnings};
+ return {available:true,slowModels:slowNotes,metrics:{modelSpeed:speeds,tasks,coordinatorDecisions:coordinatorDecisions.length,hostDecisions:hostDecisions.length,workerJevCalls:workerJev.length,delegations:delegations.length,workerDispatches:claims.length,manualLoopSteps:manualSteps,reopenedChunks:reopened,hostTakeovers:hostTakeovers.length,hostTakeoversByTask,hostActionRecords:ledger.records.length,revisions:s.revision,revisionAllowance,retries,coordinatorDecisionsPerTask:perTask(coordinatorDecisions.length),hostActionsPerTask:perTask(ledger.records.length),revisionsPerTask:perTask(s.revision),workerFamilies:families,cost:runtime.totals,spend:costs},warnings};
 }
 // Shareable by explicit user choice: omit all free text, paths, models, raw
 // identifiers, prompts, artifact bodies and original exception messages.

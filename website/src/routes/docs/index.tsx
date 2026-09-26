@@ -42,7 +42,7 @@ const roles = [
 const escalation = [
   ['Flash repair', 'The routed worker', 'Default repair of review findings, inside the chunk’s own loop.'],
   ['Kimi repair', 'A deeper specialist model', 'Justified deeper work once the Flash repair allowance is exhausted.'],
-  ['Host', 'The coordinator', 'Justified escalated diagnosis, missing evidence and genuine external blockers.'],
+  ['Host', 'The coordinator', 'Justified escalated diagnosis, missing evidence and genuine external blockers. The last step: host work is accepted on its checks, with no model review.'],
 ];
 
 export default function DocsOverview() {

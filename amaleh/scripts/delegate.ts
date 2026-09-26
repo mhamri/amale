@@ -4,7 +4,7 @@
 // Workers consult Jev directly through scripts/jev.ts; the loop itself only
 // spends one bounded Jev call per repair cycle for course correction.
 import { hostname } from 'node:os';
-import { Store, taskOf, invariant, check, repair, accept, fingerprint, family, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, type Check, type Task } from './core.ts';
+import { Store, taskOf, invariant, check, repair, accept, fingerprint, family, scopeCheckId, event, reviewCoverageDebt, openDelegations, next, requireShaped, execute, hostAuthored, scopeQuestion, askedScopePaths, answerScopeQuestion, type Check, type Task } from './core.ts';
 import { worker, reviewer, requestJson, choiceAnswer, transientProvider, settledProviderFailure, taskDiff, WorkspaceEscape } from './adapters.ts';
 import type { RoutingRequest } from './routing.ts';
 import { jevModel, loadModelConfig } from './config.ts';
@@ -14,7 +14,9 @@ export type DelegateDeps = { runWorker:typeof worker; runReviewer:typeof reviewe
 export type DelegateOutcome = { task:string; trail:Trail; outcome:string; [key:string]:unknown };
 const real:DelegateDeps = { runWorker:worker, runReviewer:reviewer, runCheck:check };
 type Trail = { stage:string; detail:unknown }[];
-const routePending = (r:unknown) => r && typeof r==='object' && 'action' in r && (r as any).action!=='launch' ? r as {action:string} : undefined;
+const routePending = (r:unknown) => r && typeof r==='object' && 'action' in r && (r as any).action!=='launch' ? r as {action:string;model?:string} : undefined;
+const hostTakeover=(model:string)=>({outcome:'escalated',stage:'host-takeover',model,reason:'The task is at host depth: take it over under host-exception. Host work is final, so the next delegate runs its checks and accepts it with no model review'});
+const pendingOutcome=(pending:{action:string;model?:string})=>pending.action==='host-takeover'?hostTakeover(pending.model!):{outcome:'route-pending',route:pending};
 const resumableReview=(t:Task)=>t.status==='review'&&!!t.output&&!t.activity&&!t.owner;
 const escapedPaths=(error:unknown)=>error instanceof WorkspaceEscape?error.paths:undefined;
 
@@ -72,7 +74,12 @@ export async function scopeVerdict(store:Store,id:string,fingerprint:string,main
 async function recordScope(store:Store,id:string,verdict:ScopeVerdict){
  const stdout=verdict.outOfScope.length?`Changed paths outside the task's resources:\n${verdict.outOfScope.map(p=>`- ${p}`).join('\n')}\nRevert them or bring the work inside the task's resources.`:'Every changed path is inside the task\'s resources.';
  const artifact=await store.artifact({command:{command:scopeCheckId,args:[]},resources:verdict.resources,changedPaths:verdict.changedPaths,outOfScope:verdict.outOfScope,code:verdict.code,stdout,stderr:''});
- await store.transaction(s=>{const t=taskOf(s,id);const prior=t.receipts.findIndex(r=>r.id===scopeCheckId);if(prior>=0)t.receipts.splice(prior,1);t.receipts.push({id:scopeCheckId,code:verdict.code,fingerprint:verdict.fingerprint,artifact});event(s,'check',{id,checkId:scopeCheckId,code:verdict.code,artifact});});
+ await store.transaction(s=>{
+  const t=taskOf(s,id);const prior=t.receipts.findIndex(r=>r.id===scopeCheckId);if(prior>=0)t.receipts.splice(prior,1);
+  t.receipts.push({id:scopeCheckId,code:verdict.code,fingerprint:verdict.fingerprint,artifact});event(s,'check',{id,checkId:scopeCheckId,code:verdict.code,artifact});
+  const asked=askedScopePaths(s,id);
+  if(!hostAuthored(t)&&verdict.outOfScope.some(p=>!asked.has(p)))event(s,'scope-question',{id,fingerprint:verdict.fingerprint,outOfScope:verdict.outOfScope});
+ });
  return stdout;
 }
 
@@ -125,10 +132,12 @@ async function reviewFailover<T>(store:Store,id:string,trail:Trail,routing:Routi
 export async function delegate(store:Store,id:string,input:{workspace?:string;brief?:string;routing?:RoutingRequest;lenses?:string[];skills?:string[];references?:string[]}={},deps:Partial<DelegateDeps>={}):Promise<DelegateOutcome>{
  const d:DelegateDeps={...real,...deps};
  const trail:Trail=[];
- await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status)||resumableReview(t),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
+ await store.transaction(s=>{requireShaped(s,'delegate');const t=taskOf(s,id);invariant(['ready','repair'].includes(t.status)||resumableReview(t),'Task is not delegable; reconcile or requeue it first');invariant(t.workspace||input.workspace,'Task workspace required');answerScopeQuestion(s,t,'revert');event(s,'delegate-started',{id,pid:process.pid,host:hostname()});});
  const resumeAtVerification=resumableReview(taskOf(await store.load(),id));
  const finish=async(outcome:Record<string,unknown>):Promise<DelegateOutcome>=>{await store.transaction(s=>event(s,'delegate-finished',{id,outcome:outcome.outcome})).catch(()=>{});return {task:id,trail,outcome:String(outcome.outcome),...outcome};};
+ const acceptChunk=async(detail:Record<string,unknown>)=>{await accept(store,id);const done=taskOf(await store.load(),id);return finish({outcome:'accepted',cycles:done.cycles,author:done.author,fingerprint:done.fingerprint,...detail});};
  const s0=await store.load(),t0=taskOf(s0,id);
+ if(!resumeAtVerification&&t0.depth==='host')return finish(hostTakeover(s0.host.model));
  if(t0.status==='ready'&&!t0.output){
   const passing=await passingProbes(t0.checks,input.workspace??t0.workspace!);
   if(passing.length)return finish({outcome:'refused',passing,reason:`Probe check${passing.length>1?'s':''} ${passing.join(', ')} already pass${passing.length===1?'es':''} on the unchanged checkout; a probe that passes there cannot detect the task defect, so no worker is launched`});
@@ -140,11 +149,11 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:input.workspace??taskOf(await store.load(),id).workspace!,brief:input.brief,routing:input.routing,skills:input.skills,references:input.references}));}
    catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
    trail.push({stage:'worker',detail:out});
-   pending=routePending(out);if(pending)return finish({outcome:'route-pending',route:pending});
+   pending=routePending(out);if(pending)return finish(pendingOutcome(pending));
   }
   for(;;){
    let s=await store.load(),t=taskOf(s,id);
-   let mutating:string[]=[],settled=false,scopeNoted=false,recordedScope:string|undefined;
+   let mutating:string[]=[],settled=false,scopeNoted=false,recordedScope=t.receipts.find(r=>r.id===scopeCheckId)?.fingerprint;
    for(let pass=1;pass<=checkSettlePasses&&!settled;pass++){
     s=await store.load();t=taskOf(s,id);
     const fp=await fingerprint(t.workspace!);
@@ -171,6 +180,14 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
     reason:`Checks never settled: ${mutating.length?mutating.join(', ')+' rewrite the workspace every run, so no receipt can match the tree acceptance compares against':'the workspace keeps changing between check runs'}. Register a check that leaves the tree unchanged, or exclude its generated output from the task workspace.`});
    s=await store.load();t=taskOf(s,id);
    const failing=t.receipts.filter(r=>r.code!==0).map(r=>r.id);
+   if(hostAuthored(t)){
+    if(!failing.length)return acceptChunk({hostFinal:true});
+    await repair(store,id);
+    return finish({outcome:'escalated',stage:'host-checks-failed',failingChecks:failing,reason:'Host work is final and no model reviews it, so a failing check returns it to the host without spending a repair cycle'});
+   }
+   const question=scopeQuestion(s,t);
+   if(question)return finish({outcome:'escalated',stage:'scope-question',outOfScope:question.outOfScope,failingChecks:failing,workerOutput:t.output,
+    reason:`The worker changed ${question.outOfScope.length} path(s) outside the task's resources. Amend resources to keep them, and the next delegate verifies this same output with no new worker run; or delegate again, and a repair reverts them`});
    let blocking:unknown[]=[];
    if(!failing.length){
     const lenses=input.lenses??['Spec','Standards','Correctness','Omissions'];
@@ -194,7 +211,7 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
      blocking=t.review?.findings.filter(f=>f.blocking&&f.disposition==='open')??[];
      debt=reviewCoverageDebt(s,t);
     }
-    if(!blocking.length&&!debt.length){await accept(store,id);return finish({outcome:'accepted',cycles:t.cycles,author:t.author,reviewFamily:t.review?.family,fingerprint:t.fingerprint});}
+    if(!blocking.length&&!debt.length)return acceptChunk({reviewFamily:t.review?.family});
     if(!blocking.length)return finish({outcome:'escalated',stage:'review-evidence',reason:'Reviewer left obligations unreviewed; supply the requested host evidence or a corrected independent review',obligations:debt});
    }
    s=await store.load();t=taskOf(s,id);
@@ -209,7 +226,7 @@ export async function delegate(store:Store,id:string,input:{workspace?:string;br
    try{out=await failover(store,id,'worker',trail,async()=>d.runWorker(store,id,{workspace:t.workspace!,brief:repairBrief(blocking,failing,guidance,scopeOut),skills:input.skills,references:input.references}));}
    catch(error){const escaped=escapedPaths(error);if(!escaped)throw error;trail.push({stage:'repair-worker',detail:{workspaceEscape:escaped}});return finish({outcome:'escalated',stage:'workspace-escape',escaped,reason:(error as Error).message});}
    pending=routePending(out);
-   if(pending)return (pending as any).action==='host-takeover'?finish({outcome:'escalated',stage:'host-takeover',model:(pending as any).model}):finish({outcome:'route-pending',route:pending});
+   if(pending)return finish(pendingOutcome(pending));
    trail.push({stage:'repair-worker',detail:{cycle:taskOf(await store.load(),id).cycles}});
   }
  }catch(error){
