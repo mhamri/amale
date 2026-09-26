@@ -3,6 +3,7 @@ import PageMeta from '../../components/PageMeta';
 import DocsLayout, { type DocsSection } from '../../components/docs/DocsLayout';
 import RunLifecycle from '../../components/diagrams/RunLifecycle';
 import { asset } from '../../lib/paths';
+import { articleGraph } from '../../lib/seo';
 
 const sections: DocsSection[] = [
   { id: 'discovery', label: 'Discovery and specification' },
@@ -30,11 +31,17 @@ const parallelFields = [
 ];
 
 export default function DocsWorkflow() {
+  const path = 'docs/workflow/';
+  const title = 'Workflow — Amaleh documentation';
+  const description =
+    'How an Amaleh run moves from discovery and planning through delegated parallel execution to verified delivery.';
   return (
     <>
       <PageMeta
-        title="Workflow — Amaleh documentation"
-        description="How an Amaleh run moves from discovery and planning through delegated parallel execution to verified delivery."
+        path={path}
+        title={title}
+        description={description}
+        structuredData={articleGraph(path, title, description)}
       />
       <DocsLayout
         current="workflow"

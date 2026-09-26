@@ -1,8 +1,14 @@
 import { For } from 'solid-js';
 import PageMeta from '../components/PageMeta';
 import { asset } from '../lib/paths';
+import { CASE_STUDY_PATH, articleGraph } from '../lib/seo';
 import { Blobs, Glow, GridDots, LightRays } from '../components/decor';
 import JevAsciiMark from '../components/case-study/JevAsciiMark';
+
+const title = 'Case study — Amaleh';
+const description =
+  'How Amaleh built this site: every claim the landing page makes, proven with measured figures from the run records that built it.';
+const graph = articleGraph(CASE_STUDY_PATH, title, description);
 
 const claims = [
   {
@@ -95,10 +101,7 @@ const skillRuntime = [
 export default function CaseStudyPage() {
   return (
     <>
-      <PageMeta
-        title="Case study — Amaleh"
-        description="How Amaleh built this site: every claim the landing page makes, proven with measured figures from the run records that built it."
-      />
+      <PageMeta path={CASE_STUDY_PATH} title={title} description={description} structuredData={graph} />
       <main id="main">
         <section class="relative isolate min-h-[30rem] overflow-hidden pb-4 pt-32 md:pb-8 md:pt-32">
           <div
