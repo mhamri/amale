@@ -303,7 +303,9 @@ scene, and nothing else:
    `<p>` in the hero, saying what the reader gets;
 3. one primary call to action, `btn btn-primary`, pointing at the getting
    started documentation page through `asset()`;
-4. one `Sponsor` button pointing at `SPONSOR_URL` from `src/lib/links.ts`.
+4. one `Sponsor` button — `SponsorButton` from
+   `src/components/ProjectActions.tsx`, heart icon before its label — pointing
+   at `SPONSOR_URL` from `src/lib/links.ts`.
 
 Measured rebuild figures, the pronunciation and origin of the name, and every
 explanation of the scene belong to the benefits and author sections, not to the
@@ -534,6 +536,18 @@ rises in once, over 0.6s, and is finished well inside 700ms:
 - Secondary: `btn btn-outline border-line text-base-content hover:bg-base-200`
 - Tertiary/ghost: `btn btn-ghost text-dim hover:text-base-content`
 - Compact (nav, tables): add `btn-sm`. Only one primary button per view.
+- **Sponsor button**: `SponsorButton` in `src/components/ProjectActions.tsx` —
+  the Secondary class plus an inline SVG heart before the label, `aria-hidden="true"`,
+  filled `#db61a2`, measured **5.58:1** on `base-100` `#0f1216` (clears the 3:1
+  non-text contrast floor for a graphical icon). Its href is `SPONSOR_URL` from
+  `src/lib/links.ts` and it opens with `target="_blank" rel="noopener noreferrer"`.
+- **Star on GitHub button**: `StarButton` in the same module — the Secondary
+  class plus an inline SVG star in `currentColor` before the label,
+  `aria-hidden="true"`, href `REPOSITORY_URL` from `src/lib/links.ts`, opening
+  in a new tab the same way. The header renders it compact
+  (`btn-sm hidden sm:inline-flex`) and shows no star count; the final call to
+  action renders it beside `SponsorButton`. A page renders these two components
+  and never writes either button by hand.
 
 **Links** — body links:
 `class="link link-hover text-primary"`. In running copy keep the sentence

@@ -1,13 +1,13 @@
 import { asset } from '../lib/paths';
+import { REPOSITORY_URL } from '../lib/links';
 import Brand from './Brand';
+import { StarButton } from './ProjectActions';
 
 const primaryLinks = [
   { label: 'Overview', href: asset('') },
   { label: 'Docs', href: asset('docs/') },
   { label: 'Case study', href: asset('case-study/') },
 ];
-
-const github = { label: 'GitHub', href: 'https://github.com/mhamri/amaleh' };
 
 function MenuList() {
   return (
@@ -20,8 +20,8 @@ function MenuList() {
         </li>
       ))}
       <li class="mt-1 border-t border-line pt-1">
-        <a class="text-sm font-medium text-primary hover:bg-base-300" href={github.href} target="_blank" rel="noopener noreferrer">
-          {github.label}
+        <a class="text-sm font-medium text-primary hover:bg-base-300" href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+          Star on GitHub
         </a>
       </li>
     </ul>
@@ -45,9 +45,7 @@ export default function Header() {
               ))}
             </ul>
           </nav>
-          <a class="btn btn-primary btn-sm hidden rounded-field font-semibold sm:inline-flex" href={github.href} target="_blank" rel="noopener noreferrer">
-            {github.label}
-          </a>
+          <StarButton class="btn-sm hidden sm:inline-flex" />
           <details class="dropdown dropdown-end md:hidden">
             <summary class="btn btn-square btn-sm border-line bg-base-200 hover:bg-base-300" aria-label="Open menu">
               <svg viewBox="0 0 20 20" fill="currentColor" class="size-5" aria-hidden="true">
