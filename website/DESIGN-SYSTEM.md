@@ -54,7 +54,7 @@ introduce a new hex in a page.
 | `base-content` | `#e8edf3` | Primary text |
 | `dim` | `#a3adb9` | Secondary text |
 | `line` | `#2b333c` | Hairline borders and dividers |
-| `primary` | `#e2a45c` | Brass — primary actions, active states, the mark |
+| `primary` | `#e2a45c` | Brass — primary actions, active states |
 | `primary-content` | `#221505` | Text on primary |
 | `secondary` | `#5cc9b4` | Teal — verification, success, "checked" |
 | `secondary-content` | `#06231d` | Text on secondary |
@@ -91,6 +91,40 @@ values — every text pair clears AA at 4.5:1 and most clear AAA at 7:1):
 
 Tinted fills for callouts and soft badges use the component's own soft
 variant (e.g. `alert-soft alert-info`); do not hand-mix alpha colours.
+
+## Brand assets
+
+The mark is the glowing Amaleh logo. Its master is
+`brand/amaleh-logo-transparent.png` (1254 x 1254 RGBA PNG, 1226587 bytes): a
+repository file that is never deployed. It must not appear in `public/`, in
+the build output, or in any reference on a page.
+
+Every logo image the site serves is produced by
+`scripts/generate-brand-images.mjs`, run by hand from `website/` as
+`node scripts/generate-brand-images.mjs`. It has no npm dependency (`node:fs`
+and `node:zlib`): it decodes the master, crops a square around the visible
+glow so the mark fills its box, downsamples in premultiplied alpha with area
+averaging — so a semi-transparent edge blends colour instead of pulling toward
+black — and encodes each PNG with zlib level 9 and per-row filter selection.
+The files in `public/brand/` are that script's output and are committed with
+it; regenerate them whenever the master changes.
+
+| File under `public/` | Size | Used for | Limit |
+| --- | --- | --- | --- |
+| `brand/amaleh-mark.png` | 30 x 30 | header and footer lockup, 1x | 40 KB |
+| `brand/amaleh-mark@2x.png` | 60 x 60 | the lockup `srcset`, 2x | 40 KB |
+| `brand/favicon-32.png` | 32 x 32 | `<link rel="icon" sizes="32x32">` | 40 KB |
+| `brand/favicon-16.png` | 16 x 16 | `<link rel="icon" sizes="16x16">` | 40 KB |
+| `brand/apple-touch-icon.png` | 180 x 180 | `<link rel="apple-touch-icon">` | 40 KB |
+| `brand/amaleh-share.png` | 600 x 600 | social share image | 300 KB |
+
+The two lockup marks and both favicons are transparent; the apple-touch icon
+and the share image are opaque on the `#0f1216` page background, with the
+mark drawn at 85% of the apple-touch icon and 60% of the share square so each
+carries a margin. No page may reference any other copy:
+`scripts/check-static.mjs` fails when a page references `mark.svg`, when the
+master ships or is referenced, or when a referenced brand image is over its
+limit.
 
 ## Typography
 
@@ -843,8 +877,11 @@ Diagram panel wrapper, for any visual in this layer:
 **Header pattern** (fixed by this task, in `Header.tsx`): sticky
 `bg-base-100/85 backdrop-blur-md border-b border-line shadow-rest` — the
 sticky bar is the shell's one raised surface, so it carries the resting tier;
-brand lockup is the
-mark plus the wordmark `amaleh` in `font-display` — the Arabic-script word
+the brand lockup — one shared `Brand` component (`src/components/Brand.tsx`)
+used by the header and the footer — is the glowing Amaleh mark
+`public/brand/amaleh-mark.png` at width and height 30 with its 2x `srcset`,
+plus the wordmark `amaleh` in `font-display`; the mark image has an empty
+`alt` because its link carries the `aria-label`, and the Arabic-script word
 عمله never appears in the lockup or any document title; it may appear only
 in body copy, always with its pronunciation (Ah-mah-leh), its meaning
 (workers / laborers) and its **Persian origin** (the word is Persian, not
